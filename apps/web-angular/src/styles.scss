@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+:root {
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-display: 'Fraunces', Georgia, serif;
+}
+
+body {
+  font-family: var(--font-body);
+  @apply text-elyo-ink bg-elyo-bg;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+}

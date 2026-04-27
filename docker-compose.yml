@@ -1,0 +1,135 @@
+services:
+  # Angular Frontend
+  web:
+    build:
+      context: ./apps/web-angular
+      dockerfile: Dockerfile
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./apps/web-angular:/app
+      - angular_node_modules:/app/node_modules
+    environment:
+      - NG_APP_API_URL=http://localhost:8080/api
+    networks:
+      - elyo-network
+
+  # Laravel API (PHP-FPM)
+  api:
+    build:
+      context: ./apps/api-laravel
+      dockerfile: Dockerfile
+    volumes:
+      - ./apps/api-laravel:/var/www
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE:-elyo}
+      - DB_USERNAME=${DB_USERNAME:-elyo}
+      - DB_PASSWORD=${DB_PASSWORD:-elyo_secret}
+      - REDIS_HOST=redis
+      - MAIL_MAILER=smtp
+      - MAIL_HOST=mailpit
+      - MAIL_PORT=1025
+    networks:
+      - elyo-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # Nginx Proxy for Laravel
+  nginx:
+    image: nginx:stable-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./apps/api-laravel:/var/www
+      - ./infra/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - elyo-network
+    depends_on:
+      - api
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${DB_DATABASE:-elyo}
+      - POSTGRES_USER=${DB_USERNAME:-elyo}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-elyo_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-elyo} -d ${DB_DATABASE:-elyo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - elyo-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - elyo-network
+
+  # Workflow Automation
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=n8n
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${DB_DATABASE:-elyo}
+      - DB_POSTGRESDB_USER=${DB_USERNAME:-elyo}
+      - DB_POSTGRESDB_PASSWORD=${DB_PASSWORD:-elyo_secret}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - elyo-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # SMTP Testing
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025" # UI
+      - "1025:1025" # SMTP
+    networks:
+      - elyo-network
+
+  # Optional Legacy Next.js (using ../ELYO)
+  legacy-next:
+    image: node:18-alpine
+    profiles: ["legacy"]
+    working_dir: /app
+    volumes:
+      - ../ELYO:/app:ro
+    ports:
+      - "3000:3000"
+    command: sh -c "npm install && npm run dev"
+    networks:
+      - elyo-network
+
+networks:
+  elyo-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  angular_node_modules:
+  n8n_data:

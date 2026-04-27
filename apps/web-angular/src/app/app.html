@@ -1,0 +1,51 @@
+<div class="min-h-screen bg-elyo-bg flex flex-col">
+  <!-- Header / Nav -->
+  <header class="bg-white border-b border-elyo-line px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-8">
+      <span class="text-2xl font-bold text-elyo-500">ELYO</span>
+
+      <nav *ngIf="authStore.isAuthenticated()" class="flex gap-4">
+        <a routerLink="/employee" *ngIf="authStore.hasRole([Role.EMPLOYEE])" routerLinkActive="text-elyo-500 font-bold" class="text-elyo-ink-soft hover:text-elyo-500">Dashboard</a>
+        <a routerLink="/company" *ngIf="authStore.hasRole([Role.COMPANY_ADMIN, Role.COMPANY_MANAGER])" routerLinkActive="text-elyo-500 font-bold" class="text-elyo-ink-soft hover:text-elyo-500">Company</a>
+        <a routerLink="/partner" *ngIf="authStore.hasRole([Role.PARTNER])" routerLinkActive="text-elyo-500 font-bold" class="text-elyo-ink-soft hover:text-elyo-500">Partner</a>
+        <a routerLink="/admin" *ngIf="authStore.hasRole([Role.ELYO_ADMIN])" routerLinkActive="text-elyo-500 font-bold" class="text-elyo-ink-soft hover:text-elyo-500">Admin</a>
+      </nav>
+    </div>
+
+    <div class="flex items-center gap-4">
+      <!-- Health Check Indicator -->
+      <div class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium"
+           [ngClass]="{
+             'bg-green-100 text-green-700': healthStatus === 'ok',
+             'bg-red-100 text-red-700': healthStatus === 'error',
+             'bg-gray-100 text-gray-500': healthStatus === 'loading'
+           }">
+        <span class="w-2 h-2 rounded-full"
+              [ngClass]="{
+                'bg-green-500': healthStatus === 'ok',
+                'bg-red-500': healthStatus === 'error',
+                'bg-gray-400': healthStatus === 'loading'
+              }"></span>
+        API: {{ healthStatus === 'ok' ? 'Online' : healthStatus === 'error' ? 'Offline' : 'Checking...' }}
+      </div>
+
+      <div *ngIf="authStore.isAuthenticated()" class="flex items-center gap-3">
+        <span class="text-sm font-medium">{{ authStore.user()?.name }}</span>
+        <button (click)="logout()" class="text-sm text-red-600 hover:underline">Logout</button>
+      </div>
+      <div *ngIf="!authStore.isAuthenticated()" class="flex items-center gap-3">
+        <a routerLink="/auth/login" class="text-sm font-medium text-elyo-500">Login</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1">
+    <router-outlet></router-outlet>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-elyo-line p-4 text-center text-xs text-elyo-ink-mute">
+    &copy; 2026 ELYO Migration. Built with Angular & Laravel.
+  </footer>
+</div>
