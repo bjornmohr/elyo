@@ -6,6 +6,24 @@ use App\Http\Controllers\Partner\PartnerAuthController;
 use App\Http\Controllers\Admin\AdminPartnerController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
+
+// Health check
+Route::get('/health', function () {
+    try {
+        DB::connection()->getPdo();
+        return response()->json([
+            'status' => 'up',
+            'database' => 'connected',
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'down',
+            'database' => 'disconnected',
+            'error' => $e->getMessage(),
+        ], 503);
+    }
+});
 
 // Public routes
 Route::post('/auth/login', [AuthController::class, 'login']);
