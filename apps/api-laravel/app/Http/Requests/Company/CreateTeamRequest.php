@@ -2,13 +2,14 @@
 
 namespace App\Http\Requests\Company;
 
+use App\Enums\Role;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CreateTeamRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->role->value === 'COMPANY_ADMIN';
+        return $this->user()->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
     }
 
     public function rules(): array

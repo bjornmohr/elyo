@@ -37,8 +37,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 
-    // Admin routes (ELYO_ADMIN only)
-    Route::middleware('role:ELYO_ADMIN')->prefix('admin')->group(function () {
+    // Admin routes
+    Route::middleware('role:ELYO_ADMIN,ELYO_SUPPORT')->prefix('admin')->group(function () {
         Route::get('/companies', [AdminCompanyController::class, 'index']);
         Route::post('/companies', [AdminCompanyController::class, 'store']);
         Route::get('/companies/{company}', [AdminCompanyController::class, 'show']);

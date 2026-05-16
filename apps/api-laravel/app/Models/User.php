@@ -15,6 +15,8 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
+    protected array $pendingRoles = [];
+
     protected $fillable = [
         'name', 'email', 'password', 'company_id', 'status','team_id', 'last_login_at',
     ];
@@ -104,6 +106,27 @@ class User extends Authenticatable
     }
 
     // Role helpers
+
+    protected static function booted(): void
+    {
+        static::created(function (User $user) {
+            foreach ($user->pendingRoles as $role) {
+                UserRole::firstOrCreate([
+                    'user_id' => $user->id,
+                    'role' => $role,
+                ]);
+            }
+        });
+    }
+
+    public function setRoleAttribute(Role|string|null $role): void
+    {
+        if ($role !== null) {
+            $this->pendingRoles[] = $role instanceof Role ? $role->value : Role::from($role)->value;
+        }
+
+        unset($this->attributes['role']);
+    }
 
     public function hasRole(Role|string $role): bool
     {

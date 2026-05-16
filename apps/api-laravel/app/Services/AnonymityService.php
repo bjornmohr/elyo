@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\Role;
 use App\Models\WellbeingEntry;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -120,8 +121,8 @@ class AnonymityService
         $threshold = $options['threshold'] ?? self::DEFAULT_THRESHOLD;
 
         $totalEmployees = User::where('company_id', $companyId)
-            ->where('role', \App\Enums\Role::EMPLOYEE)
-            ->where('is_active', true)
+            ->where('status', 'active')
+            ->whereHas('roles', fn ($query) => $query->where('role', Role::EMPLOYEE->value))
             ->count();
 
         if ($totalEmployees < $threshold) {

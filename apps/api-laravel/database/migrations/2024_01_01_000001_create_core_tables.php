@@ -26,17 +26,10 @@ return new class extends Migration
             $table->unsignedBigInteger('company_id')->nullable();
             $table->string('status')->default('active');
             $table->timestamp('last_login_at')->nullable();
-            $table->foreignId('team_id')
-                ->nullable()
-                ->constrained('teams')
-                ->nullOnDelete();
+            $table->uuid('team_id')->nullable();
             $table->timestamps();
             $table->index(['company_id', 'team_id']);
             $table->foreign('company_id')->references('id')->on('companies')->onDelete('set null');
-        });
-
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('team_id');
         });
 
         Schema::table('companies', function (Blueprint $table) {
@@ -70,7 +63,7 @@ return new class extends Migration
         });
 
         Schema::create('teams', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('name');
             $table->text('description')->nullable();
             $table->string('color')->nullable();
@@ -80,6 +73,10 @@ return new class extends Migration
 
             $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
             $table->foreign('manager_id')->references('id')->on('users')->onDelete('set null');
+        });
+
+        Schema::table('users', function (Blueprint $table) {
+            $table->foreign('team_id')->references('id')->on('teams')->nullOnDelete();
         });
 
         Schema::create('wellbeing_entries', function (Blueprint $table) {
@@ -104,6 +101,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('wellbeing_entries');
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropForeign(['team_id']);
+        });
         Schema::dropIfExists('teams');
         Schema::dropIfExists('invite_tokens');
         Schema::dropIfExists('user_roles');

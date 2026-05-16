@@ -2,13 +2,14 @@
 
 namespace App\Http\Requests\Company;
 
+use App\Enums\Role;
 use Illuminate\Foundation\Http\FormRequest;
 
 class PatchSurveyRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return in_array($this->user()->role->value, ['COMPANY_ADMIN', 'COMPANY_MANAGER']);
+        return $this->user()->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_MANAGER]);
     }
 
     public function rules(): array
