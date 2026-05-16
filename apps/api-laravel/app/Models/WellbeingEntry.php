@@ -10,11 +10,8 @@ class WellbeingEntry extends Model
 {
     use HasFactory;
 
-    protected $keyType = 'string';
-    public $incrementing = false;
-
     protected $fillable = [
-        'id', 'mood', 'stress', 'energy', 'score', 'note',
+        'mood', 'stress', 'energy', 'score', 'note',
         'period_key', 'company_id', 'user_id'
     ];
 

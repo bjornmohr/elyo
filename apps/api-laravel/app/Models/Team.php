@@ -12,11 +12,8 @@ class Team extends Model
 {
     use HasFactory;
 
-    protected $keyType = 'string';
-    public $incrementing = false;
-
     protected $fillable = [
-        'id', 'name', 'description', 'color', 'company_id', 'manager_id'
+        'name', 'description', 'color', 'company_id', 'manager_id'
     ];
 
     public function company(): BelongsTo

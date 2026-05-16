@@ -10,11 +10,8 @@ class UserPoints extends Model
 {
     use HasFactory;
 
-    protected $keyType = 'string';
-    public $incrementing = false;
-
     protected $fillable = [
-        'id', 'user_id', 'total', 'level', 'streak', 'last_checkin'
+        'user_id', 'total', 'level', 'streak', 'last_checkin'
     ];
 
     protected $casts = [

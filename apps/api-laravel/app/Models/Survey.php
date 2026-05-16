@@ -13,11 +13,8 @@ class Survey extends Model
 {
     use HasFactory;
 
-    protected $keyType = 'string';
-    public $incrementing = false;
-
     protected $fillable = [
-        'id', 'title', 'description', 'status', 'starts_at',
+        'title', 'description', 'status', 'starts_at',
         'ends_at', 'is_anonymous', 'company_id'
     ];
 
@@ -27,16 +24,6 @@ class Survey extends Model
         'ends_at' => 'datetime',
         'is_anonymous' => 'boolean',
     ];
-
-    protected static function boot()
-    {
-        parent::boot();
-        static::creating(function ($model) {
-            if (empty($model->{$model->getKeyName()})) {
-                $model->{$model->getKeyName()} = (string) \Illuminate\Support\Str::orderedUuid();
-            }
-        });
-    }
 
     public function company(): BelongsTo
     {

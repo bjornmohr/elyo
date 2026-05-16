@@ -10,7 +10,6 @@ use App\Enums\PartnerVerificationStatus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class PartnerAuthController extends Controller
 {
@@ -21,7 +20,6 @@ class PartnerAuthController extends Controller
         unset($data['password']);
 
         $partner = Partner::create(array_merge($data, [
-            'id' => (string) Str::orderedUuid(),
             'password_hash' => Hash::make($password),
             'verification_status' => PartnerVerificationStatus::PENDING_DOCS,
         ]));

@@ -26,7 +26,7 @@ return new class extends Migration
             $table->unsignedBigInteger('company_id')->nullable();
             $table->string('status')->default('active');
             $table->timestamp('last_login_at')->nullable();
-            $table->uuid('team_id')->nullable();
+            $table->unsignedBigInteger('team_id')->nullable();
             $table->timestamps();
             $table->index(['company_id', 'team_id']);
             $table->foreign('company_id')->references('id')->on('companies')->onDelete('set null');
@@ -63,7 +63,7 @@ return new class extends Migration
         });
 
         Schema::create('teams', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+            $table->id();
             $table->string('name');
             $table->text('description')->nullable();
             $table->string('color')->nullable();

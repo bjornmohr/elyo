@@ -26,7 +26,7 @@ import { EmployeeService, WellbeingEntry } from '../../services/employee.service
                 {{ getMoodEmoji(entry.mood) }}
               </div>
               <div>
-                <div class="font-bold text-slate-800">{{ entry.mood || 'Check-in' }}</div>
+                <div class="font-bold text-slate-800">Mood {{ entry.mood ?? '-' }}/10</div>
                 <div class="text-sm text-slate-400">{{ entry.createdAt | date:'EEEE, d. MMMM' }}</div>
               </div>
             </div>
@@ -41,15 +41,15 @@ import { EmployeeService, WellbeingEntry } from '../../services/employee.service
           <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-50">
              <div class="text-center p-2 rounded-xl bg-slate-50">
                <div class="text-xs text-slate-400">Stress</div>
-               <div class="font-bold text-slate-700">{{ entry.stressLevel || '-' }}/10</div>
+               <div class="font-bold text-slate-700">{{ entry.stress ?? '-' }}/10</div>
              </div>
              <div class="text-center p-2 rounded-xl bg-slate-50">
-               <div class="text-xs text-slate-400">Sleep</div>
-               <div class="font-bold text-slate-700">{{ entry.sleepQuality || '-' }}/10</div>
+               <div class="text-xs text-slate-400">Energy</div>
+               <div class="font-bold text-slate-700">{{ entry.energy ?? '-' }}/10</div>
              </div>
              <div class="text-center p-2 rounded-xl bg-slate-50">
-               <div class="text-xs text-slate-400">Activity</div>
-               <div class="font-bold text-slate-700">{{ entry.physicalActivity || '-' }}/10</div>
+               <div class="text-xs text-slate-400">Mood</div>
+               <div class="font-bold text-slate-700">{{ entry.mood ?? '-' }}/10</div>
              </div>
           </div>
 

@@ -10,11 +10,8 @@ class Measure extends Model
 {
     use HasFactory;
 
-    protected $keyType = 'string';
-    public $incrementing = false;
-
     protected $fillable = [
-        'id', 'company_id', 'team_id', 'title', 'category',
+        'company_id', 'team_id', 'title', 'category',
         'description', 'status', 'suggested_at', 'started_at',
         'completed_at', 'created_by'
     ];
@@ -24,16 +21,6 @@ class Measure extends Model
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
     ];
-
-    protected static function boot()
-    {
-        parent::boot();
-        static::creating(function ($model) {
-            if (empty($model->{$model->getKeyName()})) {
-                $model->{$model->getKeyName()} = (string) \Illuminate\Support\Str::orderedUuid();
-            }
-        });
-    }
 
     public function company(): BelongsTo
     {

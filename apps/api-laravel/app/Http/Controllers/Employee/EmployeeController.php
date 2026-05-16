@@ -33,6 +33,7 @@ class EmployeeController extends Controller
             'latest' => $latest ? new WellbeingEntryResource($latest) : null,
             'entries' => WellbeingEntryResource::collection($entries->reverse()),
             'streakCount' => $streakCount,
+            'points' => $user->userPoints?->total ?? 0,
         ]);
     }
 

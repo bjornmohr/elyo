@@ -12,7 +12,6 @@ use App\Models\SurveyAnswer;
 use App\Enums\SurveyStatus;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Str;
 
 class SurveyController extends Controller
 {
@@ -87,7 +86,6 @@ class SurveyController extends Controller
         }
 
         $response = SurveyResponse::create([
-            'id' => (string) Str::orderedUuid(),
             'survey_id' => $id,
             'user_id' => $user->id,
             'company_id' => $user->company_id,
@@ -96,7 +94,6 @@ class SurveyController extends Controller
 
         foreach ($answers as $a) {
             SurveyAnswer::create([
-                'id' => (string) Str::orderedUuid(),
                 'response_id' => $response->id,
                 'question_id' => $a['questionId'],
                 'scale_value' => $a['scaleValue'] ?? null,

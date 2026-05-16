@@ -1,15 +1,15 @@
 import { Injectable, inject } from '@angular/core';
 import { ApiClient } from '../../../core/services/api-client.service';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 export interface WellbeingEntry {
   id: string;
   score: number;
-  mood: string | null;
-  stressLevel: number | null;
-  sleepQuality: number | null;
-  physicalActivity: number | null;
-  notes: string | null;
+  mood: number | null;
+  stress: number | null;
+  energy: number | null;
+  notes?: string | null;
   createdAt: string;
 }
 
@@ -49,40 +49,71 @@ export class EmployeeService {
   private api = inject(ApiClient);
 
   getDashboard(): Observable<DashboardData> {
-    return this.api.get<DashboardData>('employee/dashboard');
+    return this.api.get<any>('/employee/dashboard').pipe(map(res => ({
+      recentEntries: res.entries ?? [],
+      streak: res.streakCount ?? 0,
+      points: res.points ?? 0,
+      lastCheckin: res.latest?.createdAt ?? null,
+    })));
   }
 
   getHistory(): Observable<WellbeingEntry[]> {
-    return this.api.get<WellbeingEntry[]>('employee/history');
+    return this.api.get<{ entries: WellbeingEntry[] }>('/employee/history').pipe(map(res => res.entries ?? []));
   }
 
   submitCheckin(data: {
-    mood: string;
-    stressLevel: number;
-    sleepQuality: number;
-    physicalActivity: number;
+    mood: number;
+    stress: number;
+    energy: number;
     notes?: string;
   }): Observable<any> {
-    return this.api.post('employee/checkin', data);
+    return this.api.post('/employee/checkin', {
+      mood: data.mood,
+      stress: data.stress,
+      energy: data.energy,
+      note: data.notes,
+    });
   }
 
   getProfile(): Observable<any> {
-    return this.api.get('employee/profile');
+    return this.api.get('/employee/profile');
   }
 
   updateProfile(data: any): Observable<any> {
-    return this.api.put('employee/profile', data);
+    return this.api.put('/employee/profile', data);
   }
 
   getSurveys(): Observable<SurveyListItem[]> {
-    return this.api.get<SurveyListItem[]>('employee/surveys');
+    return this.api.get<{ surveys: any[] }>('/employee/surveys').pipe(map(res => (res.surveys ?? []).map(s => ({
+      id: s.id,
+      title: s.title,
+      description: s.description,
+      status: s.completed ? 'COMPLETED' : 'ACTIVE',
+      expiresAt: s.endsAt,
+      isCompleted: s.completed,
+    }))));
   }
 
   getSurvey(id: string): Observable<SurveyDetail> {
-    return this.api.get<SurveyDetail>(`employee/surveys/${id}`);
+    return this.api.get<{ survey: any }>(`/employee/surveys/${id}`).pipe(map(res => ({
+      id: res.survey.id,
+      title: res.survey.title,
+      description: res.survey.description,
+      status: 'ACTIVE',
+      expiresAt: null,
+      isCompleted: false,
+      questions: (res.survey.questions ?? []).map((q: any) => ({
+        id: q.id,
+        text: q.text,
+        type: q.type,
+        options: q.options,
+        required: q.isRequired,
+        order: q.order,
+      })),
+    })));
   }
 
   submitSurveyResponse(id: string, answers: any[]): Observable<any> {
-    return this.api.post(`employee/surveys/${id}/respond`, { answers });
+    return this.api.post(`/employee/surveys/${id}/respond`, { answers });
   }
 }

@@ -121,10 +121,16 @@ export class SurveysComponent implements OnInit {
     const survey = this.selectedSurvey();
     if (!survey) return;
 
-    const payload = Object.entries(this.answers).map(([questionId, value]) => ({
-      questionId,
-      value: value.toString()
-    }));
+    const questionById = new Map(survey.questions.map(q => [q.id, q]));
+    const payload = Object.entries(this.answers).map(([questionId, value]) => {
+      const question = questionById.get(questionId);
+      const answer: any = { questionId };
+      if (question?.type === 'SCALE') answer.scaleValue = Number(value);
+      else if (question?.type === 'YES_NO') answer.boolValue = value === 'YES';
+      else if (question?.type === 'MULTIPLE_CHOICE') answer.choiceValue = String(value);
+      else answer.textValue = String(value);
+      return answer;
+    });
 
     this.employeeService.submitSurveyResponse(survey.id, payload).subscribe(() => {
       alert('Thank you for your feedback!');

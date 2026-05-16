@@ -11,11 +11,8 @@ class Partner extends Authenticatable
 {
     use HasFactory, HasApiTokens;
 
-    protected $keyType = 'string';
-    public $incrementing = false;
-
     protected $fillable = [
-        'id', 'email', 'password_hash', 'name', 'type', 'categories',
+        'email', 'password_hash', 'name', 'type', 'categories',
         'description', 'address', 'city', 'lat', 'lng', 'website',
         'phone', 'minimum_level', 'nachweis_url', 'verification_status',
         'rejection_reason', 'reviewed_at', 'reviewed_by_id'

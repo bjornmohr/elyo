@@ -13,7 +13,6 @@ use App\Enums\SurveyStatus;
 use App\Enums\QuestionType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
-use Illuminate\Support\Str;
 
 class EmployeeTest extends TestCase
 {
@@ -25,10 +24,9 @@ class EmployeeTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->company = Company::factory()->create(['id' => 'company-1']);
+        $this->company = Company::factory()->create();
         $this->employee = User::factory()->create([
-            'id' => 'user-1',
-            'company_id' => 'company-1',
+            'company_id' => $this->company->id,
             'role' => Role::EMPLOYEE,
         ]);
     }
@@ -36,7 +34,6 @@ class EmployeeTest extends TestCase
     public function test_employee_can_get_dashboard_data()
     {
         WellbeingEntry::factory()->create([
-            'id' => Str::orderedUuid(),
             'user_id' => $this->employee->id,
             'company_id' => $this->company->id,
             'period_key' => '2024-W01',
@@ -114,7 +111,6 @@ class EmployeeTest extends TestCase
     public function test_employee_can_list_surveys()
     {
         $survey = Survey::create([
-            'id' => 'survey-1',
             'company_id' => $this->company->id,
             'title' => 'Test Survey',
             'status' => SurveyStatus::ACTIVE,
@@ -130,22 +126,20 @@ class EmployeeTest extends TestCase
     public function test_employee_can_get_survey_details()
     {
         $survey = Survey::create([
-            'id' => 'survey-1',
             'company_id' => $this->company->id,
             'title' => 'Test Survey',
             'status' => SurveyStatus::ACTIVE,
         ]);
 
         SurveyQuestion::create([
-            'id' => 'q-1',
-            'survey_id' => 'survey-1',
+            'survey_id' => $survey->id,
             'text' => 'How are you?',
             'type' => QuestionType::SCALE,
             'order' => 1,
         ]);
 
         $response = $this->actingAs($this->employee, 'sanctum')
-            ->getJson('/api/employee/surveys/survey-1');
+            ->getJson("/api/employee/surveys/{$survey->id}");
 
         $response->assertStatus(200)
             ->assertJsonPath('survey.title', 'Test Survey')
@@ -155,25 +149,23 @@ class EmployeeTest extends TestCase
     public function test_employee_can_respond_to_survey()
     {
         $survey = Survey::create([
-            'id' => 'survey-1',
             'company_id' => $this->company->id,
             'title' => 'Test Survey',
             'status' => SurveyStatus::ACTIVE,
         ]);
 
         $question = SurveyQuestion::create([
-            'id' => 'q-1',
-            'survey_id' => 'survey-1',
+            'survey_id' => $survey->id,
             'text' => 'How are you?',
             'type' => QuestionType::SCALE,
             'order' => 1,
         ]);
 
         $response = $this->actingAs($this->employee, 'sanctum')
-            ->postJson('/api/employee/surveys/survey-1/respond', [
+            ->postJson("/api/employee/surveys/{$survey->id}/respond", [
                 'answers' => [
                     [
-                        'questionId' => 'q-1',
+                        'questionId' => $question->id,
                         'scaleValue' => 8,
                     ]
                 ]
@@ -184,7 +176,7 @@ class EmployeeTest extends TestCase
 
         $this->assertDatabaseHas('survey_responses', [
             'user_id' => $this->employee->id,
-            'survey_id' => 'survey-1',
+            'survey_id' => $survey->id,
         ]);
     }
 }

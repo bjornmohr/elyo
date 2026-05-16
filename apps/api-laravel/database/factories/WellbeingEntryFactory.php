@@ -6,7 +6,6 @@ use App\Models\WellbeingEntry;
 use App\Models\User;
 use App\Models\Company;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Str;
 
 class WellbeingEntryFactory extends Factory
 {
@@ -19,7 +18,6 @@ class WellbeingEntryFactory extends Factory
         $energy = $this->faker->numberBetween(1, 10);
 
         return [
-            'id' => Str::orderedUuid()->toString(),
             'mood' => $mood,
             'stress' => $stress,
             'energy' => $energy,

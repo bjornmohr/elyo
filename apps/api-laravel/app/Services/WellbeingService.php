@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\WellbeingEntry;
 use App\Enums\CheckinFrequency;
-use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 class WellbeingService
@@ -39,7 +38,6 @@ class WellbeingService
                 'period_key' => $periodKey,
             ],
             [
-                'id' => (string) Str::orderedUuid(),
                 'company_id' => $user->company_id,
                 'mood' => $data['mood'],
                 'stress' => $data['stress'],

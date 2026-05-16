@@ -47,7 +47,7 @@ import { EmployeeService, DashboardData } from '../../services/employee.service'
                   {{ getMoodEmoji(entry.mood) }}
                 </div>
                 <div>
-                  <div class="font-medium text-slate-800">{{ entry.mood || 'Check-in' }}</div>
+                  <div class="font-medium text-slate-800">Score {{ entry.score.toFixed(1) }}</div>
                   <div class="text-xs text-slate-500">{{ entry.createdAt | date:'MMM d, HH:mm' }}</div>
                 </div>
               </div>

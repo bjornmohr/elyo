@@ -51,12 +51,12 @@ import { EmployeeService } from '../../services/employee.service';
 
         <!-- Step 2: Sleep -->
         <div *ngIf="step() === 2" class="space-y-6 text-center animate-in fade-in slide-in-from-right-4 duration-500">
-          <h2 class="text-2xl font-bold text-slate-800">Sleep Quality</h2>
-          <div class="text-6xl my-8">😴</div>
-          <input type="range" min="1" max="10" [(ngModel)]="sleep" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
+          <h2 class="text-2xl font-bold text-slate-800">Energy Level</h2>
+          <div class="text-6xl my-8">⚡</div>
+          <input type="range" min="1" max="10" [(ngModel)]="energy" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
           <div class="flex justify-between text-xs text-slate-400 font-medium uppercase tracking-wider">
-            <span>Poor</span>
-            <span>Excellent</span>
+            <span>Low</span>
+            <span>High</span>
           </div>
         </div>
 
@@ -91,7 +91,7 @@ export class CheckinComponent {
   step = signal(0);
   mood = signal(5);
   stress = signal(5);
-  sleep = signal(5);
+  energy = signal(5);
   notes = signal('');
 
   next() {
@@ -110,22 +110,13 @@ export class CheckinComponent {
 
   submit() {
     this.employeeService.submitCheckin({
-      mood: this.getMoodLabel(this.mood()),
-      stressLevel: this.stress(),
-      sleepQuality: this.sleep(),
-      physicalActivity: 5, // Default for now
+      mood: this.mood(),
+      stress: this.stress(),
+      energy: this.energy(),
       notes: this.notes()
     }).subscribe(() => {
       this.router.navigate(['/employee']);
     });
-  }
-
-  getMoodLabel(val: number): string {
-    if (val >= 9) return 'GREAT';
-    if (val >= 7) return 'GOOD';
-    if (val >= 4) return 'OKAY';
-    if (val >= 2) return 'BAD';
-    return 'TERRIBLE';
   }
 
   getMoodEmoji(val: number) {

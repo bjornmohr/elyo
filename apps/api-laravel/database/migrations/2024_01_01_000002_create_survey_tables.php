@@ -67,7 +67,7 @@ return new class extends Migration
 
         Schema::create('survey_team', function (Blueprint $table) {
             $table->unsignedBigInteger('survey_id');
-            $table->uuid('team_id');
+            $table->unsignedBigInteger('team_id');
 
             $table->foreign('survey_id')->references('id')->on('surveys')->onDelete('cascade');
             $table->foreign('team_id')->references('id')->on('teams')->onDelete('cascade');

@@ -10,11 +10,8 @@ class SurveyAnswer extends Model
 {
     use HasFactory;
 
-    protected $keyType = 'string';
-    public $incrementing = false;
-
     protected $fillable = [
-        'id', 'response_id', 'question_id', 'scale_value',
+        'response_id', 'question_id', 'scale_value',
         'text_value', 'choice_value', 'bool_value'
     ];
 
@@ -22,16 +19,6 @@ class SurveyAnswer extends Model
         'scale_value' => 'integer',
         'bool_value' => 'boolean',
     ];
-
-    protected static function boot()
-    {
-        parent::boot();
-        static::creating(function ($model) {
-            if (empty($model->{$model->getKeyName()})) {
-                $model->{$model->getKeyName()} = (string) \Illuminate\Support\Str::orderedUuid();
-            }
-        });
-    }
 
     public function response(): BelongsTo
     {

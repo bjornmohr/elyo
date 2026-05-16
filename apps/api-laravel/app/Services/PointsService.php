@@ -6,7 +6,6 @@ use App\Models\User;
 use App\Models\UserPoints;
 use App\Models\PointTransaction;
 use App\Models\WellbeingEntry;
-use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 class PointsService
@@ -23,7 +22,6 @@ class PointsService
         if ($points === 0) return;
 
         PointTransaction::create([
-            'id' => (string) Str::orderedUuid(),
             'user_id' => $user->id,
             'points' => $points,
             'reason' => $reason,
@@ -31,7 +29,7 @@ class PointsService
 
         $userPoints = UserPoints::firstOrCreate(
             ['user_id' => $user->id],
-            ['id' => (string) Str::orderedUuid(), 'total' => 0, 'streak' => 0]
+            ['total' => 0, 'streak' => 0]
         );
 
         $userPoints->increment('total', $points);
@@ -44,7 +42,6 @@ class PointsService
         UserPoints::updateOrCreate(
             ['user_id' => $user->id],
             [
-                'id' => (string) Str::orderedUuid(),
                 'streak' => $streak,
                 'last_checkin' => Carbon::now()
             ]

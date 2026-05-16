@@ -36,7 +36,7 @@ return new class extends Migration
         Schema::create('measures', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('company_id');
-            $table->uuid('team_id')->nullable();
+            $table->unsignedBigInteger('team_id')->nullable();
             $table->string('title');
             $table->string('category');
             $table->text('description');

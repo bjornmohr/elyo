@@ -15,7 +15,7 @@ class SurveyRespondRequest extends FormRequest
     {
         return [
             'answers' => ['required', 'array', 'min:1'],
-            'answers.*.questionId' => ['required', 'string'],
+            'answers.*.questionId' => ['required'],
             'answers.*.scaleValue' => ['nullable', 'integer', 'min:1', 'max:10'],
             'answers.*.textValue' => ['nullable', 'string', 'max:2000'],
             'answers.*.choiceValue' => ['nullable', 'string', 'max:200'],
