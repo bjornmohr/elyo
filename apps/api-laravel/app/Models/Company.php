@@ -4,24 +4,18 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Enums\CheckinFrequency;
 
 class Company extends Model
 {
     use HasFactory;
 
-    protected $keyType = 'string';
-    public $incrementing = false;
-
     protected $fillable = [
-        'id', 'name', 'slug', 'logo_url', 'primary_color', 'industry',
-        'employee_range', 'country', 'checkin_frequency',
-        'anonymity_threshold', 'billing_email'
+        'name', 'slug', 'status', 'anonymity_threshold', 'created_by_elyo_admin_id',
     ];
 
     protected $casts = [
-        'checkin_frequency' => CheckinFrequency::class,
         'anonymity_threshold' => 'integer',
     ];
 
@@ -48,5 +42,10 @@ class Company extends Model
     public function measures(): HasMany
     {
         return $this->hasMany(Measure::class);
+    }
+
+    public function createdByAdmin(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_elyo_admin_id');
     }
 }

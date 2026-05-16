@@ -19,10 +19,13 @@ class RoleMiddleware
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        $userRole = $request->user()->role->value;
+        $user = $request->user();
+        $user->loadMissing('roles');
 
-        if (! in_array($userRole, $roles)) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
+        $hasRole = $user->roles->contains(fn ($ur) => in_array($ur->role->value, $roles));
+
+        if (! $hasRole) {
+            return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Unauthorized.']], 403);
         }
 
         return $next($request);

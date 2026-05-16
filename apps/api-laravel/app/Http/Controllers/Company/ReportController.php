@@ -19,15 +19,14 @@ class ReportController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        if ($user->role->value === 'EMPLOYEE') {
-            abort(403);
-        }
+        $user->loadMissing('roles');
 
-        $isManager = $user->role->value === 'COMPANY_MANAGER';
+        $isManager = $user->hasRole('COMPANY_MANAGER') && !$user->hasAnyRole([\App\Enums\Role::COMPANY_ADMIN, \App\Enums\Role::COMPANY_OWNER]);
         $limit = (int) $request->query('limit', 12);
 
+        $managedTeam = $isManager ? \App\Models\Team::where('manager_id', $user->id)->where('company_id', $user->company_id)->first() : null;
         $teamId = $isManager
-            ? $user->managed_team_id
+            ? $managedTeam?->id
             : $request->query('teamId');
 
         $company = $user->company;

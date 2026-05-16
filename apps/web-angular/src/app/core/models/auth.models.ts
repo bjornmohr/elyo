@@ -1,21 +1,40 @@
 export enum Role {
-  EMPLOYEE = 'EMPLOYEE',
-  COMPANY_MANAGER = 'COMPANY_MANAGER',
-  COMPANY_ADMIN = 'COMPANY_ADMIN',
   ELYO_ADMIN = 'ELYO_ADMIN',
-  PARTNER = 'PARTNER'
+  ELYO_SUPPORT = 'ELYO_SUPPORT',
+  COMPANY_OWNER = 'COMPANY_OWNER',
+  COMPANY_ADMIN = 'COMPANY_ADMIN',
+  COMPANY_MANAGER = 'COMPANY_MANAGER',
+  EMPLOYEE = 'EMPLOYEE',
+  PARTNER = 'PARTNER',
 }
 
+export type Portal = 'admin' | 'company' | 'employee' | 'partner';
+
 export interface User {
-  id: string;
+  id: number;
   email: string;
   name: string;
-  role: Role;
-  companyId?: string;
+  roles: string[];
+  companyId?: number | null;
+  companyName?: string | null;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+  activePortal: Portal | null;
+  allowedPortals: Portal[];
+}
+
+export interface MeResponse extends User {
+  allowedPortals: Portal[];
 }
 
 export interface AuthState {
   user: User | null;
   token: string | null;
+  activePortal: Portal | null;
+  allowedPortals: Portal[];
   loading: boolean;
 }

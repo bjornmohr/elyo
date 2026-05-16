@@ -2,48 +2,45 @@
 
 namespace App\Models;
 
+use App\Enums\Role;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use App\Enums\Role;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
-    protected $keyType = 'string';
-    public $incrementing = false;
-
     protected $fillable = [
-        'id', 'email', 'name', 'avatar_url', 'role', 'password_hash',
-        'is_active', 'last_login_at', 'company_id', 'team_id'
+        'name', 'email', 'password', 'company_id', 'status','team_id', 'last_login_at',
     ];
 
     protected $hidden = [
-        'password_hash',
+        'password', 'remember_token',
     ];
 
     protected function casts(): array
     {
         return [
-            'role' => Role::class,
-            'is_active' => 'boolean',
+            'password' => 'hashed',
             'last_login_at' => 'datetime',
         ];
     }
+
+    // Relationships
 
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
     }
 
-    public function team(): BelongsTo
+    public function roles(): HasMany
     {
-        return $this->belongsTo(Team::class);
+        return $this->hasMany(UserRole::class);
     }
 
     public function managedTeams(): HasMany
@@ -104,5 +101,65 @@ class User extends Authenticatable
     public function notificationPreference(): HasOne
     {
         return $this->hasOne(NotificationPreference::class);
+    }
+
+    // Role helpers
+
+    public function hasRole(Role|string $role): bool
+    {
+        $value = $role instanceof Role ? $role->value : $role;
+        return $this->roles->contains('role', Role::from($value));
+    }
+
+    public function hasAnyRole(array $roles): bool
+    {
+        $values = array_map(fn ($r) => $r instanceof Role ? $r : Role::from($r), $roles);
+        return $this->roles->whereIn('role', $values)->isNotEmpty();
+    }
+
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
+    }
+
+    public function isPlatformUser(): bool
+    {
+        return $this->hasAnyRole([Role::ELYO_ADMIN, Role::ELYO_SUPPORT]);
+    }
+
+    public function isCompanyUser(): bool
+    {
+        return $this->hasAnyRole(Role::companyPortalRoles());
+    }
+
+    public function isEmployee(): bool
+    {
+        return $this->hasRole(Role::EMPLOYEE);
+    }
+
+    public function canUsePortal(string $portal): bool
+    {
+        return match ($portal) {
+            'admin' => $this->hasAnyRole(Role::adminPortalRoles()),
+            'company' => $this->isCompanyUser(),
+            'employee' => $this->isEmployee(),
+            'partner' => $this->hasRole(Role::PARTNER),
+            default => false,
+        };
+    }
+
+    public function allowedPortals(): array
+    {
+        $portals = [];
+        if ($this->hasAnyRole(Role::adminPortalRoles())) $portals[] = 'admin';
+        if ($this->isCompanyUser()) $portals[] = 'company';
+        if ($this->isEmployee()) $portals[] = 'employee';
+        if ($this->hasRole(Role::PARTNER)) $portals[] = 'partner';
+        return $portals;
+    }
+
+    public function roleNames(): array
+    {
+        return $this->roles->pluck('role')->map(fn ($r) => $r->value)->toArray();
     }
 }

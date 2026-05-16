@@ -8,22 +8,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('invite_tokens', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->string('token')->unique();
-            $table->string('email')->nullable();
-            $table->string('role')->default('EMPLOYEE');
-            $table->string('team_id')->nullable();
-            $table->timestamp('used_at')->nullable();
-            $table->timestamp('expires_at');
-            $table->string('company_id');
-            $table->timestamps();
-
-            $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
-        });
-
         Schema::create('partners', function (Blueprint $table) {
-            $table->string('id')->primary();
+            $table->id();
             $table->string('email')->unique();
             $table->string('password_hash');
             $table->string('name');
@@ -41,16 +27,16 @@ return new class extends Migration
             $table->string('verification_status')->default('PENDING_DOCS');
             $table->string('rejection_reason')->nullable();
             $table->timestamp('reviewed_at')->nullable();
-            $table->string('reviewed_by_id')->nullable();
+            $table->unsignedBigInteger('reviewed_by_id')->nullable();
             $table->timestamps();
 
             $table->index('verification_status');
         });
 
         Schema::create('measures', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->string('company_id');
-            $table->string('team_id')->nullable();
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('team_id')->nullable();
             $table->string('title');
             $table->string('category');
             $table->text('description');
@@ -58,7 +44,7 @@ return new class extends Migration
             $table->timestamp('suggested_at')->useCurrent();
             $table->timestamp('started_at')->nullable();
             $table->timestamp('completed_at')->nullable();
-            $table->string('created_by');
+            $table->unsignedBigInteger('created_by');
             $table->timestamps();
 
             $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
@@ -67,8 +53,8 @@ return new class extends Migration
         });
 
         Schema::create('wearable_connections', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->string('user_id');
+            $table->id();
+            $table->unsignedBigInteger('user_id');
             $table->string('source');
             $table->text('access_token')->nullable();
             $table->text('refresh_token')->nullable();
@@ -82,8 +68,8 @@ return new class extends Migration
         });
 
         Schema::create('wearable_syncs', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->string('user_id');
+            $table->id();
+            $table->unsignedBigInteger('user_id');
             $table->string('source');
             $table->timestamp('date');
             $table->integer('steps')->nullable();
@@ -101,8 +87,8 @@ return new class extends Migration
         });
 
         Schema::create('push_subscriptions', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->string('user_id');
+            $table->id();
+            $table->unsignedBigInteger('user_id');
             $table->string('endpoint')->unique();
             $table->string('p256dh');
             $table->string('auth');
@@ -112,7 +98,7 @@ return new class extends Migration
         });
 
         Schema::create('notification_preferences', function (Blueprint $table) {
-            $table->string('user_id')->primary();
+            $table->unsignedBigInteger('user_id')->primary();
             $table->boolean('checkin_reminder')->default(true);
             $table->string('checkin_reminder_time')->default('09:00');
             $table->boolean('weekly_summary')->default(true);
@@ -131,6 +117,5 @@ return new class extends Migration
         Schema::dropIfExists('wearable_connections');
         Schema::dropIfExists('measures');
         Schema::dropIfExists('partners');
-        Schema::dropIfExists('invite_tokens');
     }
 };

@@ -14,7 +14,8 @@ class MeasureController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        if ($user->role->value !== 'COMPANY_ADMIN') {
+        $user->loadMissing('roles');
+        if (!$user->hasAnyRole([\App\Enums\Role::COMPANY_ADMIN, \App\Enums\Role::COMPANY_OWNER])) {
             abort(403);
         }
 
@@ -45,7 +46,8 @@ class MeasureController extends Controller
     public function update(PatchMeasureRequest $request, $id)
     {
         $user = $request->user();
-        if ($user->role->value !== 'COMPANY_ADMIN') {
+        $user->loadMissing('roles');
+        if (!$user->hasAnyRole([\App\Enums\Role::COMPANY_ADMIN, \App\Enums\Role::COMPANY_OWNER])) {
             abort(403);
         }
 

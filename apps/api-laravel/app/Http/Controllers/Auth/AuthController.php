@@ -15,53 +15,83 @@ class AuthController extends Controller
         $request->validate([
             'email' => 'required|email',
             'password' => 'required',
+            'requested_portal' => 'nullable|string|in:admin,company,employee,partner',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::with('roles', 'company')->where('email', $request->email)->first();
 
-        // Do not leak whether an email exists - same message for both
-        if (! $user || ! Hash::check($request->password, $user->password_hash)) {
+        if (! $user || ! Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
-                'email' => [__('auth.failed')],
+                'email' => ['Die Anmeldedaten sind ungültig.'],
             ]);
         }
 
-        if (! $user->is_active) {
+        if ($user->status !== 'active') {
             throw ValidationException::withMessages([
-                'email' => [__('auth.inactive')],
+                'email' => ['Die Anmeldedaten sind ungültig.'],
             ]);
         }
+
+        // Validate portal access
+        $requestedPortal = $request->input('requested_portal');
+        $allowedPortals = $user->allowedPortals();
+
+        if ($requestedPortal && ! $user->canUsePortal($requestedPortal)) {
+            return response()->json([
+                'error' => [
+                    'code' => 'PORTAL_FORBIDDEN',
+                    'message' => 'Sie haben keinen Zugang zu diesem Portal.',
+                ],
+            ], 403);
+        }
+
+        $activePortal = $requestedPortal && in_array($requestedPortal, $allowedPortals)
+            ? $requestedPortal
+            : ($allowedPortals[0] ?? null);
 
         $user->update(['last_login_at' => now()]);
+        $user->load(['company', 'team']);
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'access_token' => $token,
             'token_type' => 'Bearer',
+            'user' => [
+                'id' => $user->id,
+                'email' => $user->email,
+                'name' => $user->name,
+                'roles' => $user->roleNames(),
+                'teamId' => $user->team_id,
+                'teamName' => $user->team?->name,
+                'companyId' => $user->company_id,
+                'companyName' => $user->company?->name,
+            ],
+            'activePortal' => $activePortal,
+            'allowedPortals' => $allowedPortals,
         ]);
     }
 
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
-
         return response()->json(['message' => 'Logged out']);
     }
 
     public function me(Request $request)
     {
-        $user = $request->user()->load(['company', 'team']);
+        $user = $request->user()->load(['company', 'roles']);
 
-        // Match legacy session structure as much as possible for Angular frontend
         return response()->json([
             'id' => $user->id,
             'email' => $user->email,
             'name' => $user->name,
-            'role' => $user->role,
+            'roles' => $user->roleNames(),
             'companyId' => $user->company_id,
+            'companyName' => $user->company?->name,
             'teamId' => $user->team_id,
-            // Add other relevant data
+            'teamName' => $user->team?->name,
+            'allowedPortals' => $user->allowedPortals(),
         ]);
     }
 }

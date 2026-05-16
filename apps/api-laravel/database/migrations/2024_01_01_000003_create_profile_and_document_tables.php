@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('anamnesis_profiles', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->string('user_id')->unique();
+            $table->id();
+            $table->unsignedBigInteger('user_id')->unique();
             $table->integer('completion_pct')->default(0);
             $table->integer('birth_year')->nullable();
             $table->string('biological_sex')->nullable();
@@ -27,8 +27,8 @@ return new class extends Migration
         });
 
         Schema::create('health_documents', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->string('user_id');
+            $table->id();
+            $table->unsignedBigInteger('user_id');
             $table->string('type');
             $table->string('file_name');
             $table->timestamp('uploaded_at')->useCurrent();
@@ -38,8 +38,8 @@ return new class extends Migration
         });
 
         Schema::create('user_documents', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->string('user_id');
+            $table->id();
+            $table->unsignedBigInteger('user_id');
             $table->string('file_name');
             $table->string('blob_url');
             $table->string('blob_key');

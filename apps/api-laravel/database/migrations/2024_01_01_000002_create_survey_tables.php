@@ -9,21 +9,21 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('surveys', function (Blueprint $table) {
-            $table->string('id')->primary();
+            $table->id();
             $table->string('title');
             $table->text('description')->nullable();
             $table->string('status')->default('DRAFT');
             $table->timestamp('starts_at')->nullable();
             $table->timestamp('ends_at')->nullable();
             $table->boolean('is_anonymous')->default(true);
-            $table->string('company_id');
+            $table->unsignedBigInteger('company_id');
             $table->timestamps();
 
             $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
         });
 
         Schema::create('survey_questions', function (Blueprint $table) {
-            $table->string('id')->primary();
+            $table->id();
             $table->string('text');
             $table->string('type')->default('SCALE');
             $table->integer('order');
@@ -31,29 +31,30 @@ return new class extends Migration
             $table->jsonb('options')->nullable();
             $table->string('scale_min_label')->nullable();
             $table->string('scale_max_label')->nullable();
-            $table->string('survey_id');
+            $table->unsignedBigInteger('survey_id');
             $table->timestamps();
 
             $table->foreign('survey_id')->references('id')->on('surveys')->onDelete('cascade');
         });
 
         Schema::create('survey_responses', function (Blueprint $table) {
-            $table->string('id')->primary();
+            $table->id();
             $table->timestamp('submitted_at')->useCurrent();
-            $table->string('company_id');
-            $table->string('survey_id');
-            $table->string('user_id')->nullable();
+            $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('survey_id');
+            $table->unsignedBigInteger('user_id')->nullable();
             $table->timestamps();
 
             $table->foreign('survey_id')->references('id')->on('surveys')->onDelete('cascade');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
             $table->unique(['user_id', 'survey_id']);
         });
 
         Schema::create('survey_answers', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->string('response_id');
-            $table->string('question_id');
+            $table->id();
+            $table->unsignedBigInteger('response_id');
+            $table->unsignedBigInteger('question_id');
             $table->integer('scale_value')->nullable();
             $table->text('text_value')->nullable();
             $table->string('choice_value')->nullable();
@@ -65,8 +66,8 @@ return new class extends Migration
         });
 
         Schema::create('survey_team', function (Blueprint $table) {
-            $table->string('survey_id');
-            $table->string('team_id');
+            $table->unsignedBigInteger('survey_id');
+            $table->unsignedBigInteger('team_id');
 
             $table->foreign('survey_id')->references('id')->on('surveys')->onDelete('cascade');
             $table->foreign('team_id')->references('id')->on('teams')->onDelete('cascade');

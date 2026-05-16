@@ -19,9 +19,7 @@ class CompanySurveyController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        if ($user->role->value === 'EMPLOYEE') {
-            abort(403);
-        }
+        // Route middleware already restricts to company roles
 
         $surveys = Survey::where('company_id', $user->company_id)
             ->withCount(['responses', 'questions'])
@@ -70,10 +68,6 @@ class CompanySurveyController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        if ($request->user()->role->value === 'EMPLOYEE') {
-            abort(403);
-        }
-
         $survey = Survey::where('id', $id)
             ->where('company_id', $request->user()->company_id)
             ->firstOrFail();
@@ -86,9 +80,7 @@ class CompanySurveyController extends Controller
     public function results(Request $request, $id)
     {
         $user = $request->user();
-        if ($user->role->value === 'EMPLOYEE') {
-            abort(403);
-        }
+        // Route middleware already restricts to company roles
 
         $survey = Survey::where('id', $id)
             ->where('company_id', $user->company_id)

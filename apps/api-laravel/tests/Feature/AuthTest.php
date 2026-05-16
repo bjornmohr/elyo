@@ -3,150 +3,404 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Models\UserRole;
 use App\Models\Company;
 use App\Models\InviteToken;
 use App\Enums\Role;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
+    private function createUserWithRole(Role $role, ?int $companyId = null): User
     {
-        parent::setUp();
-        Company::factory()->create(['id' => 'company-1', 'name' => 'ELYO']);
+        $user = User::factory()->create([
+            'company_id' => $companyId,
+        ]);
+        UserRole::create(['user_id' => $user->id, 'role' => $role]);
+        return $user;
     }
+
+    private function createCompanyWithAdmin(): array
+    {
+        $company = Company::factory()->create();
+        $admin = $this->createUserWithRole(Role::COMPANY_ADMIN, $company->id);
+        return [$company, $admin];
+    }
+
+    private function createPlatformAdmin(): User
+    {
+        $user = User::factory()->platformAdmin()->create();
+        UserRole::create(['user_id' => $user->id, 'role' => Role::ELYO_ADMIN]);
+        return $user;
+    }
+
+    // --- Login ---
 
     public function test_user_can_login_with_correct_credentials()
     {
-        $user = User::factory()->create([
-            'email' => 'test@elyo.de',
-            'password_hash' => Hash::make('password123'),
-            'is_active' => true,
-        ]);
+        $user = $this->createUserWithRole(Role::EMPLOYEE, Company::factory()->create()->id);
 
         $response = $this->postJson('/api/auth/login', [
-            'email' => 'test@elyo.de',
-            'password' => 'password123',
+            'email' => $user->email,
+            'password' => 'password',
         ]);
 
         $response->assertStatus(200)
-            ->assertJsonStructure(['access_token', 'token_type']);
+            ->assertJsonStructure(['access_token', 'token_type', 'user', 'activePortal', 'allowedPortals']);
     }
 
     public function test_user_cannot_login_with_incorrect_password()
     {
-        $user = User::factory()->create([
-            'email' => 'test@elyo.de',
-            'password_hash' => Hash::make('password123'),
-        ]);
+        $user = $this->createUserWithRole(Role::EMPLOYEE, Company::factory()->create()->id);
 
         $response = $this->postJson('/api/auth/login', [
-            'email' => 'test@elyo.de',
+            'email' => $user->email,
             'password' => 'wrong-password',
         ]);
 
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['email']);
+        $response->assertStatus(422);
     }
 
-    public function test_user_cannot_login_if_inactive()
+    public function test_login_does_not_reveal_email_existence()
     {
-        $user = User::factory()->create([
-            'email' => 'test@elyo.de',
-            'password_hash' => Hash::make('password123'),
-            'is_active' => false,
+        $response = $this->postJson('/api/auth/login', [
+            'email' => 'nonexistent@test.com',
+            'password' => 'password',
         ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_inactive_user_cannot_login()
+    {
+        $user = User::factory()->create(['status' => 'inactive', 'company_id' => Company::factory()->create()->id]);
+        UserRole::create(['user_id' => $user->id, 'role' => Role::EMPLOYEE]);
 
         $response = $this->postJson('/api/auth/login', [
-            'email' => 'test@elyo.de',
-            'password' => 'password123',
+            'email' => $user->email,
+            'password' => 'password',
         ]);
 
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['email']);
+        $response->assertStatus(422);
     }
+
+    // --- Portal validation ---
+
+    public function test_login_to_company_portal_fails_for_employee_only_user()
+    {
+        $user = $this->createUserWithRole(Role::EMPLOYEE, Company::factory()->create()->id);
+
+        $response = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password',
+            'requested_portal' => 'company',
+        ]);
+
+        $response->assertStatus(403)
+            ->assertJsonPath('error.code', 'PORTAL_FORBIDDEN');
+    }
+
+    public function test_login_to_employee_portal_fails_for_company_only_user()
+    {
+        $user = $this->createUserWithRole(Role::COMPANY_ADMIN, Company::factory()->create()->id);
+
+        $response = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password',
+            'requested_portal' => 'employee',
+        ]);
+
+        $response->assertStatus(403)
+            ->assertJsonPath('error.code', 'PORTAL_FORBIDDEN');
+    }
+
+    // --- Me ---
 
     public function test_authenticated_user_can_get_me_info()
     {
-        $user = User::factory()->create([
-            'email' => 'test@elyo.de',
-            'role' => Role::EMPLOYEE,
-        ]);
+        $user = $this->createUserWithRole(Role::EMPLOYEE, Company::factory()->create()->id);
 
         $response = $this->actingAs($user, 'sanctum')->getJson('/api/auth/me');
 
         $response->assertStatus(200)
-            ->assertJson([
-                'email' => 'test@elyo.de',
-                'role' => 'EMPLOYEE',
-            ]);
+            ->assertJsonStructure(['id', 'email', 'name', 'roles', 'allowedPortals']);
     }
 
-    public function test_role_restriction_works_for_admin_endpoint()
+    // --- Admin company management ---
+
+    public function test_elyo_admin_can_create_company()
     {
-        $employee = User::factory()->create(['role' => Role::EMPLOYEE]);
-        $admin = User::factory()->create(['role' => Role::ELYO_ADMIN]);
+        $admin = $this->createPlatformAdmin();
 
-        // Employee should be forbidden
-        $this->actingAs($employee, 'sanctum')
-            ->getJson('/api/admin/stats')
-            ->assertStatus(403);
-
-        // Admin should be allowed
-        $this->actingAs($admin, 'sanctum')
-            ->getJson('/api/admin/stats')
-            ->assertStatus(200);
-    }
-
-    public function test_invite_verification_works()
-    {
-        $invite = InviteToken::create([
-            'id' => 'token-1',
-            'token' => 'valid-token',
-            'email' => 'invited@test.com',
-            'role' => Role::EMPLOYEE,
-            'company_id' => 'company-1',
-            'expires_at' => now()->addDays(7),
+        $response = $this->actingAs($admin, 'sanctum')->postJson('/api/admin/companies', [
+            'name' => 'Test Company',
         ]);
 
-        $response = $this->getJson('/api/auth/invite/verify/valid-token');
-
-        $response->assertStatus(200)
-            ->assertJson([
-                'email' => 'invited@test.com',
-                'role' => 'EMPLOYEE',
-            ]);
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('companies', ['name' => 'Test Company']);
     }
 
-    public function test_invite_acceptance_works()
+    public function test_non_admin_cannot_create_company()
     {
-        $invite = InviteToken::create([
-            'id' => 'token-1',
-            'token' => 'valid-token',
+        $user = $this->createUserWithRole(Role::COMPANY_ADMIN, Company::factory()->create()->id);
+
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/admin/companies', [
+            'name' => 'Test Company',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_employee_cannot_create_company()
+    {
+        $user = $this->createUserWithRole(Role::EMPLOYEE, Company::factory()->create()->id);
+
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/admin/companies', [
+            'name' => 'Test Company',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_elyo_admin_can_invite_first_company_admin()
+    {
+        $admin = $this->createPlatformAdmin();
+        $company = Company::factory()->create();
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/admin/companies/{$company->id}/invite-company-admin", [
+                'email' => 'newadmin@test.com',
+            ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('invite_tokens', ['email' => 'newadmin@test.com']);
+    }
+
+    // --- Company invitation management ---
+
+    public function test_company_admin_can_invite_employee()
+    {
+        [$company, $admin] = $this->createCompanyWithAdmin();
+
+        $response = $this->actingAs($admin, 'sanctum')->postJson('/api/company/invitations', [
+            'email' => 'employee@test.com',
+            'role' => 'EMPLOYEE',
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('invite_tokens', ['email' => 'employee@test.com', 'role' => 'EMPLOYEE']);
+    }
+
+    public function test_company_admin_cannot_invite_into_another_company()
+    {
+        [$company1, $admin1] = $this->createCompanyWithAdmin();
+        $company2 = Company::factory()->create();
+        $existingUser = $this->createUserWithRole(Role::EMPLOYEE, $company2->id);
+
+        $response = $this->actingAs($admin1, 'sanctum')->postJson('/api/company/invitations', [
+            'email' => $existingUser->email,
+            'role' => 'EMPLOYEE',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('error.code', 'COMPANY_CONFLICT');
+    }
+
+    public function test_employee_cannot_invite_users()
+    {
+        $company = Company::factory()->create();
+        $employee = $this->createUserWithRole(Role::EMPLOYEE, $company->id);
+
+        $response = $this->actingAs($employee, 'sanctum')->postJson('/api/company/invitations', [
+            'email' => 'someone@test.com',
+            'role' => 'EMPLOYEE',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_employee_cannot_access_company_dashboard()
+    {
+        $company = Company::factory()->create();
+        $employee = $this->createUserWithRole(Role::EMPLOYEE, $company->id);
+
+        $response = $this->actingAs($employee, 'sanctum')->getJson('/api/company/dashboard');
+
+        $response->assertStatus(403);
+    }
+
+    public function test_company_admin_cannot_access_another_companys_data()
+    {
+        [$company1, $admin1] = $this->createCompanyWithAdmin();
+        [$company2, $admin2] = $this->createCompanyWithAdmin();
+
+        // admin1 should only see their own company's users
+        $response = $this->actingAs($admin1, 'sanctum')->getJson('/api/company/users');
+        $response->assertStatus(200);
+
+        // The response should not contain admin2's data
+        $users = $response->json('data');
+        foreach ($users as $user) {
+            $this->assertNotEquals($admin2->email, $user['email']);
+        }
+    }
+
+    // --- Invite accept ---
+
+    public function test_invite_accept_creates_user_with_correct_role()
+    {
+        $company = Company::factory()->create();
+        $rawToken = 'test-token-123';
+
+        InviteToken::create([
+            'company_id' => $company->id,
             'email' => 'invited@test.com',
             'role' => Role::EMPLOYEE,
-            'company_id' => 'company-1',
+            'token_hash' => hash('sha256', $rawToken),
             'expires_at' => now()->addDays(7),
         ]);
 
         $response = $this->postJson('/api/auth/invite/accept', [
-            'token' => 'valid-token',
+            'token' => $rawToken,
             'name' => 'New User',
             'password' => 'password123',
+            'password_confirmation' => 'password123',
         ]);
 
-        $response->assertStatus(200)
-            ->assertJsonStructure(['access_token']);
+        $response->assertStatus(200)->assertJsonStructure(['access_token']);
+        $this->assertDatabaseHas('users', ['email' => 'invited@test.com', 'company_id' => $company->id]);
+        $this->assertDatabaseHas('user_roles', ['role' => 'EMPLOYEE']);
+    }
 
-        $this->assertDatabaseHas('users', [
-            'email' => 'invited@test.com',
+    public function test_invite_accept_cannot_override_role()
+    {
+        $company = Company::factory()->create();
+        $rawToken = 'test-token-456';
+
+        InviteToken::create([
+            'company_id' => $company->id,
+            'email' => 'invited2@test.com',
+            'role' => Role::EMPLOYEE,
+            'token_hash' => hash('sha256', $rawToken),
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        $response = $this->postJson('/api/auth/invite/accept', [
+            'token' => $rawToken,
             'name' => 'New User',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'role' => 'ELYO_ADMIN', // attempt to escalate
         ]);
 
-        $this->assertNotNull($invite->refresh()->used_at);
+        $response->assertStatus(200);
+        // User should have EMPLOYEE role, not ELYO_ADMIN
+        $user = User::where('email', 'invited2@test.com')->first();
+        $this->assertTrue($user->hasRole(Role::EMPLOYEE));
+        $this->assertFalse($user->hasRole(Role::ELYO_ADMIN));
+    }
+
+    public function test_invite_accept_cannot_override_company()
+    {
+        $company = Company::factory()->create();
+        $otherCompany = Company::factory()->create();
+        $rawToken = 'test-token-789';
+
+        InviteToken::create([
+            'company_id' => $company->id,
+            'email' => 'invited3@test.com',
+            'role' => Role::EMPLOYEE,
+            'token_hash' => hash('sha256', $rawToken),
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        $response = $this->postJson('/api/auth/invite/accept', [
+            'token' => $rawToken,
+            'name' => 'New User',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'company_id' => $otherCompany->id, // attempt to override
+        ]);
+
+        $response->assertStatus(200);
+        $user = User::where('email', 'invited3@test.com')->first();
+        $this->assertEquals($company->id, $user->company_id);
+    }
+
+    public function test_invite_for_email_already_in_another_company_is_rejected()
+    {
+        $company1 = Company::factory()->create();
+        $company2 = Company::factory()->create();
+        $existingUser = $this->createUserWithRole(Role::EMPLOYEE, $company1->id);
+
+        $rawToken = 'test-token-conflict';
+        InviteToken::create([
+            'company_id' => $company2->id,
+            'email' => $existingUser->email,
+            'role' => Role::EMPLOYEE,
+            'token_hash' => hash('sha256', $rawToken),
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        $response = $this->postJson('/api/auth/invite/accept', [
+            'token' => $rawToken,
+            'name' => 'Existing User',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('error.code', 'COMPANY_CONFLICT');
+    }
+
+    public function test_expired_invite_cannot_be_accepted()
+    {
+        $company = Company::factory()->create();
+        $rawToken = 'expired-token';
+
+        InviteToken::create([
+            'company_id' => $company->id,
+            'email' => 'expired@test.com',
+            'role' => Role::EMPLOYEE,
+            'token_hash' => hash('sha256', $rawToken),
+            'expires_at' => now()->subDay(),
+        ]);
+
+        $response = $this->postJson('/api/auth/invite/accept', [
+            'token' => $rawToken,
+            'name' => 'Late User',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_used_invite_cannot_be_accepted_twice()
+    {
+        $company = Company::factory()->create();
+        $rawToken = 'used-token';
+
+        InviteToken::create([
+            'company_id' => $company->id,
+            'email' => 'used@test.com',
+            'role' => Role::EMPLOYEE,
+            'token_hash' => hash('sha256', $rawToken),
+            'status' => 'accepted',
+            'accepted_at' => now(),
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        $response = $this->postJson('/api/auth/invite/accept', [
+            'token' => $rawToken,
+            'name' => 'Duplicate User',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $response->assertStatus(422);
     }
 }

@@ -26,11 +26,10 @@ class CompanyController extends Controller
         $companyId = $company->id;
         $threshold = $company->anonymity_threshold ?? AnonymityService::DEFAULT_THRESHOLD;
 
-        $isManager = $user->role->value === 'COMPANY_MANAGER';
-        $managedTeamId = $user->managed_team_id; // In reality, we might need a better way to get this if it's not on User model directly.
-        // Actually, based on previous work, User has team_id, but managers manage a team.
-        // Let's find the team they manage.
-        if ($isManager && !$managedTeamId) {
+        $user->loadMissing('roles');
+        $isManager = $user->hasRole('COMPANY_MANAGER') && !$user->hasAnyRole([\App\Enums\Role::COMPANY_ADMIN, \App\Enums\Role::COMPANY_OWNER]);
+        $managedTeamId = null;
+        if ($isManager) {
              $managedTeam = Team::where('manager_id', $user->id)->where('company_id', $companyId)->first();
              $managedTeamId = $managedTeam?->id;
         }

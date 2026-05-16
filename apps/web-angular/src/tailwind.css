@@ -1,0 +1,15 @@
+body {
+  outline: 10px solid lime;
+}
+
+@import "tailwindcss";
+@source "../src/**/*.{html,ts}";
+@source "./**/*.{html,ts}";@theme {
+  --color-elyo-bg: #f7f4ee;
+  --color-elyo-ink: #13201b;
+  --color-elyo-muted: #6f7d76;
+  --color-elyo-primary: #14b8a6;
+  --color-elyo-primary-dark: #0f766e;
+  --color-elyo-surface: #ffffff;
+  --color-elyo-border: #e5ded3;
+}

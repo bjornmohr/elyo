@@ -1,15 +1,24 @@
-@import "tailwindcss";
-
 :root {
   --font-body: 'DM Sans', system-ui, sans-serif;
   --font-display: 'Fraunces', Georgia, serif;
 }
 
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
 body {
   font-family: var(--font-body);
-  @apply text-elyo-ink bg-elyo-bg;
+  color: var(--color-elyo-ink);
+  background: var(--color-elyo-bg);
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
+}
+
+* {
+  box-sizing: border-box;
 }

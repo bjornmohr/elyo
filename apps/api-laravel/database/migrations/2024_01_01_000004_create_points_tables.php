@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('user_points', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->string('user_id')->unique();
+            $table->id();
+            $table->unsignedBigInteger('user_id')->unique();
             $table->integer('total')->default(0);
             $table->string('level')->default('STARTER');
             $table->integer('streak')->default(0);
@@ -21,8 +21,8 @@ return new class extends Migration
         });
 
         Schema::create('point_transactions', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->string('user_id');
+            $table->id();
+            $table->unsignedBigInteger('user_id');
             $table->integer('points');
             $table->string('reason');
             $table->timestamps();
