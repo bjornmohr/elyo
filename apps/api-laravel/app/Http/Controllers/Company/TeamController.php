@@ -33,11 +33,17 @@ class TeamController extends Controller
 
     public function store(CreateTeamRequest $request)
     {
-        $team = Team::create($request->validated() + [
+        $validated = $request->validated();
+
+        $team = Team::create([
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'color' => $validated['color'] ?? null,
+            'manager_id' => $validated['managerId'] ?? null,
             'company_id' => $request->user()->company_id
         ]);
 
-        return new TeamResource($team);
+        return new TeamResource($team->loadCount('members')->load('manager:id,name'));
     }
 
     public function show(Request $request, $id)
@@ -60,9 +66,15 @@ class TeamController extends Controller
             ->where('company_id', $request->user()->company_id)
             ->firstOrFail();
 
-        $team->update($request->validated());
+        $validated = $request->validated();
+        $team->update([
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'color' => $validated['color'] ?? null,
+            'manager_id' => $validated['managerId'] ?? null,
+        ]);
 
-        return new TeamResource($team);
+        return new TeamResource($team->loadCount('members')->load('manager:id,name'));
     }
 
     public function destroy(Request $request, $id)

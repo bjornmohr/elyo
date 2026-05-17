@@ -9,7 +9,7 @@ class PatchMeasureRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
+        return $this->user()->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER, Role::COMPANY_MANAGER]);
     }
 
     public function rules(): array

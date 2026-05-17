@@ -37,6 +37,9 @@ class CompanySurveyController extends Controller
                 'description' => $request->description,
                 'company_id' => $request->user()->company_id,
                 'status' => 'DRAFT',
+                'starts_at' => $request->startsAt,
+                'ends_at' => $request->endsAt,
+                'is_anonymous' => $request->boolean('isAnonymous', true),
             ]);
 
             foreach ($request->questions as $qData) {
@@ -49,6 +52,10 @@ class CompanySurveyController extends Controller
                     'scale_min_label' => $qData['scaleMinLabel'] ?? null,
                     'scale_max_label' => $qData['scaleMaxLabel'] ?? null,
                 ]);
+            }
+
+            if ($request->filled('teamIds')) {
+                $survey->teams()->sync($request->teamIds);
             }
 
             return new SurveyResource($survey->loadCount(['responses', 'questions']));

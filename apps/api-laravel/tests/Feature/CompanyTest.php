@@ -240,4 +240,75 @@ class CompanyTest extends TestCase
         ]);
         $response->assertStatus(400);
     }
+
+    public function test_manager_can_see_global_and_managed_team_measures()
+    {
+        $otherTeam = Team::factory()->create(['company_id' => $this->company->id, 'name' => 'Sales']);
+
+        Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'title' => 'Global measure',
+            'created_by' => $this->admin->id,
+        ]);
+        Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'title' => 'Managed team measure',
+            'created_by' => $this->admin->id,
+        ]);
+        Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $otherTeam->id,
+            'title' => 'Other team measure',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $response = $this->actingAs($this->manager)->getJson('/api/company/measures');
+
+        $response->assertStatus(200);
+        $this->assertEqualsCanonicalizing(
+            ['Global measure', 'Managed team measure'],
+            collect($response->json('data'))->pluck('title')->all()
+        );
+    }
+
+    public function test_company_can_create_team_with_manager_and_survey_with_dates()
+    {
+        $response = $this->actingAs($this->admin)->postJson('/api/company/teams', [
+            'name' => 'People Team',
+            'description' => 'Responsible for employee experience.',
+            'color' => '#0d9488',
+            'managerId' => $this->manager->id,
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.name', 'People Team');
+        $response->assertJsonPath('data.managerId', $this->manager->id);
+
+        $teamId = $response->json('data.id');
+
+        $response = $this->actingAs($this->admin)->postJson('/api/company/surveys', [
+            'title' => 'Quarterly pulse',
+            'description' => 'Quarterly employee survey.',
+            'startsAt' => '2026-06-01T09:00:00',
+            'endsAt' => '2026-06-30T17:00:00',
+            'isAnonymous' => true,
+            'teamIds' => [$teamId],
+            'questions' => [
+                [
+                    'text' => 'How balanced is your workload?',
+                    'type' => 'SCALE',
+                    'order' => 0,
+                    'isRequired' => true,
+                    'scaleMinLabel' => 'Too high',
+                    'scaleMaxLabel' => 'Balanced',
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.title', 'Quarterly pulse');
+        $response->assertJsonPath('data.questionsCount', 1);
+    }
 }
