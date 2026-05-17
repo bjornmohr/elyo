@@ -18,6 +18,7 @@ export interface DashboardData {
   streak: number;
   points: number;
   lastCheckin: string | null;
+  todayCheckinCompleted: boolean;
 }
 
 export interface SurveyListItem {
@@ -42,6 +43,14 @@ export interface SurveyDetail extends SurveyListItem {
   questions: SurveyQuestion[];
 }
 
+export interface SurveyResult {
+  id: string;
+  title: string;
+  description: string | null;
+  submittedAt: string | null;
+  questions: Array<SurveyQuestion & { answer: any }>;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -54,7 +63,12 @@ export class EmployeeService {
       streak: res.streakCount ?? 0,
       points: res.points ?? 0,
       lastCheckin: res.latest?.createdAt ?? null,
+      todayCheckinCompleted: res.todayCheckinCompleted ?? false,
     })));
+  }
+
+  getCheckinStatus(): Observable<{ completed: boolean; entry: WellbeingEntry | null }> {
+    return this.api.get<{ completed: boolean; entry: WellbeingEntry | null }>('/employee/checkin/status');
   }
 
   getHistory(): Observable<WellbeingEntry[]> {
@@ -115,5 +129,19 @@ export class EmployeeService {
 
   submitSurveyResponse(id: string, answers: any[]): Observable<any> {
     return this.api.post(`/employee/surveys/${id}/respond`, { answers });
+  }
+
+  getSurveyResult(id: string): Observable<SurveyResult> {
+    return this.api.get<{ survey: SurveyResult }>(`/employee/surveys/${id}/result`).pipe(map(res => res.survey));
+  }
+
+  getMeasures(): Observable<any[]> {
+    return this.api.get<{ data: any[] }>('/employee/measures').pipe(map(res => res.data ?? []));
+  }
+
+  uploadDocument(file: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.api.postForm('/employee/documents', formData);
   }
 }

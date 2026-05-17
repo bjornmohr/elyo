@@ -8,10 +8,15 @@ use App\Models\WellbeingEntry;
 use App\Models\Survey;
 use App\Models\SurveyQuestion;
 use App\Models\SurveyResponse;
+use App\Models\SurveyAnswer;
+use App\Models\Measure;
+use App\Models\Team;
 use App\Enums\Role;
 use App\Enums\SurveyStatus;
 use App\Enums\QuestionType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class EmployeeTest extends TestCase
@@ -75,6 +80,29 @@ class EmployeeTest extends TestCase
         ]);
     }
 
+    public function test_employee_can_submit_checkin_only_once_per_day()
+    {
+        $payload = [
+            'mood' => 8,
+            'stress' => 3,
+            'energy' => 7,
+        ];
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson('/api/employee/checkin', $payload)
+            ->assertStatus(200);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson('/api/employee/checkin', $payload)
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'CHECKIN_ALREADY_DONE');
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/checkin/status')
+            ->assertStatus(200)
+            ->assertJsonPath('completed', true);
+    }
+
     public function test_employee_can_get_history()
     {
         WellbeingEntry::factory()->create([
@@ -100,12 +128,25 @@ class EmployeeTest extends TestCase
         $response = $this->actingAs($this->employee, 'sanctum')
             ->putJson('/api/employee/profile', [
                 'name' => 'Updated Name',
+                'birthYear' => 1990,
+                'biologicalSex' => 'PREFER_NOT_TO_SAY',
+                'activityLevel' => 'MEDIUM',
+                'sleepQuality' => 'GOOD',
+                'stressTendency' => 'LOW',
+                'smokingStatus' => 'NEVER',
+                'nutritionType' => 'balanced',
+                'hasMedication' => false,
             ]);
 
         $response->assertStatus(200)
-            ->assertJsonPath('data.name', 'Updated Name');
+            ->assertJsonPath('data.name', 'Updated Name')
+            ->assertJsonPath('data.anamnesis.birthYear', 1990);
 
         $this->assertEquals('Updated Name', $this->employee->refresh()->name);
+        $this->assertDatabaseHas('anamnesis_profiles', [
+            'user_id' => $this->employee->id,
+            'birth_year' => 1990,
+        ]);
     }
 
     public function test_employee_can_list_surveys()
@@ -177,6 +218,92 @@ class EmployeeTest extends TestCase
         $this->assertDatabaseHas('survey_responses', [
             'user_id' => $this->employee->id,
             'survey_id' => $survey->id,
+        ]);
+    }
+
+    public function test_employee_can_always_view_own_survey_result()
+    {
+        $survey = Survey::create([
+            'company_id' => $this->company->id,
+            'title' => 'Result Survey',
+            'status' => SurveyStatus::ACTIVE,
+        ]);
+
+        $question = SurveyQuestion::create([
+            'survey_id' => $survey->id,
+            'text' => 'How are you?',
+            'type' => QuestionType::SCALE,
+            'order' => 1,
+        ]);
+
+        $surveyResponse = SurveyResponse::factory()->create([
+            'survey_id' => $survey->id,
+            'user_id' => $this->employee->id,
+            'company_id' => $this->company->id,
+        ]);
+        SurveyAnswer::factory()->create([
+            'response_id' => $surveyResponse->id,
+            'question_id' => $question->id,
+            'scale_value' => 8,
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson("/api/employee/surveys/{$survey->id}/result")
+            ->assertStatus(200)
+            ->assertJsonPath('survey.title', 'Result Survey')
+            ->assertJsonPath('survey.questions.0.answer.scaleValue', 8);
+    }
+
+    public function test_employee_can_list_relevant_measures()
+    {
+        $team = Team::factory()->create(['company_id' => $this->company->id]);
+        $otherTeam = Team::factory()->create(['company_id' => $this->company->id]);
+        $this->employee->update(['team_id' => $team->id]);
+
+        Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'title' => 'Global measure',
+            'status' => 'ACTIVE',
+        ]);
+        Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $team->id,
+            'title' => 'Team measure',
+            'status' => 'ACTIVE',
+        ]);
+        Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $otherTeam->id,
+            'title' => 'Other team measure',
+            'status' => 'ACTIVE',
+        ]);
+
+        $response = $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/measures');
+
+        $response->assertStatus(200);
+        $this->assertEqualsCanonicalizing(
+            ['Global measure', 'Team measure'],
+            collect($response->json('data'))->pluck('title')->all()
+        );
+    }
+
+    public function test_employee_can_upload_medical_pdf()
+    {
+        Storage::fake('public');
+
+        $response = $this->actingAs($this->employee, 'sanctum')
+            ->post('/api/employee/documents', [
+                'file' => UploadedFile::fake()->create('report.pdf', 128, 'application/pdf'),
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.fileName', 'report.pdf');
+
+        $this->assertDatabaseHas('user_documents', [
+            'user_id' => $this->employee->id,
+            'file_name' => 'report.pdf',
         ]);
     }
 }

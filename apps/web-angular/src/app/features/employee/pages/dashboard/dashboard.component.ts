@@ -28,9 +28,13 @@ import { EmployeeService, DashboardData } from '../../services/employee.service'
           <h2 class="text-lg font-semibold text-slate-800">How are you feeling today?</h2>
           <p class="text-slate-500 text-sm">Track your wellbeing and earn points.</p>
         </div>
-        <a routerLink="/employee/checkin" class="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-xl transition-colors font-medium">
-          Start Check-in
-        </a>
+        @if (data()?.todayCheckinCompleted) {
+          <span class="bg-slate-100 text-slate-500 px-6 py-2 rounded-xl font-medium">Done today</span>
+        } @else {
+          <a routerLink="/employee/checkin" class="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-xl transition-colors font-medium">
+            Start Check-in
+          </a>
+        }
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -73,6 +77,16 @@ import { EmployeeService, DashboardData } from '../../services/employee.service'
              </div>
           </div>
         </div>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center justify-between">
+        <div>
+          <h3 class="font-semibold text-slate-800">Active Measures</h3>
+          <p class="text-sm text-slate-500">Check available company and team measures.</p>
+        </div>
+        <a routerLink="/employee/measures" class="bg-slate-100 hover:bg-teal-600 hover:text-white text-slate-600 px-5 py-2 rounded-xl transition-colors font-medium">
+          View
+        </a>
       </div>
     </div>
   `

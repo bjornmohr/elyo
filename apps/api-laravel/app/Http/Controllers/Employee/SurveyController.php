@@ -20,6 +20,12 @@ class SurveyController extends Controller
         $user = $request->user();
         $surveys = Survey::where('company_id', $user->company_id)
             ->where('status', SurveyStatus::ACTIVE)
+            ->where(function ($query) use ($user) {
+                $query->whereDoesntHave('teams');
+                if ($user->team_id) {
+                    $query->orWhereHas('teams', fn ($teamQuery) => $teamQuery->where('teams.id', $user->team_id));
+                }
+            })
             ->withCount('questions')
             ->orderBy('created_at', 'desc')
             ->get();
@@ -46,12 +52,56 @@ class SurveyController extends Controller
             ->where('survey_id', $id)
             ->exists();
 
-        if ($existing) {
-            return response()->json(['error' => 'Already completed'], 409);
-        }
-
         return response()->json([
             'survey' => new SurveyDetailResource($survey),
+            'completed' => $existing,
+        ]);
+    }
+
+    public function result(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        $survey = Survey::where('id', $id)
+            ->where('company_id', $user->company_id)
+            ->with(['questions' => fn($q) => $q->orderBy('order', 'asc')])
+            ->first();
+
+        if (!$survey) {
+            return response()->json(['error' => 'Not found'], 404);
+        }
+
+        $response = SurveyResponse::where('survey_id', $id)
+            ->where('user_id', $user->id)
+            ->with('answers')
+            ->first();
+
+        if (!$response) {
+            return response()->json(['error' => 'No result for this survey'], 404);
+        }
+
+        $answersByQuestion = $response->answers->keyBy('question_id');
+
+        return response()->json([
+            'survey' => [
+                'id' => $survey->id,
+                'title' => $survey->title,
+                'description' => $survey->description,
+                'submittedAt' => $response->submitted_at?->toIso8601String(),
+                'questions' => $survey->questions->map(function ($question) use ($answersByQuestion) {
+                    $answer = $answersByQuestion->get($question->id);
+                    return [
+                        'id' => $question->id,
+                        'text' => $question->text,
+                        'type' => $question->type->value,
+                        'answer' => [
+                            'scaleValue' => $answer?->scale_value,
+                            'textValue' => $answer?->text_value,
+                            'choiceValue' => $answer?->choice_value,
+                            'boolValue' => $answer?->bool_value,
+                        ],
+                    ];
+                }),
+            ],
         ]);
     }
 

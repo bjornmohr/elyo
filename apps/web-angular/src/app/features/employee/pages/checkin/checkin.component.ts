@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -17,8 +17,19 @@ import { EmployeeService } from '../../services/employee.service';
         <h1 class="text-xl font-bold text-slate-800">Check-in</h1>
       </header>
 
+      <div *ngIf="loading()" class="flex justify-center py-12">
+        <div class="w-8 h-8 border-4 border-teal-500/30 border-t-teal-500 rounded-full animate-spin"></div>
+      </div>
+
+      <div *ngIf="!loading() && alreadyDone()" class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 text-center space-y-4">
+        <div class="text-5xl">✓</div>
+        <h2 class="text-2xl font-bold text-slate-800">Check-in already completed</h2>
+        <p class="text-slate-500">You can submit one wellbeing check-in per day. Come back tomorrow for the next one.</p>
+        <a routerLink="/employee" class="inline-block bg-teal-600 text-white px-6 py-3 rounded-2xl font-bold">Back to dashboard</a>
+      </div>
+
       <!-- Progress -->
-      <div class="flex justify-between items-center px-2">
+      <div *ngIf="!loading() && !alreadyDone()" class="flex justify-between items-center px-2">
         <div *ngFor="let s of [0, 1, 2, 3]; let i = index"
              class="h-1 flex-1 mx-1 rounded-full transition-colors duration-500"
              [class.bg-teal-500]="i <= step()"
@@ -26,7 +37,7 @@ import { EmployeeService } from '../../services/employee.service';
         </div>
       </div>
 
-      <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 min-h-[400px] flex flex-col justify-between">
+      <div *ngIf="!loading() && !alreadyDone()" class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 min-h-[400px] flex flex-col justify-between">
         <!-- Step 0: Mood -->
         <div *ngIf="step() === 0" class="space-y-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
           <h2 class="text-2xl font-bold text-slate-800">How are you feeling?</h2>
@@ -80,11 +91,12 @@ import { EmployeeService } from '../../services/employee.service';
             {{ step() === 3 ? 'Finish' : 'Next' }}
           </button>
         </div>
+        <p *ngIf="error()" class="text-sm text-red-600 text-center mt-3">{{ error() }}</p>
       </div>
     </div>
   `
 })
-export class CheckinComponent {
+export class CheckinComponent implements OnInit {
   private employeeService = inject(EmployeeService);
   private router = inject(Router);
 
@@ -93,6 +105,19 @@ export class CheckinComponent {
   stress = signal(5);
   energy = signal(5);
   notes = signal('');
+  loading = signal(true);
+  alreadyDone = signal(false);
+  error = signal<string | null>(null);
+
+  ngOnInit() {
+    this.employeeService.getCheckinStatus().subscribe({
+      next: status => {
+        this.alreadyDone.set(status.completed);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false)
+    });
+  }
 
   next() {
     if (this.step() < 3) {
@@ -109,13 +134,21 @@ export class CheckinComponent {
   }
 
   submit() {
+    this.error.set(null);
     this.employeeService.submitCheckin({
       mood: this.mood(),
       stress: this.stress(),
       energy: this.energy(),
       notes: this.notes()
-    }).subscribe(() => {
-      this.router.navigate(['/employee']);
+    }).subscribe({
+      next: () => this.router.navigate(['/employee']),
+      error: err => {
+        if (err.status === 409) {
+          this.alreadyDone.set(true);
+        } else {
+          this.error.set('Check-in could not be submitted.');
+        }
+      }
     });
   }
 

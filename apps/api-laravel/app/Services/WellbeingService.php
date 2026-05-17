@@ -4,22 +4,13 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Models\WellbeingEntry;
-use App\Enums\CheckinFrequency;
 use Carbon\Carbon;
 
 class WellbeingService
 {
     public function getPeriodKey(User $user): string
     {
-        $now = Carbon::now();
-        $frequency = $user->company->checkin_frequency ?? CheckinFrequency::WEEKLY;
-
-        if ($frequency === CheckinFrequency::DAILY) {
-            return $now->toDateString();
-        }
-
-        // WEEKLY: ISO week key e.g. "2024-W12"
-        return $now->format('Y-\WW');
+        return Carbon::now()->toDateString();
     }
 
     public function calculateScore(int $mood, int $stress, int $energy): float
@@ -32,19 +23,15 @@ class WellbeingService
         $periodKey = $this->getPeriodKey($user);
         $score = $this->calculateScore($data['mood'], $data['stress'], $data['energy']);
 
-        return WellbeingEntry::updateOrCreate(
-            [
-                'user_id' => $user->id,
-                'period_key' => $periodKey,
-            ],
-            [
-                'company_id' => $user->company_id,
-                'mood' => $data['mood'],
-                'stress' => $data['stress'],
-                'energy' => $data['energy'],
-                'score' => $score,
-                'note' => $data['note'] ?? null,
-            ]
-        );
+        return WellbeingEntry::create([
+            'user_id' => $user->id,
+            'period_key' => $periodKey,
+            'company_id' => $user->company_id,
+            'mood' => $data['mood'],
+            'stress' => $data['stress'],
+            'energy' => $data['energy'],
+            'score' => $score,
+            'note' => $data['note'] ?? null,
+        ]);
     }
 }

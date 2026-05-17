@@ -14,6 +14,8 @@ class PointsService
     {
         $points = match ($reason) {
             'daily_checkin' => 10,
+            'anamnesis_completed' => 100,
+            'medical_document_upload' => 25,
             'streak_7days' => 50,
             'streak_30days' => 200,
             default => 0,

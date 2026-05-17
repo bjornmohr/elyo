@@ -80,13 +80,17 @@ Route::middleware('auth:sanctum')->group(function () {
     // Employee routes (EMPLOYEE only)
     Route::middleware('role:EMPLOYEE')->prefix('employee')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\Employee\EmployeeController::class, 'dashboard']);
+        Route::get('/checkin/status', [\App\Http\Controllers\Employee\EmployeeController::class, 'checkinStatus']);
         Route::post('/checkin', [\App\Http\Controllers\Employee\EmployeeController::class, 'checkin']);
         Route::get('/history', [\App\Http\Controllers\Employee\EmployeeController::class, 'history']);
         Route::get('/profile', [\App\Http\Controllers\Employee\EmployeeController::class, 'getProfile']);
         Route::put('/profile', [\App\Http\Controllers\Employee\EmployeeController::class, 'updateProfile']);
+        Route::post('/documents', [\App\Http\Controllers\Employee\EmployeeController::class, 'uploadDocument']);
+        Route::get('/measures', [\App\Http\Controllers\Employee\EmployeeController::class, 'measures']);
 
         Route::get('/surveys', [\App\Http\Controllers\Employee\SurveyController::class, 'index']);
         Route::get('/surveys/{id}', [\App\Http\Controllers\Employee\SurveyController::class, 'show']);
+        Route::get('/surveys/{id}/result', [\App\Http\Controllers\Employee\SurveyController::class, 'result']);
         Route::post('/surveys/{id}/respond', [\App\Http\Controllers\Employee\SurveyController::class, 'respond']);
     });
 });
