@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ApiClient } from '../../../../core/services/api-client.service';
+import { NotificationService } from '../../../../shared/notifications/notification.service';
 
 @Component({
   selector: 'app-admin-companies-create',
@@ -72,6 +73,7 @@ export class AdminCompaniesCreateComponent {
   private fb = inject(FormBuilder);
   private api = inject(ApiClient);
   private router = inject(Router);
+  private notifications = inject(NotificationService);
 
   form = this.fb.group({
     name: ['', [Validators.required]],
@@ -101,17 +103,22 @@ export class AdminCompaniesCreateComponent {
           next: (inviteRes) => {
             this.success.set(true);
             this.inviteToken.set(inviteRes.data.invite_token);
+            this.notifications.success('Unternehmen wurde angelegt und die Einladung wurde gespeichert.');
             this.loading.set(false);
           },
           error: (err) => {
             this.success.set(true); // Company was created
-            this.error.set('Unternehmen angelegt, aber Einladung fehlgeschlagen: ' + (err.error?.error?.message || 'Unbekannter Fehler'));
+            const message = 'Unternehmen angelegt, aber Einladung fehlgeschlagen: ' + (err.error?.error?.message || 'Unbekannter Fehler');
+            this.error.set(message);
+            this.notifications.error(message);
             this.loading.set(false);
           }
         });
       },
       error: (err) => {
-        this.error.set(err.error?.error?.message || err.error?.message || 'Fehler beim Anlegen.');
+        const message = err.error?.error?.message || err.error?.message || 'Fehler beim Anlegen.';
+        this.error.set(message);
+        this.notifications.error(message);
         this.loading.set(false);
       }
     });

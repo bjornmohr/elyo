@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { EmployeeService } from '../../services/employee.service';
+import { NotificationService } from '../../../../shared/notifications/notification.service';
 
 @Component({
   selector: 'app-checkin',
@@ -99,6 +100,7 @@ import { EmployeeService } from '../../services/employee.service';
 export class CheckinComponent implements OnInit {
   private employeeService = inject(EmployeeService);
   private router = inject(Router);
+  private notifications = inject(NotificationService);
 
   step = signal(0);
   mood = signal(5);
@@ -141,12 +143,17 @@ export class CheckinComponent implements OnInit {
       energy: this.energy(),
       notes: this.notes()
     }).subscribe({
-      next: () => this.router.navigate(['/employee']),
+      next: () => {
+        this.notifications.success('Check-in wurde gespeichert.');
+        this.router.navigate(['/employee']);
+      },
       error: err => {
         if (err.status === 409) {
           this.alreadyDone.set(true);
         } else {
-          this.error.set('Check-in konnte nicht gespeichert werden.');
+          const message = 'Check-in konnte nicht gespeichert werden.';
+          this.error.set(message);
+          this.notifications.error(message);
         }
       }
     });

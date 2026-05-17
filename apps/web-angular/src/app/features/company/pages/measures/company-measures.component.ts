@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiClient } from '../../../../core/services/api-client.service';
+import { NotificationService } from '../../../../shared/notifications/notification.service';
 
 @Component({
   selector: 'app-company-measures',
@@ -107,6 +108,7 @@ import { ApiClient } from '../../../../core/services/api-client.service';
 export class CompanyMeasuresComponent implements OnInit {
   private api = inject(ApiClient);
   private fb = inject(FormBuilder);
+  private notifications = inject(NotificationService);
 
   measures = signal<any[]>([]);
   teams = signal<any[]>([]);
@@ -153,10 +155,13 @@ export class CompanyMeasuresComponent implements OnInit {
         this.measures.update(measures => [res.data, ...measures]);
         this.measureForm.reset({ title: '', category: '', description: '', teamId: null, status: 'ACTIVE' });
         this.showForm.set(false);
+        this.notifications.success('Maßnahme wurde gespeichert.');
         this.saving.set(false);
       },
       error: err => {
-        this.formError.set(this.validationMessage(err));
+        const message = this.validationMessage(err);
+        this.formError.set(message);
+        this.notifications.error(message);
         this.saving.set(false);
       }
     });

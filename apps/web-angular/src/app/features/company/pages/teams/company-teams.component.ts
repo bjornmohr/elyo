@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiClient } from '../../../../core/services/api-client.service';
+import { NotificationService } from '../../../../shared/notifications/notification.service';
 
 @Component({
   selector: 'app-company-teams',
@@ -84,6 +85,7 @@ import { ApiClient } from '../../../../core/services/api-client.service';
 export class CompanyTeamsComponent implements OnInit {
   private api = inject(ApiClient);
   private fb = inject(FormBuilder);
+  private notifications = inject(NotificationService);
 
   teams = signal<any[]>([]);
   users = signal<any[]>([]);
@@ -133,10 +135,13 @@ export class CompanyTeamsComponent implements OnInit {
         this.teams.update(teams => [res.data, ...teams]);
         this.teamForm.reset({ name: '', description: '', color: '#14b8a6', managerId: null });
         this.showForm.set(false);
+        this.notifications.success('Team wurde gespeichert.');
         this.saving.set(false);
       },
       error: err => {
-        this.formError.set(this.validationMessage(err));
+        const message = this.validationMessage(err);
+        this.formError.set(message);
+        this.notifications.error(message);
         this.saving.set(false);
       }
     });

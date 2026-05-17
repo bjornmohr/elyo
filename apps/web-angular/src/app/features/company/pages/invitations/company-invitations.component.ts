@@ -2,6 +2,7 @@ import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiClient } from '../../../../core/services/api-client.service';
+import { NotificationService } from '../../../../shared/notifications/notification.service';
 
 @Component({
   selector: 'app-company-invitations',
@@ -100,6 +101,7 @@ import { ApiClient } from '../../../../core/services/api-client.service';
 export class CompanyInvitationsComponent implements OnInit {
   private api = inject(ApiClient);
   private fb = inject(FormBuilder);
+  private notifications = inject(NotificationService);
 
   invitations = signal<any[]>([]);
   loading = signal(true);
@@ -136,10 +138,13 @@ export class CompanyInvitationsComponent implements OnInit {
         this.lastToken.set(res.data.invite_token);
         this.inviting.set(false);
         this.inviteForm.reset({ role: 'EMPLOYEE' });
+        this.notifications.success('Einladung wurde gespeichert.');
         this.loadInvitations();
       },
       error: (err) => {
-        this.inviteError.set(err.error?.error?.message || 'Einladung fehlgeschlagen.');
+        const message = err.error?.error?.message || 'Einladung fehlgeschlagen.';
+        this.inviteError.set(message);
+        this.notifications.error(message);
         this.inviting.set(false);
       }
     });
@@ -147,7 +152,11 @@ export class CompanyInvitationsComponent implements OnInit {
 
   revoke(id: number) {
     this.api.delete(`/company/invitations/${id}`).subscribe({
-      next: () => this.loadInvitations(),
+      next: () => {
+        this.notifications.success('Einladung wurde widerrufen.');
+        this.loadInvitations();
+      },
+      error: () => this.notifications.error('Einladung konnte nicht widerrufen werden.'),
     });
   }
 }

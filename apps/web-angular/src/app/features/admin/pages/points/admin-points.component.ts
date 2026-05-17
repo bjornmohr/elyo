@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiClient } from '../../../../core/services/api-client.service';
+import { NotificationService } from '../../../../shared/notifications/notification.service';
 
 @Component({
   selector: 'app-admin-points',
@@ -44,6 +45,7 @@ import { ApiClient } from '../../../../core/services/api-client.service';
 export class AdminPointsComponent implements OnInit {
   private api = inject(ApiClient);
   private fb = inject(FormBuilder);
+  private notifications = inject(NotificationService);
 
   fields = [
     { key: 'daily_checkin', label: 'Täglicher Check-in' },
@@ -89,10 +91,13 @@ export class AdminPointsComponent implements OnInit {
       next: res => {
         this.form.patchValue(res.data ?? {});
         this.success.set(true);
+        this.notifications.success('Punktwerte wurden gespeichert.');
         this.saving.set(false);
       },
       error: err => {
-        this.error.set(err.error?.message ?? 'Punktwerte konnten nicht gespeichert werden.');
+        const message = err.error?.message ?? 'Punktwerte konnten nicht gespeichert werden.';
+        this.error.set(message);
+        this.notifications.error(message);
         this.saving.set(false);
       }
     });

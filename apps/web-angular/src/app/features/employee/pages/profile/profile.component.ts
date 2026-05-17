@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { EmployeeService } from '../../services/employee.service';
+import { NotificationService } from '../../../../shared/notifications/notification.service';
 
 @Component({
   selector: 'app-profile',
@@ -101,6 +102,7 @@ import { EmployeeService } from '../../services/employee.service';
 })
 export class ProfileComponent implements OnInit {
   private employeeService = inject(EmployeeService);
+  private notifications = inject(NotificationService);
   profile = signal<any>(null);
   documents = signal<any[]>([]);
   uploadError = signal<string | null>(null);
@@ -140,8 +142,14 @@ export class ProfileComponent implements OnInit {
   }
 
   save() {
-    this.employeeService.updateProfile(this.form).subscribe((res: any) => {
-      this.profile.set({ ...this.profile(), ...res.data });
+    this.employeeService.updateProfile(this.form).subscribe({
+      next: (res: any) => {
+        this.profile.set({ ...this.profile(), ...res.data });
+        this.notifications.success('Anamnese wurde gespeichert.');
+      },
+      error: err => {
+        this.notifications.error(err.error?.message || 'Anamnese konnte nicht gespeichert werden.');
+      },
     });
   }
 
@@ -154,8 +162,15 @@ export class ProfileComponent implements OnInit {
       return;
     }
     this.employeeService.uploadDocument(file).subscribe({
-      next: (res: any) => this.documents.update(documents => [res.data, ...documents]),
-      error: err => this.uploadError.set(err.error?.message || 'Upload fehlgeschlagen.'),
+      next: (res: any) => {
+        this.documents.update(documents => [res.data, ...documents]);
+        this.notifications.success('Dokument wurde gespeichert.');
+      },
+      error: err => {
+        const message = err.error?.message || 'Upload fehlgeschlagen.';
+        this.uploadError.set(message);
+        this.notifications.error(message);
+      },
     });
   }
 }

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { EmployeeService, SurveyListItem, SurveyDetail, SurveyResult } from '../../services/employee.service';
+import { NotificationService } from '../../../../shared/notifications/notification.service';
 
 @Component({
   selector: 'app-surveys',
@@ -106,6 +107,7 @@ import { EmployeeService, SurveyListItem, SurveyDetail, SurveyResult } from '../
 })
 export class SurveysComponent implements OnInit {
   private employeeService = inject(EmployeeService);
+  private notifications = inject(NotificationService);
 
   surveys = signal<SurveyListItem[]>([]);
   selectedSurvey = signal<SurveyDetail | null>(null);
@@ -164,10 +166,15 @@ export class SurveysComponent implements OnInit {
       return answer;
     });
 
-    this.employeeService.submitSurveyResponse(survey.id, payload).subscribe(() => {
-      alert('Danke für dein Feedback!');
-      this.selectedSurvey.set(null);
-      this.loadSurveys();
+    this.employeeService.submitSurveyResponse(survey.id, payload).subscribe({
+      next: () => {
+        this.notifications.success('Antworten wurden gespeichert.');
+        this.selectedSurvey.set(null);
+        this.loadSurveys();
+      },
+      error: err => {
+        this.notifications.error(err.error?.message || 'Antworten konnten nicht gespeichert werden.');
+      },
     });
   }
 }

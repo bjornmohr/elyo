@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiClient } from '../../../../core/services/api-client.service';
+import { NotificationService } from '../../../../shared/notifications/notification.service';
 
 @Component({
   selector: 'app-company-surveys',
@@ -153,6 +154,7 @@ import { ApiClient } from '../../../../core/services/api-client.service';
 export class CompanySurveysComponent implements OnInit {
   private api = inject(ApiClient);
   private fb = inject(FormBuilder);
+  private notifications = inject(NotificationService);
 
   surveys = signal<any[]>([]);
   teams = signal<any[]>([]);
@@ -231,7 +233,9 @@ export class CompanySurveysComponent implements OnInit {
     });
 
     if (questions.some(question => question.type === 'MULTIPLE_CHOICE' && !question.options?.length)) {
-      this.formError.set('Mehrfachauswahl-Fragen brauchen mindestens eine Option.');
+      const message = 'Mehrfachauswahl-Fragen brauchen mindestens eine Option.';
+      this.formError.set(message);
+      this.notifications.error(message);
       return;
     }
 
@@ -243,10 +247,13 @@ export class CompanySurveysComponent implements OnInit {
         this.surveys.update(surveys => [res.data, ...surveys]);
         this.resetForm();
         this.showForm.set(false);
+        this.notifications.success('Umfrage wurde gespeichert.');
         this.saving.set(false);
       },
       error: err => {
-        this.formError.set(this.validationMessage(err));
+        const message = this.validationMessage(err);
+        this.formError.set(message);
+        this.notifications.error(message);
         this.saving.set(false);
       }
     });

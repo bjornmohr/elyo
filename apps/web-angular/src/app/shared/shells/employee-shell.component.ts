@@ -1,11 +1,12 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { NotificationBannerComponent } from '../notifications/notification-banner.component';
 
 @Component({
   selector: 'app-employee-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, NotificationBannerComponent],
   template: `
     <div class="min-h-screen flex" style="background: hsl(40, 20%, 97%)">
       <aside class="w-64 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col">
@@ -45,6 +46,7 @@ import { AuthService } from '../../core/services/auth.service';
         </div>
       </aside>
       <main class="flex-1 p-8 overflow-auto">
+        <app-notification-banner />
         <router-outlet />
       </main>
     </div>
