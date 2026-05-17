@@ -4,12 +4,22 @@
     <div class="flex items-center gap-8">
       <span class="text-2xl font-bold text-elyo-500">ELYO</span>
 
-      <nav *ngIf="authStore.isAuthenticated()" class="flex gap-4">
-        <a routerLink="/employee" *ngIf="authStore.hasRole([Role.EMPLOYEE])" routerLinkActive="text-elyo-500 font-bold" class="text-elyo-ink-soft hover:text-elyo-500">Dashboard</a>
-        <a routerLink="/company" *ngIf="authStore.hasRole([Role.COMPANY_ADMIN, Role.COMPANY_MANAGER])" routerLinkActive="text-elyo-500 font-bold" class="text-elyo-ink-soft hover:text-elyo-500">Company</a>
-        <a routerLink="/partner" *ngIf="authStore.hasRole([Role.PARTNER])" routerLinkActive="text-elyo-500 font-bold" class="text-elyo-ink-soft hover:text-elyo-500">Partner</a>
-        <a routerLink="/admin" *ngIf="authStore.hasRole([Role.ELYO_ADMIN])" routerLinkActive="text-elyo-500 font-bold" class="text-elyo-ink-soft hover:text-elyo-500">Admin</a>
-      </nav>
+      @if (authStore.isAuthenticated()) {
+        <nav class="flex gap-4">
+          @if (authStore.hasRole([Role.EMPLOYEE])) {
+            <a routerLink="/employee" routerLinkActive="text-elyo-500 font-bold" class="text-elyo-ink-soft hover:text-elyo-500">Dashboard</a>
+          }
+          @if (authStore.hasRole([Role.COMPANY_ADMIN, Role.COMPANY_MANAGER])) {
+            <a routerLink="/company" routerLinkActive="text-elyo-500 font-bold" class="text-elyo-ink-soft hover:text-elyo-500">Company</a>
+          }
+          @if (authStore.hasRole([Role.PARTNER])) {
+            <a routerLink="/partner" routerLinkActive="text-elyo-500 font-bold" class="text-elyo-ink-soft hover:text-elyo-500">Partner</a>
+          }
+          @if (authStore.hasRole([Role.ELYO_ADMIN])) {
+            <a routerLink="/admin" routerLinkActive="text-elyo-500 font-bold" class="text-elyo-ink-soft hover:text-elyo-500">Admin</a>
+          }
+        </nav>
+      }
     </div>
 
     <div class="flex items-center gap-4">
@@ -29,13 +39,16 @@
         API: {{ healthStatus === 'ok' ? 'Online' : healthStatus === 'error' ? 'Offline' : 'Checking...' }}
       </div>
 
-      <div *ngIf="authStore.isAuthenticated()" class="flex items-center gap-3">
-        <span class="text-sm font-medium">{{ authStore.user()?.name }}</span>
-        <button (click)="logout()" class="text-sm text-red-600 hover:underline">Logout</button>
-      </div>
-      <div *ngIf="!authStore.isAuthenticated()" class="flex items-center gap-3">
-        <a routerLink="/auth/login" class="text-sm font-medium text-elyo-500">Login</a>
-      </div>
+      @if (authStore.isAuthenticated()) {
+        <div class="flex items-center gap-3">
+          <span class="text-sm font-medium">{{ authStore.user()?.name }}</span>
+          <button (click)="logout()" class="text-sm text-red-600 hover:underline">Logout</button>
+        </div>
+      } @else {
+        <div class="flex items-center gap-3">
+          <a routerLink="/auth/login" class="text-sm font-medium text-elyo-500">Login</a>
+        </div>
+      }
     </div>
   </header>
 

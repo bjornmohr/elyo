@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { ApiClient } from '../../../../core/services/api-client.service';
 import { NotificationService } from '../../../../shared/notifications/notification.service';
 
@@ -72,7 +72,6 @@ import { NotificationService } from '../../../../shared/notifications/notificati
 export class AdminCompaniesCreateComponent {
   private fb = inject(FormBuilder);
   private api = inject(ApiClient);
-  private router = inject(Router);
   private notifications = inject(NotificationService);
 
   form = this.fb.group({

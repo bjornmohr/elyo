@@ -16,50 +16,54 @@ import { EmployeeService, WellbeingEntry } from '../../services/employee.service
         <h1 class="text-xl font-bold text-slate-800">Check-in Verlauf</h1>
       </header>
 
-      <div class="space-y-4" *ngIf="entries().length; else emptyState">
-        <div *ngFor="let entry of entries()" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 space-y-3">
-          <div class="flex justify-between items-start">
-            <div class="flex items-center space-x-3">
-              <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
-                   [style.backgroundColor]="getScoreColor(entry.score) + '20'"
-                   [style.color]="getScoreColor(entry.score)">
-                {{ getMoodEmoji(entry.mood) }}
+      @if (entries().length) {
+        <div class="space-y-4">
+          @for (entry of entries(); track entry.id) {
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 space-y-3">
+              <div class="flex justify-between items-start">
+                <div class="flex items-center space-x-3">
+                  <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
+                       [style.backgroundColor]="getScoreColor(entry.score) + '20'"
+                       [style.color]="getScoreColor(entry.score)">
+                    {{ getMoodEmoji(entry.mood) }}
+                  </div>
+                  <div>
+                    <div class="font-bold text-slate-800">Mood {{ entry.mood ?? '-' }}/10</div>
+                    <div class="text-sm text-slate-400">{{ entry.createdAt | date:'EEEE, d. MMMM' }}</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="text-2xl font-black" [style.color]="getScoreColor(entry.score)">
+                    {{ entry.score.toFixed(1) }}
+                  </div>
+                  <div class="text-[10px] font-bold uppercase tracking-widest text-slate-300">Score</div>
+                </div>
               </div>
-              <div>
-                <div class="font-bold text-slate-800">Mood {{ entry.mood ?? '-' }}/10</div>
-                <div class="text-sm text-slate-400">{{ entry.createdAt | date:'EEEE, d. MMMM' }}</div>
-              </div>
-            </div>
-            <div class="text-right">
-              <div class="text-2xl font-black" [style.color]="getScoreColor(entry.score)">
-                {{ entry.score.toFixed(1) }}
-              </div>
-              <div class="text-[10px] font-bold uppercase tracking-widest text-slate-300">Score</div>
-            </div>
-          </div>
 
-          <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-50">
-             <div class="text-center p-2 rounded-xl bg-slate-50">
-               <div class="text-xs text-slate-400">Stress</div>
-               <div class="font-bold text-slate-700">{{ entry.stress ?? '-' }}/10</div>
-             </div>
-             <div class="text-center p-2 rounded-xl bg-slate-50">
-               <div class="text-xs text-slate-400">Energy</div>
-               <div class="font-bold text-slate-700">{{ entry.energy ?? '-' }}/10</div>
-             </div>
-             <div class="text-center p-2 rounded-xl bg-slate-50">
-               <div class="text-xs text-slate-400">Mood</div>
-               <div class="font-bold text-slate-700">{{ entry.mood ?? '-' }}/10</div>
-             </div>
-          </div>
+              <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-50">
+                 <div class="text-center p-2 rounded-xl bg-slate-50">
+                   <div class="text-xs text-slate-400">Stress</div>
+                   <div class="font-bold text-slate-700">{{ entry.stress ?? '-' }}/10</div>
+                 </div>
+                 <div class="text-center p-2 rounded-xl bg-slate-50">
+                   <div class="text-xs text-slate-400">Energy</div>
+                   <div class="font-bold text-slate-700">{{ entry.energy ?? '-' }}/10</div>
+                 </div>
+                 <div class="text-center p-2 rounded-xl bg-slate-50">
+                   <div class="text-xs text-slate-400">Mood</div>
+                   <div class="font-bold text-slate-700">{{ entry.mood ?? '-' }}/10</div>
+                 </div>
+              </div>
 
-          <div *ngIf="entry.notes" class="bg-teal-50/50 p-3 rounded-xl text-sm text-slate-600 italic border-l-2 border-teal-200">
-            "{{ entry.notes }}"
-          </div>
+              @if (entry.notes) {
+                <div class="bg-teal-50/50 p-3 rounded-xl text-sm text-slate-600 italic border-l-2 border-teal-200">
+                  "{{ entry.notes }}"
+                </div>
+              }
+            </div>
+          }
         </div>
-      </div>
-
-      <ng-template #emptyState>
+      } @else {
         <div class="bg-white rounded-3xl p-12 text-center border border-dashed border-slate-200">
           <div class="text-4xl mb-4">📜</div>
           <h3 class="text-lg font-bold text-slate-800 mb-2">Noch kein Verlauf vorhanden</h3>
@@ -68,7 +72,7 @@ import { EmployeeService, WellbeingEntry } from '../../services/employee.service
             Jetzt starten
           </a>
         </div>
-      </ng-template>
+      }
     </div>
   `
 })

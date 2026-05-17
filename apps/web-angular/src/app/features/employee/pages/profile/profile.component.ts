@@ -16,9 +16,11 @@ import { NotificationService } from '../../../../shared/notifications/notificati
         <h1 class="text-xl font-bold text-slate-800">Gesundheitsprofil</h1>
       </header>
 
-      <div *ngIf="profile()?.anamnesisDue" class="bg-amber-50 border border-amber-100 text-amber-800 rounded-2xl p-4 text-sm">
-        Deine Anamnese-Daten sind zur Aktualisierung fällig. Bitte prüfe sie und aktualisiere sie.
-      </div>
+      @if (profile()?.anamnesisDue) {
+        <div class="bg-amber-50 border border-amber-100 text-amber-800 rounded-2xl p-4 text-sm">
+          Deine Anamnese-Daten sind zur Aktualisierung fällig. Bitte prüfe sie und aktualisiere sie.
+        </div>
+      }
 
       <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
         <div class="p-6 bg-slate-50 border-b border-slate-100">
@@ -90,11 +92,15 @@ import { NotificationService } from '../../../../shared/notifications/notificati
         </div>
         <div class="p-6 space-y-4">
           <input type="file" accept="application/pdf" (change)="upload($event)" class="block w-full text-sm text-slate-500">
-          <p *ngIf="uploadError()" class="text-sm text-red-600">{{ uploadError() }}</p>
-          <div *ngFor="let document of documents()" class="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
-            <span class="font-medium text-slate-700">{{ document.fileName }}</span>
-            <span class="text-xs text-slate-400">{{ document.uploadedAt | date:'mediumDate' }}</span>
-          </div>
+          @if (uploadError()) {
+            <p class="text-sm text-red-600">{{ uploadError() }}</p>
+          }
+          @for (document of documents(); track document.id) {
+            <div class="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
+              <span class="font-medium text-slate-700">{{ document.fileName }}</span>
+              <span class="text-xs text-slate-400">{{ document.uploadedAt | date:'mediumDate' }}</span>
+            </div>
+          }
         </div>
       </div>
     </div>

@@ -44,25 +44,28 @@ import { EmployeeService, DashboardData } from '../../services/employee.service'
             <h3 class="font-semibold text-slate-800">Letzte Aktivitäten</h3>
             <a routerLink="/employee/history" class="text-teal-600 text-sm font-medium hover:underline">Alle anzeigen</a>
           </div>
-          <div class="space-y-4" *ngIf="data()?.recentEntries?.length; else emptyEntries">
-            <div *ngFor="let entry of data()?.recentEntries" class="flex items-center justify-between p-3 rounded-xl bg-slate-50">
-              <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg" [style.backgroundColor]="getScoreColor(entry.score) + '20'" [style.color]="getScoreColor(entry.score)">
-                  {{ getMoodEmoji(entry.mood) }}
+          @if (data()?.recentEntries?.length) {
+            <div class="space-y-4">
+              @for (entry of data()?.recentEntries; track entry.id) {
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50">
+                  <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg" [style.backgroundColor]="getScoreColor(entry.score) + '20'" [style.color]="getScoreColor(entry.score)">
+                      {{ getMoodEmoji(entry.mood) }}
+                    </div>
+                    <div>
+                      <div class="font-medium text-slate-800">Score {{ entry.score.toFixed(1) }}</div>
+                      <div class="text-xs text-slate-500">{{ entry.createdAt | date:'MMM d, HH:mm' }}</div>
+                    </div>
+                  </div>
+                  <div class="font-bold" [style.color]="getScoreColor(entry.score)">
+                    {{ entry.score.toFixed(1) }}
+                  </div>
                 </div>
-                <div>
-                  <div class="font-medium text-slate-800">Score {{ entry.score.toFixed(1) }}</div>
-                  <div class="text-xs text-slate-500">{{ entry.createdAt | date:'MMM d, HH:mm' }}</div>
-                </div>
-              </div>
-              <div class="font-bold" [style.color]="getScoreColor(entry.score)">
-                {{ entry.score.toFixed(1) }}
-              </div>
+              }
             </div>
-          </div>
-          <ng-template #emptyEntries>
+          } @else {
             <p class="text-center text-slate-400 py-8 italic">Noch keine Einträge vorhanden.</p>
-          </ng-template>
+          }
         </div>
 
         <!-- Surveys -->

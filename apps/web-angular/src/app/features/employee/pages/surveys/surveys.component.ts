@@ -19,89 +19,110 @@ import { NotificationService } from '../../../../shared/notifications/notificati
       </header>
 
       <!-- List View -->
-      <div *ngIf="!selectedSurvey()" class="space-y-4">
-        <div *ngFor="let survey of surveys()"
-             class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center justify-between group hover:border-teal-200 transition-colors">
-          <div class="space-y-1">
-            <div class="flex items-center space-x-2">
-              <h2 class="font-bold text-slate-800">{{ survey.title }}</h2>
-              <span *ngIf="survey.isCompleted" class="bg-teal-100 text-teal-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Abgeschlossen</span>
+      @if (!selectedSurvey()) {
+        <div class="space-y-4">
+          @for (survey of surveys(); track survey.id) {
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center justify-between group hover:border-teal-200 transition-colors">
+              <div class="space-y-1">
+                <div class="flex items-center space-x-2">
+                  <h2 class="font-bold text-slate-800">{{ survey.title }}</h2>
+                  @if (survey.isCompleted) {
+                    <span class="bg-teal-100 text-teal-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Abgeschlossen</span>
+                  }
+                </div>
+                <p class="text-sm text-slate-500">{{ survey.description }}</p>
+              </div>
+              <button (click)="selectSurvey(survey)"
+                      class="bg-slate-50 group-hover:bg-teal-600 group-hover:text-white text-slate-400 p-3 rounded-xl transition-all disabled:opacity-30">
+                →
+              </button>
             </div>
-            <p class="text-sm text-slate-500">{{ survey.description }}</p>
-          </div>
-          <button (click)="selectSurvey(survey)"
-                  class="bg-slate-50 group-hover:bg-teal-600 group-hover:text-white text-slate-400 p-3 rounded-xl transition-all disabled:opacity-30">
-            →
-          </button>
-        </div>
+          }
 
-        <div *ngIf="surveys().length === 0" class="text-center py-12 text-slate-400">
-          Aktuell sind keine Umfragen verfügbar.
+          @if (surveys().length === 0) {
+            <div class="text-center py-12 text-slate-400">
+              Aktuell sind keine Umfragen verfügbar.
+            </div>
+          }
         </div>
-      </div>
+      }
 
       <!-- Detail/Response View -->
-      <div *ngIf="selectedSurvey() as survey" class="animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-          <div class="p-8 bg-slate-50 border-b border-slate-100">
-             <h2 class="text-2xl font-bold text-slate-800">{{ survey.title }}</h2>
-             <p class="text-slate-500 mt-1">{{ survey.description }}</p>
-          </div>
-
-          <div class="p-8 space-y-10">
-            <div *ngFor="let q of survey.questions" class="space-y-4">
-               <label class="block font-bold text-slate-800">{{ q.text }}</label>
-
-               <!-- Scale Question -->
-               <div *ngIf="q.type === 'SCALE'" class="space-y-4">
-                  <input type="range" min="1" max="10" [(ngModel)]="answers[q.id]" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
-                  <div class="flex justify-between text-xs text-slate-400 font-bold uppercase tracking-widest">
-                    <span>1</span><span>10</span>
-                  </div>
-               </div>
-
-               <!-- Yes/No Question -->
-               <div *ngIf="q.type === 'YES_NO'" class="flex space-x-4">
-                 <button (click)="answers[q.id] = 'YES'"
-                         [class.bg-teal-600]="answers[q.id] === 'YES'"
-                         [class.text-white]="answers[q.id] === 'YES'"
-                         class="flex-1 py-3 px-6 rounded-xl border border-slate-100 font-bold transition-all">Ja</button>
-                 <button (click)="answers[q.id] = 'NO'"
-                         [class.bg-teal-600]="answers[q.id] === 'NO'"
-                         [class.text-white]="answers[q.id] === 'NO'"
-                         class="flex-1 py-3 px-6 rounded-xl border border-slate-100 font-bold transition-all">Nein</button>
-               </div>
-
-               <!-- Text Question -->
-               <div *ngIf="q.type === 'TEXT'">
-                 <textarea [(ngModel)]="answers[q.id]"
-                           class="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none min-h-[100px]"></textarea>
-               </div>
+      @if (selectedSurvey(); as survey) {
+        <div class="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="p-8 bg-slate-50 border-b border-slate-100">
+               <h2 class="text-2xl font-bold text-slate-800">{{ survey.title }}</h2>
+               <p class="text-slate-500 mt-1">{{ survey.description }}</p>
             </div>
 
-            <div class="flex space-x-4 pt-6">
-              <button (click)="selectedSurvey.set(null)" class="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl">Abbrechen</button>
-              <button (click)="submit()" class="flex-[2] py-4 bg-teal-600 text-white font-bold rounded-2xl shadow-lg shadow-teal-100">Antworten absenden</button>
+            <div class="p-8 space-y-10">
+              @for (q of survey.questions; track q.id) {
+                <div class="space-y-4">
+                 <label class="block font-bold text-slate-800">{{ q.text }}</label>
+
+                 <!-- Scale Question -->
+                 @if (q.type === 'SCALE') {
+                   <div class="space-y-4">
+                      <input type="range" min="1" max="10" [(ngModel)]="answers[q.id]" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
+                      <div class="flex justify-between text-xs text-slate-400 font-bold uppercase tracking-widest">
+                        <span>1</span><span>10</span>
+                      </div>
+                   </div>
+                 }
+
+                 <!-- Yes/No Question -->
+                 @if (q.type === 'YES_NO') {
+                   <div class="flex space-x-4">
+                     <button (click)="answers[q.id] = 'YES'"
+                             [class.bg-teal-600]="answers[q.id] === 'YES'"
+                             [class.text-white]="answers[q.id] === 'YES'"
+                             class="flex-1 py-3 px-6 rounded-xl border border-slate-100 font-bold transition-all">Ja</button>
+                     <button (click)="answers[q.id] = 'NO'"
+                             [class.bg-teal-600]="answers[q.id] === 'NO'"
+                             [class.text-white]="answers[q.id] === 'NO'"
+                             class="flex-1 py-3 px-6 rounded-xl border border-slate-100 font-bold transition-all">Nein</button>
+                   </div>
+                 }
+
+                 <!-- Text Question -->
+                 @if (q.type === 'TEXT') {
+                   <div>
+                     <textarea [(ngModel)]="answers[q.id]"
+                               class="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none min-h-[100px]"></textarea>
+                   </div>
+                 }
+                </div>
+              }
+
+              <div class="flex space-x-4 pt-6">
+                <button (click)="selectedSurvey.set(null)" class="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl">Abbrechen</button>
+                <button (click)="submit()" class="flex-[2] py-4 bg-teal-600 text-white font-bold rounded-2xl shadow-lg shadow-teal-100">Antworten absenden</button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      }
 
-      <div *ngIf="selectedResult() as result" class="animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-          <div class="p-8 bg-slate-50 border-b border-slate-100">
-             <h2 class="text-2xl font-bold text-slate-800">{{ result.title }}</h2>
-             <p class="text-slate-500 mt-1">Deine abgegebenen Antworten</p>
-          </div>
-          <div class="p-8 space-y-5">
-            <div *ngFor="let q of result.questions" class="rounded-2xl bg-slate-50 p-4">
-              <div class="font-bold text-slate-800">{{ q.text }}</div>
-              <div class="text-slate-600 mt-2">{{ answerLabel(q) }}</div>
+      @if (selectedResult(); as result) {
+        <div class="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="p-8 bg-slate-50 border-b border-slate-100">
+               <h2 class="text-2xl font-bold text-slate-800">{{ result.title }}</h2>
+               <p class="text-slate-500 mt-1">Deine abgegebenen Antworten</p>
             </div>
-            <button (click)="selectedResult.set(null)" class="w-full py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl">Zurück zu den Umfragen</button>
+            <div class="p-8 space-y-5">
+              @for (q of result.questions; track q.id) {
+                <div class="rounded-2xl bg-slate-50 p-4">
+                  <div class="font-bold text-slate-800">{{ q.text }}</div>
+                  <div class="text-slate-600 mt-2">{{ answerLabel(q) }}</div>
+                </div>
+              }
+              <button (click)="selectedResult.set(null)" class="w-full py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl">Zurück zu den Umfragen</button>
+            </div>
           </div>
         </div>
-      </div>
+      }
     </div>
   `
 })
