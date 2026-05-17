@@ -8,7 +8,7 @@ import { AuthService } from '../../core/services/auth.service';
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
   template: `
     <div class="min-h-screen flex" style="background: hsl(40, 20%, 97%)">
-      <aside class="w-64 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col">
+      <aside class="w-64 shrink-0 border-r border-gray-200 bg-white flex flex-col">
         <div class="p-6 flex items-center gap-3">
           <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background: linear-gradient(135deg, #14b8a6, #0d9488)">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2C8 2 3 5.5 3 9a5 5 0 0010 0C13 5.5 8 2 8 2z" fill="white" fill-opacity="0.9"/><path d="M8 6v4M6 8h4" stroke="#0a4540" stroke-width="1.5" stroke-linecap="round"/></svg>
