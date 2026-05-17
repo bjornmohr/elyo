@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { ApiClient } from './api-client.service';
 import { AuthStore } from '../store/auth.store';
 import { User, LoginResponse, MeResponse, Portal } from '../models/auth.models';
-import { Observable, tap, catchError, of, finalize, map } from 'rxjs';
+import { Observable, tap, catchError, of, finalize, map, shareReplay } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
@@ -12,6 +12,7 @@ export class AuthService {
   private api = inject(ApiClient);
   private store = inject(AuthStore);
   private router = inject(Router);
+  private meRequest$: Observable<User | null> | null = null;
 
   login(credentials: { email: string; password: string; requested_portal?: string }): Observable<LoginResponse> {
     this.store.setLoading(true);
@@ -34,7 +35,11 @@ export class AuthService {
 
   getMe(): Observable<User | null> {
     if (!this.store.token()) return of(null);
-    return this.api.get<MeResponse>('/auth/me').pipe(
+    if (this.store.user()) return of(this.store.user());
+    if (this.meRequest$) return this.meRequest$;
+
+    this.store.setLoading(true);
+    this.meRequest$ = this.api.get<MeResponse>('/auth/me').pipe(
       tap(res => {
         this.store.setUser(res);
         this.store.setAllowedPortals(res.allowedPortals);
@@ -48,8 +53,15 @@ export class AuthService {
       catchError(() => {
         this.store.clear();
         return of(null);
-      })
+      }),
+      finalize(() => {
+        this.store.setLoading(false);
+        this.meRequest$ = null;
+      }),
+      shareReplay(1)
     );
+
+    return this.meRequest$;
   }
 
   detectPortalFromHostname(): Portal | null {

@@ -94,14 +94,12 @@ export class DashboardComponent implements OnInit {
     return "#ef4444";
   }
 
-  getMoodEmoji(mood: string | null) {
-    switch (mood) {
-      case 'GREAT': return '😊';
-      case 'GOOD': return '🙂';
-      case 'OKAY': return '😐';
-      case 'BAD': return '🙁';
-      case 'TERRIBLE': return '😫';
-      default: return '✨';
-    }
+  getMoodEmoji(mood: number | null) {
+    if (mood === null) return '✨';
+    if (mood >= 9) return '😊';
+    if (mood >= 7) return '🙂';
+    if (mood >= 5) return '😐';
+    if (mood >= 3) return '🙁';
+    return '😫';
   }
 }

@@ -1,8 +1,9 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { AuthStore } from '../../../core/store/auth.store';
 import { AuthLayoutComponent } from '../components/auth-layout.component';
 
 @Component({
@@ -73,9 +74,11 @@ import { AuthLayoutComponent } from '../components/auth-layout.component';
     </app-auth-layout>
   `
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   private fb = inject(FormBuilder);
   private authService = inject(AuthService);
+  private authStore = inject(AuthStore);
+  private route = inject(ActivatedRoute);
   private router = inject(Router);
 
   loginForm = this.fb.group({
@@ -85,6 +88,27 @@ export class LoginComponent {
 
   loading = signal(false);
   error = signal<string | null>(null);
+
+  ngOnInit() {
+    if (this.authStore.isAuthenticated()) {
+      this.redirectAfterAuth(this.authStore.activePortal());
+      return;
+    }
+
+    if (!this.authStore.token()) return;
+
+    this.loading.set(true);
+    this.authService.getMe().subscribe({
+      next: user => {
+        if (user) {
+          this.redirectAfterAuth(this.authStore.activePortal());
+        } else {
+          this.loading.set(false);
+        }
+      },
+      error: () => this.loading.set(false)
+    });
+  }
 
   onSubmit() {
     if (this.loginForm.invalid) return;
@@ -100,8 +124,7 @@ export class LoginComponent {
       requested_portal: requestedPortal ?? undefined,
     }).subscribe({
       next: (res) => {
-        const route = this.authService.getDefaultRoute(res.activePortal);
-        this.router.navigate([route]);
+        this.redirectAfterAuth(res.activePortal);
       },
       error: (err) => {
         if (err.status === 403 && err.error?.error?.code === 'PORTAL_FORBIDDEN') {
@@ -112,5 +135,14 @@ export class LoginComponent {
         this.loading.set(false);
       }
     });
+  }
+
+  private redirectAfterAuth(portal = this.authStore.activePortal()) {
+    const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+    const target = returnUrl && returnUrl !== '/auth/login'
+      ? returnUrl
+      : this.authService.getDefaultRoute(portal);
+
+    this.router.navigateByUrl(target);
   }
 }

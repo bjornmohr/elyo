@@ -44,18 +44,27 @@ class AnonymityService
             AVG(stress) as avg_stress,
             AVG(energy) as avg_energy,
             AVG(score) as avg_score,
-            COUNT(id) as response_count
+            COUNT(id) as response_count,
+            COUNT(DISTINCT user_id) as respondent_count
         ')->first();
 
-        $count = (int) $stats->response_count;
+        $responseCount = (int) $stats->response_count;
+        $respondentCount = (int) $stats->respondent_count;
+        $eligibleEmployeeCount = $this->eligibleEmployeeCount($companyId, $options);
+        $participationRate = $eligibleEmployeeCount > 0
+            ? min(100, round(($respondentCount / $eligibleEmployeeCount) * 100))
+            : 0;
 
-        if ($count < $threshold) {
+        if ($respondentCount < $threshold) {
             return [
                 'avgMood' => 0,
                 'avgStress' => 0,
                 'avgEnergy' => 0,
                 'avgScore' => 0,
-                'responseCount' => $count,
+                'responseCount' => $responseCount,
+                'respondentCount' => $respondentCount,
+                'eligibleEmployeeCount' => $eligibleEmployeeCount,
+                'participationRate' => $participationRate,
                 'isAboveThreshold' => false,
             ];
         }
@@ -65,7 +74,10 @@ class AnonymityService
             'avgStress' => round($stats->avg_stress, 1),
             'avgEnergy' => round($stats->avg_energy, 1),
             'avgScore' => round($stats->avg_score, 1),
-            'responseCount' => $count,
+            'responseCount' => $responseCount,
+            'respondentCount' => $respondentCount,
+            'eligibleEmployeeCount' => $eligibleEmployeeCount,
+            'participationRate' => $participationRate,
             'isAboveThreshold' => true,
         ];
     }
@@ -120,10 +132,7 @@ class AnonymityService
     {
         $threshold = $options['threshold'] ?? self::DEFAULT_THRESHOLD;
 
-        $totalEmployees = User::where('company_id', $companyId)
-            ->where('status', 'active')
-            ->whereHas('roles', fn ($query) => $query->where('role', Role::EMPLOYEE->value))
-            ->count();
+        $totalEmployees = $this->eligibleEmployeeCount($companyId, $options);
 
         if ($totalEmployees < $threshold) {
             return [
@@ -138,10 +147,17 @@ class AnonymityService
         $currentPeriod = $this->currentPeriodKey();
         $checkedInThisPeriod = WellbeingEntry::where('company_id', $companyId)
             ->where('period_key', $currentPeriod)
-            ->count();
+            ->when(!empty($options['teamId']), function ($query) use ($options) {
+                $query->whereHas('user', fn ($q) => $q->where('team_id', $options['teamId']));
+            })
+            ->distinct('user_id')
+            ->count('user_id');
 
         // Get last 4 periods present in the DB for this company
         $periodKeys = WellbeingEntry::where('company_id', $companyId)
+            ->when(!empty($options['teamId']), function ($query) use ($options) {
+                $query->whereHas('user', fn ($q) => $q->where('team_id', $options['teamId']));
+            })
             ->orderBy('period_key', 'desc')
             ->distinct()
             ->limit(4)
@@ -151,6 +167,9 @@ class AnonymityService
         if ($periodKeys->count() >= 3) {
             $continuousUsers = WellbeingEntry::where('company_id', $companyId)
                 ->whereIn('period_key', $periodKeys)
+                ->when(!empty($options['teamId']), function ($query) use ($options) {
+                    $query->whereHas('user', fn ($q) => $q->where('team_id', $options['teamId']));
+                })
                 ->groupBy('user_id')
                 ->havingRaw('COUNT(DISTINCT period_key) >= 3')
                 ->get()
@@ -159,11 +178,20 @@ class AnonymityService
 
         return [
             'continuityRate' => $totalEmployees > 0 ? round(($continuousUsers / $totalEmployees) * 100) : 0,
-            'activeUserRate' => $totalEmployees > 0 ? round(($checkedInThisPeriod / $totalEmployees) * 100) : 0,
+            'activeUserRate' => $totalEmployees > 0 ? min(100, round(($checkedInThisPeriod / $totalEmployees) * 100)) : 0,
             'totalEmployees' => $totalEmployees,
             'checkedInThisPeriod' => $checkedInThisPeriod,
             'isAboveThreshold' => true,
         ];
+    }
+
+    private function eligibleEmployeeCount(string $companyId, array $options = []): int
+    {
+        return User::where('company_id', $companyId)
+            ->where('status', 'active')
+            ->whereHas('roles', fn ($query) => $query->where('role', Role::EMPLOYEE->value))
+            ->when(!empty($options['teamId']), fn ($query) => $query->where('team_id', $options['teamId']))
+            ->count();
     }
 
     /**

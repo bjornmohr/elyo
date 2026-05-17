@@ -96,6 +96,60 @@ class CompanyTest extends TestCase
         $response->assertJsonPath('company.avgScore', 7.3);
     }
 
+    public function test_company_dashboard_participation_counts_distinct_active_employees()
+    {
+        $employees = User::factory()->count(3)->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+
+        foreach (range(1, 10) as $index) {
+            WellbeingEntry::factory()->create([
+                'user_id' => $employees->first()->id,
+                'company_id' => $this->company->id,
+                'period_key' => sprintf('2024-W%02d', $index),
+            ]);
+        }
+
+        $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('company.responseCount', 10);
+        $response->assertJsonPath('company.respondentCount', 1);
+        $response->assertJsonPath('company.eligibleEmployeeCount', 3);
+        $response->assertJsonPath('company.participationRate', 33);
+        $response->assertJsonPath('company.isAboveThreshold', false);
+    }
+
+    public function test_company_dashboard_participation_is_capped_at_one_hundred_percent()
+    {
+        $employees = User::factory()->count(3)->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+
+        foreach ($employees as $employee) {
+            foreach (range(1, 4) as $index) {
+                WellbeingEntry::factory()->create([
+                    'user_id' => $employee->id,
+                    'company_id' => $this->company->id,
+                    'period_key' => sprintf('2024-W%02d', $index),
+                ]);
+            }
+        }
+
+        $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('company.responseCount', 12);
+        $response->assertJsonPath('company.respondentCount', 3);
+        $response->assertJsonPath('company.eligibleEmployeeCount', 3);
+        $response->assertJsonPath('company.participationRate', 100);
+        $response->assertJsonPath('company.isAboveThreshold', true);
+    }
+
     public function test_manager_scoping_to_team()
     {
         $otherTeam = Team::factory()->create(['company_id' => $this->company->id, 'name' => 'Sales']);

@@ -15,6 +15,9 @@ class AggregatedMetricsResource extends JsonResource
             'avgEnergy' => $this['avgEnergy'],
             'avgScore' => $this['avgScore'],
             'responseCount' => $this['responseCount'],
+            'respondentCount' => $this['respondentCount'],
+            'eligibleEmployeeCount' => $this['eligibleEmployeeCount'],
+            'participationRate' => $this['participationRate'],
             'isAboveThreshold' => $this['isAboveThreshold'],
         ];
     }

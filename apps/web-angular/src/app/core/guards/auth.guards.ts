@@ -1,31 +1,61 @@
 import { inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
+import { CanActivateFn, Router, UrlTree } from '@angular/router';
+import { map, Observable, of } from 'rxjs';
 import { AuthStore } from '../store/auth.store';
-import { Role, Portal } from '../models/auth.models';
+import { Role, Portal, User } from '../models/auth.models';
+import { AuthService } from '../services/auth.service';
+
+const loginUrl = (router: Router, returnUrl?: string): UrlTree =>
+  router.createUrlTree(['/auth/login'], returnUrl ? { queryParams: { returnUrl } } : undefined);
+
+const restoreUser = (store: AuthStore, authService: AuthService): Observable<User | null> => {
+  const user = store.user();
+  if (user) return of(user);
+  if (!store.token()) return of(null);
+  return authService.getMe();
+};
+
+const defaultAuthenticatedRoute = (store: AuthStore, authService: AuthService): string => {
+  const activePortal = store.activePortal();
+  if (activePortal) return authService.getDefaultRoute(activePortal);
+
+  const firstPortal = store.allowedPortals()[0] ?? null;
+  return authService.getDefaultRoute(firstPortal);
+};
 
 export const authGuard: CanActivateFn = (route, state) => {
   const store = inject(AuthStore);
   const router = inject(Router);
+  const authService = inject(AuthService);
 
   if (store.isAuthenticated()) {
     return true;
   }
 
-  router.navigate(['/auth/login'], { queryParams: { returnUrl: state.url } });
-  return false;
+  return restoreUser(store, authService).pipe(
+    map(user => user ? true : loginUrl(router, state.url))
+  );
 };
 
 export const roleGuard = (roles: Role[]): CanActivateFn => {
   return (route, state) => {
     const store = inject(AuthStore);
     const router = inject(Router);
+    const authService = inject(AuthService);
 
     if (store.hasRole(roles)) {
       return true;
     }
 
-    router.navigate(['/auth/login']);
-    return false;
+    return restoreUser(store, authService).pipe(
+      map(user => {
+        if (!user) return loginUrl(router, state.url);
+        if (store.hasRole(roles)) return true;
+
+        const route = defaultAuthenticatedRoute(store, authService);
+        return router.createUrlTree([route]);
+      })
+    );
   };
 };
 
@@ -33,12 +63,20 @@ export const portalGuard = (portal: Portal): CanActivateFn => {
   return (route, state) => {
     const store = inject(AuthStore);
     const router = inject(Router);
+    const authService = inject(AuthService);
 
     if (store.activePortal() === portal || store.allowedPortals().includes(portal)) {
       return true;
     }
 
-    router.navigate(['/auth/login']);
-    return false;
+    return restoreUser(store, authService).pipe(
+      map(user => {
+        if (!user) return loginUrl(router, state.url);
+        if (store.activePortal() === portal || store.allowedPortals().includes(portal)) return true;
+
+        const route = defaultAuthenticatedRoute(store, authService);
+        return router.createUrlTree([route]);
+      })
+    );
   };
 };

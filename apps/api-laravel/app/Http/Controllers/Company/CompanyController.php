@@ -55,7 +55,11 @@ class CompanyController extends Controller
         if ($isManager) {
             $teamQuery->where('id', $managedTeamId);
         }
-        $teams = $teamQuery->withCount('members')->get();
+        $teams = $teamQuery->withCount([
+            'members' => fn ($query) => $query
+                ->where('status', 'active')
+                ->whereHas('roles', fn ($roleQuery) => $roleQuery->where('role', \App\Enums\Role::EMPLOYEE->value)),
+        ])->get();
 
         foreach ($teams as $team) {
             $teamMetrics = $this->anonymityService->getAggregatedMetrics($companyId, [

@@ -31,7 +31,7 @@ import { ApiClient } from '../../../../core/services/api-client.service';
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <h3 class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2">Participation</h3>
           <p class="text-4xl font-bold text-gray-900">{{ participationLabel() }}</p>
-          <p class="text-xs text-gray-400 mt-2">Based on active team members</p>
+          <p class="text-xs text-gray-400 mt-2">{{ participantLabel() }}</p>
         </div>
 
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -86,10 +86,17 @@ export class CompanyDashboardComponent implements OnInit {
   }
 
   participationLabel() {
-    const teams = this.data()?.teams ?? [];
-    const members = teams.reduce((sum: number, t: any) => sum + (t.memberCount ?? 0), 0);
-    const responses = this.data()?.company?.responseCount ?? 0;
-    return members > 0 ? `${Math.round((responses / members) * 100)}%` : '—';
+    const rate = this.data()?.company?.participationRate;
+    return typeof rate === 'number' ? `${rate}%` : '—';
+  }
+
+  participantLabel() {
+    const company = this.data()?.company;
+    const respondents = company?.respondentCount ?? 0;
+    const eligible = company?.eligibleEmployeeCount ?? 0;
+    return eligible > 0
+      ? `${respondents} of ${eligible} active employees`
+      : 'No active employees';
   }
 
   trendBars() {
