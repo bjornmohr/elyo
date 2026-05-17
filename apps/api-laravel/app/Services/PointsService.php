@@ -5,21 +5,23 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\UserPoints;
 use App\Models\PointTransaction;
+use App\Models\PointSetting;
 use App\Models\WellbeingEntry;
 use Carbon\Carbon;
 
 class PointsService
 {
+    public const DEFAULT_POINTS = [
+        'daily_checkin' => 10,
+        'anamnesis_completed' => 100,
+        'medical_document_upload' => 25,
+        'streak_7days' => 50,
+        'streak_30days' => 200,
+    ];
+
     public function awardPoints(User $user, string $reason): void
     {
-        $points = match ($reason) {
-            'daily_checkin' => 10,
-            'anamnesis_completed' => 100,
-            'medical_document_upload' => 25,
-            'streak_7days' => 50,
-            'streak_30days' => 200,
-            default => 0,
-        };
+        $points = self::resolvePointMap()[$reason] ?? 0;
 
         if ($points === 0) return;
 
@@ -54,10 +56,40 @@ class PointsService
 
     public function calculateStreak(User $user): int
     {
-        // Simple streak logic: count consecutive days/weeks with checkins
-        // For now, let's just return a count of recent entries as a placeholder
-        // like the legacy dashboard did (though it just returned entries.length)
+        $days = WellbeingEntry::where('user_id', $user->id)
+            ->orderByDesc('created_at')
+            ->get(['created_at'])
+            ->map(fn ($entry) => $entry->created_at->toDateString())
+            ->unique()
+            ->values();
 
-        return WellbeingEntry::where('user_id', $user->id)->count();
+        if ($days->isEmpty()) {
+            return 0;
+        }
+
+        $streak = 1;
+        $previous = Carbon::parse($days[0])->startOfDay();
+
+        for ($i = 1; $i < $days->count(); $i++) {
+            $current = Carbon::parse($days[$i])->startOfDay();
+            if ($current->equalTo((clone $previous)->subDay())) {
+                $streak++;
+                $previous = $current;
+                continue;
+            }
+            break;
+        }
+
+        return $streak;
+    }
+
+    public static function resolvePointMap(): array
+    {
+        $configured = PointSetting::query()
+            ->whereIn('action', array_keys(self::DEFAULT_POINTS))
+            ->pluck('points', 'action')
+            ->all();
+
+        return array_merge(self::DEFAULT_POINTS, $configured);
     }
 }

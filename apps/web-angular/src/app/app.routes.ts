@@ -56,6 +56,7 @@ export const routes: Routes = [
       { path: 'companies', loadComponent: () => import('./features/admin/pages/companies/companies.component').then(m => m.AdminCompaniesComponent) },
       { path: 'companies/create', loadComponent: () => import('./features/admin/pages/companies-create/companies-create.component').then(m => m.AdminCompaniesCreateComponent) },
       { path: 'users', loadComponent: () => import('./features/admin/pages/users/admin-users.component').then(m => m.AdminUsersComponent) },
+      { path: 'points', loadComponent: () => import('./features/admin/pages/points/admin-points.component').then(m => m.AdminPointsComponent) },
       { path: '', redirectTo: 'companies', pathMatch: 'full' },
     ]
   },

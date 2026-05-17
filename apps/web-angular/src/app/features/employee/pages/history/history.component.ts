@@ -13,7 +13,7 @@ import { EmployeeService, WellbeingEntry } from '../../services/employee.service
         <a routerLink="/employee" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
            ←
         </a>
-        <h1 class="text-xl font-bold text-slate-800">Check-in History</h1>
+        <h1 class="text-xl font-bold text-slate-800">Check-in Verlauf</h1>
       </header>
 
       <div class="space-y-4" *ngIf="entries().length; else emptyState">
@@ -62,10 +62,10 @@ import { EmployeeService, WellbeingEntry } from '../../services/employee.service
       <ng-template #emptyState>
         <div class="bg-white rounded-3xl p-12 text-center border border-dashed border-slate-200">
           <div class="text-4xl mb-4">📜</div>
-          <h3 class="text-lg font-bold text-slate-800 mb-2">No history yet</h3>
-          <p class="text-slate-500 mb-6">Complete your first check-in to see your history here.</p>
+          <h3 class="text-lg font-bold text-slate-800 mb-2">Noch kein Verlauf vorhanden</h3>
+          <p class="text-slate-500 mb-6">Mache deinen ersten Check-in, um hier deinen Verlauf zu sehen.</p>
           <a routerLink="/employee/checkin" class="inline-block bg-teal-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-teal-100">
-            Start Now
+            Jetzt starten
           </a>
         </div>
       </ng-template>

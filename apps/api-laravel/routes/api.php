@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\InviteController;
 use App\Http\Controllers\Admin\AdminCompanyController;
 use App\Http\Controllers\Admin\AdminPartnerController;
+use App\Http\Controllers\Admin\AdminPointsController;
 use App\Http\Controllers\Company\CompanyInvitationController;
 use App\Http\Controllers\Partner\PartnerAuthController;
 use Illuminate\Http\Request;
@@ -47,6 +48,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/partners', [AdminPartnerController::class, 'index']);
         Route::patch('/partners/{id}', [AdminPartnerController::class, 'update']);
+        Route::get('/points-config', [AdminPointsController::class, 'index']);
+        Route::put('/points-config', [AdminPointsController::class, 'update']);
     });
 
     // Company portal routes (COMPANY_OWNER, COMPANY_ADMIN, COMPANY_MANAGER)

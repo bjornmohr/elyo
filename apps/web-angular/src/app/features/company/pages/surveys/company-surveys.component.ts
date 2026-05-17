@@ -25,7 +25,7 @@ import { ApiClient } from '../../../../core/services/api-client.service';
               @if (invalid('title')) { <span class="text-xs text-red-600">Mindestens 3 Zeichen erforderlich.</span> }
             </label>
             <label class="block">
-              <span class="text-sm font-medium text-gray-700">Teams</span>
+              <span class="text-sm font-medium text-gray-700">Teams (Zielgruppe)</span>
               <select formControlName="teamIds" multiple class="mt-1 h-24 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500">
                 @for (team of teams(); track team.id) {
                   <option [ngValue]="team.id">{{ team.name }}</option>

@@ -10,7 +10,7 @@ import { ApiClient } from '../../../../core/services/api-client.service';
   template: `
     <div class="space-y-6">
       <div class="flex items-center justify-between gap-4">
-        <h1 class="text-2xl font-semibold text-gray-900" style="font-family: 'Fraunces', Georgia, serif">Teams</h1>
+        <h1 class="text-2xl font-semibold text-gray-900" style="font-family: 'Fraunces', Georgia, serif">Teamübersicht</h1>
         <button type="button" (click)="toggleForm()" class="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700">
           {{ showForm() ? 'Schließen' : 'Team hinzufügen' }}
         </button>

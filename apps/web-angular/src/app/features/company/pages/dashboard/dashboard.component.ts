@@ -9,8 +9,8 @@ import { ApiClient } from '../../../../core/services/api-client.service';
   template: `
     <div class="max-w-7xl mx-auto p-6 space-y-8">
       <header>
-        <h1 class="text-3xl font-bold text-gray-900" style="font-family: 'Fraunces', Georgia, serif">Company Dashboard</h1>
-        <p class="text-gray-500 mt-2">Aggregated health and wellbeing insights for your organization.</p>
+        <h1 class="text-3xl font-bold text-gray-900" style="font-family: 'Fraunces', Georgia, serif">Unternehmensübersicht</h1>
+        <p class="text-gray-500 mt-2">Aggregierte Gesundheits- und Wohlbefindensdaten für dein Unternehmen.</p>
       </header>
 
       <div *ngIf="loading()" class="flex justify-center py-20">
@@ -23,26 +23,26 @@ import { ApiClient } from '../../../../core/services/api-client.service';
 
       <div *ngIf="!loading() && !error()" class="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-up">
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h3 class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2">Overall Score</h3>
+          <h3 class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2">Gesamtscore</h3>
           <p class="text-4xl font-bold text-teal-600">{{ scoreLabel() }}</p>
           <p class="text-xs text-gray-400 mt-2">{{ data()?.company?.responseCount || 0 }} check-ins this period</p>
         </div>
 
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h3 class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2">Participation</h3>
+          <h3 class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2">Teilnahme</h3>
           <p class="text-4xl font-bold text-gray-900">{{ participationLabel() }}</p>
           <p class="text-xs text-gray-400 mt-2">{{ participantLabel() }}</p>
         </div>
 
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h3 class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2">Active Teams</h3>
+          <h3 class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2">Aktive Teams</h3>
           <p class="text-4xl font-bold text-gray-900">{{ data()?.teams?.length || '0' }}</p>
-          <p class="text-xs text-gray-400 mt-2">All teams meet anonymity threshold</p>
+          <p class="text-xs text-gray-400 mt-2">Alle Teams erfüllen die Anonymitätsschwelle</p>
         </div>
       </div>
 
       <div *ngIf="!loading() && !error()" class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 animate-fade-up" style="animation-delay: 100ms">
-        <h3 class="font-semibold text-gray-900 mb-6">Wellbeing Trend</h3>
+        <h3 class="font-semibold text-gray-900 mb-6">Wohlbefindenstrend</h3>
         <div class="h-64 flex items-end justify-between gap-2">
           <!-- Placeholder for chart -->
           <div *ngFor="let i of trendBars()"
@@ -95,8 +95,8 @@ export class CompanyDashboardComponent implements OnInit {
     const respondents = company?.respondentCount ?? 0;
     const eligible = company?.eligibleEmployeeCount ?? 0;
     return eligible > 0
-      ? `${respondents} of ${eligible} active employees`
-      : 'No active employees';
+      ? `${respondents} von ${eligible} aktiven Mitarbeitenden`
+      : 'Keine aktiven Mitarbeitenden';
   }
 
   trendBars() {

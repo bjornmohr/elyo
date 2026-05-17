@@ -23,9 +23,9 @@ import { EmployeeService } from '../../services/employee.service';
 
       <div *ngIf="!loading() && alreadyDone()" class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 text-center space-y-4">
         <div class="text-5xl">✓</div>
-        <h2 class="text-2xl font-bold text-slate-800">Check-in already completed</h2>
-        <p class="text-slate-500">You can submit one wellbeing check-in per day. Come back tomorrow for the next one.</p>
-        <a routerLink="/employee" class="inline-block bg-teal-600 text-white px-6 py-3 rounded-2xl font-bold">Back to dashboard</a>
+        <h2 class="text-2xl font-bold text-slate-800">Check-in bereits abgeschlossen</h2>
+        <p class="text-slate-500">Du kannst nur einen Wohlbefinden-Check-in pro Tag abgeben. Komm morgen für den nächsten zurück.</p>
+        <a routerLink="/employee" class="inline-block bg-teal-600 text-white px-6 py-3 rounded-2xl font-bold">Zurück zur Übersicht</a>
       </div>
 
       <!-- Progress -->
@@ -40,42 +40,42 @@ import { EmployeeService } from '../../services/employee.service';
       <div *ngIf="!loading() && !alreadyDone()" class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 min-h-[400px] flex flex-col justify-between">
         <!-- Step 0: Mood -->
         <div *ngIf="step() === 0" class="space-y-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <h2 class="text-2xl font-bold text-slate-800">How are you feeling?</h2>
+          <h2 class="text-2xl font-bold text-slate-800">Wie fühlst du dich?</h2>
           <div class="text-6xl my-8">{{ getMoodEmoji(mood()) }}</div>
           <input type="range" min="1" max="10" [(ngModel)]="mood" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
           <div class="flex justify-between text-xs text-slate-400 font-medium uppercase tracking-wider">
-            <span>Terrible</span>
-            <span>Great</span>
+            <span>Schlecht</span>
+            <span>Sehr gut</span>
           </div>
         </div>
 
         <!-- Step 1: Stress -->
         <div *ngIf="step() === 1" class="space-y-6 text-center animate-in fade-in slide-in-from-right-4 duration-500">
-          <h2 class="text-2xl font-bold text-slate-800">Stress Level</h2>
+          <h2 class="text-2xl font-bold text-slate-800">Stresslevel</h2>
           <div class="text-6xl my-8">{{ getStressEmoji(stress()) }}</div>
           <input type="range" min="1" max="10" [(ngModel)]="stress" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
           <div class="flex justify-between text-xs text-slate-400 font-medium uppercase tracking-wider">
-            <span>Relaxed</span>
-            <span>Stressed</span>
+            <span>Entspannt</span>
+            <span>Gestresst</span>
           </div>
         </div>
 
         <!-- Step 2: Sleep -->
         <div *ngIf="step() === 2" class="space-y-6 text-center animate-in fade-in slide-in-from-right-4 duration-500">
-          <h2 class="text-2xl font-bold text-slate-800">Energy Level</h2>
+          <h2 class="text-2xl font-bold text-slate-800">Energieniveau</h2>
           <div class="text-6xl my-8">⚡</div>
           <input type="range" min="1" max="10" [(ngModel)]="energy" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
           <div class="flex justify-between text-xs text-slate-400 font-medium uppercase tracking-wider">
-            <span>Low</span>
-            <span>High</span>
+            <span>Niedrig</span>
+            <span>Hoch</span>
           </div>
         </div>
 
         <!-- Step 3: Notes -->
         <div *ngIf="step() === 3" class="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-          <h2 class="text-2xl font-bold text-slate-800 text-center">Any notes?</h2>
+          <h2 class="text-2xl font-bold text-slate-800 text-center">Anmerkungen?</h2>
           <textarea [(ngModel)]="notes"
-                    placeholder="Optional: How was your day?"
+                    placeholder="Optional: Wie war dein Tag?"
                     class="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none min-h-[150px] resize-none"></textarea>
         </div>
 
@@ -84,11 +84,11 @@ import { EmployeeService } from '../../services/employee.service';
           <button *ngIf="step() > 0"
                   (click)="prev()"
                   class="flex-1 py-4 px-6 rounded-2xl bg-slate-100 text-slate-600 font-semibold hover:bg-slate-200 transition-colors">
-            Back
+            Zurück
           </button>
           <button (click)="next()"
                   class="flex-[2] py-4 px-6 rounded-2xl bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-all shadow-lg shadow-teal-200 disabled:opacity-50">
-            {{ step() === 3 ? 'Finish' : 'Next' }}
+            {{ step() === 3 ? 'Abschließen' : 'Weiter' }}
           </button>
         </div>
         <p *ngIf="error()" class="text-sm text-red-600 text-center mt-3">{{ error() }}</p>
@@ -146,7 +146,7 @@ export class CheckinComponent implements OnInit {
         if (err.status === 409) {
           this.alreadyDone.set(true);
         } else {
-          this.error.set('Check-in could not be submitted.');
+          this.error.set('Check-in konnte nicht gespeichert werden.');
         }
       }
     });

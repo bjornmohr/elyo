@@ -179,6 +179,27 @@ class AuthTest extends TestCase
         $this->assertDatabaseHas('invite_tokens', ['email' => 'newadmin@test.com']);
     }
 
+    public function test_elyo_admin_can_manage_points_config()
+    {
+        $admin = $this->createPlatformAdmin();
+
+        $getResponse = $this->actingAs($admin, 'sanctum')->getJson('/api/admin/points-config');
+        $getResponse->assertStatus(200)
+            ->assertJsonPath('data.daily_checkin', 10);
+
+        $updateResponse = $this->actingAs($admin, 'sanctum')->putJson('/api/admin/points-config', [
+            'daily_checkin' => 15,
+            'streak_7days' => 60,
+            'streak_30days' => 250,
+            'anamnesis_completed' => 120,
+            'medical_document_upload' => 30,
+        ]);
+
+        $updateResponse->assertStatus(200)
+            ->assertJsonPath('data.daily_checkin', 15)
+            ->assertJsonPath('data.streak_7days', 60);
+    }
+
     // --- Company invitation management ---
 
     public function test_company_admin_can_invite_employee()

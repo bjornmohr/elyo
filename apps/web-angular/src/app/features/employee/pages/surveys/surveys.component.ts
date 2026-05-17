@@ -14,7 +14,7 @@ import { EmployeeService, SurveyListItem, SurveyDetail, SurveyResult } from '../
         <a routerLink="/employee" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
            ←
         </a>
-        <h1 class="text-xl font-bold text-slate-800">Surveys</h1>
+        <h1 class="text-xl font-bold text-slate-800">Umfragen</h1>
       </header>
 
       <!-- List View -->
@@ -24,7 +24,7 @@ import { EmployeeService, SurveyListItem, SurveyDetail, SurveyResult } from '../
           <div class="space-y-1">
             <div class="flex items-center space-x-2">
               <h2 class="font-bold text-slate-800">{{ survey.title }}</h2>
-              <span *ngIf="survey.isCompleted" class="bg-teal-100 text-teal-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Completed</span>
+              <span *ngIf="survey.isCompleted" class="bg-teal-100 text-teal-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Abgeschlossen</span>
             </div>
             <p class="text-sm text-slate-500">{{ survey.description }}</p>
           </div>
@@ -35,7 +35,7 @@ import { EmployeeService, SurveyListItem, SurveyDetail, SurveyResult } from '../
         </div>
 
         <div *ngIf="surveys().length === 0" class="text-center py-12 text-slate-400">
-          No surveys available right now.
+          Aktuell sind keine Umfragen verfügbar.
         </div>
       </div>
 
@@ -64,11 +64,11 @@ import { EmployeeService, SurveyListItem, SurveyDetail, SurveyResult } from '../
                  <button (click)="answers[q.id] = 'YES'"
                          [class.bg-teal-600]="answers[q.id] === 'YES'"
                          [class.text-white]="answers[q.id] === 'YES'"
-                         class="flex-1 py-3 px-6 rounded-xl border border-slate-100 font-bold transition-all">Yes</button>
+                         class="flex-1 py-3 px-6 rounded-xl border border-slate-100 font-bold transition-all">Ja</button>
                  <button (click)="answers[q.id] = 'NO'"
                          [class.bg-teal-600]="answers[q.id] === 'NO'"
                          [class.text-white]="answers[q.id] === 'NO'"
-                         class="flex-1 py-3 px-6 rounded-xl border border-slate-100 font-bold transition-all">No</button>
+                         class="flex-1 py-3 px-6 rounded-xl border border-slate-100 font-bold transition-all">Nein</button>
                </div>
 
                <!-- Text Question -->
@@ -79,8 +79,8 @@ import { EmployeeService, SurveyListItem, SurveyDetail, SurveyResult } from '../
             </div>
 
             <div class="flex space-x-4 pt-6">
-              <button (click)="selectedSurvey.set(null)" class="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl">Cancel</button>
-              <button (click)="submit()" class="flex-[2] py-4 bg-teal-600 text-white font-bold rounded-2xl shadow-lg shadow-teal-100">Submit Answers</button>
+              <button (click)="selectedSurvey.set(null)" class="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl">Abbrechen</button>
+              <button (click)="submit()" class="flex-[2] py-4 bg-teal-600 text-white font-bold rounded-2xl shadow-lg shadow-teal-100">Antworten absenden</button>
             </div>
           </div>
         </div>
@@ -90,14 +90,14 @@ import { EmployeeService, SurveyListItem, SurveyDetail, SurveyResult } from '../
         <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
           <div class="p-8 bg-slate-50 border-b border-slate-100">
              <h2 class="text-2xl font-bold text-slate-800">{{ result.title }}</h2>
-             <p class="text-slate-500 mt-1">Your submitted answers</p>
+             <p class="text-slate-500 mt-1">Deine abgegebenen Antworten</p>
           </div>
           <div class="p-8 space-y-5">
             <div *ngFor="let q of result.questions" class="rounded-2xl bg-slate-50 p-4">
               <div class="font-bold text-slate-800">{{ q.text }}</div>
               <div class="text-slate-600 mt-2">{{ answerLabel(q) }}</div>
             </div>
-            <button (click)="selectedResult.set(null)" class="w-full py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl">Back to surveys</button>
+            <button (click)="selectedResult.set(null)" class="w-full py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl">Zurück zu den Umfragen</button>
           </div>
         </div>
       </div>
@@ -144,7 +144,7 @@ export class SurveysComponent implements OnInit {
   answerLabel(question: any) {
     const answer = question.answer ?? {};
     if (question.type === 'SCALE') return answer.scaleValue ?? '—';
-    if (question.type === 'YES_NO') return answer.boolValue === true ? 'Yes' : answer.boolValue === false ? 'No' : '—';
+    if (question.type === 'YES_NO') return answer.boolValue === true ? 'Ja' : answer.boolValue === false ? 'Nein' : '—';
     if (question.type === 'MULTIPLE_CHOICE') return answer.choiceValue ?? '—';
     return answer.textValue ?? '—';
   }
@@ -165,7 +165,7 @@ export class SurveysComponent implements OnInit {
     });
 
     this.employeeService.submitSurveyResponse(survey.id, payload).subscribe(() => {
-      alert('Thank you for your feedback!');
+      alert('Danke für dein Feedback!');
       this.selectedSurvey.set(null);
       this.loadSurveys();
     });
