@@ -12,7 +12,7 @@ class SurveyAnswer extends Model
 
     protected $fillable = [
         'response_id', 'question_id', 'scale_value',
-        'text_value', 'choice_value', 'bool_value'
+        'text_value', 'choice_value', 'bool_value',
     ];
 
     protected $casts = [

@@ -11,10 +11,11 @@ class PushSubscription extends Model
     use HasFactory;
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
-        'id', 'user_id', 'endpoint', 'p256dh', 'auth'
+        'id', 'user_id', 'endpoint', 'p256dh', 'auth',
     ];
 
     public function user(): BelongsTo

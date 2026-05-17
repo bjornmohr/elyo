@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\InviteToken;
 use App\Models\User;
-use App\Enums\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 

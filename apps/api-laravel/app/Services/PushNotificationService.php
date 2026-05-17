@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\PushSubscription;
 use App\Models\User;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class PushNotificationService
@@ -26,7 +25,7 @@ class PushNotificationService
                 $sent++;
             } catch (\Exception $e) {
                 $failed++;
-                Log::error("Push failed for {$sub->endpoint}: " . $e->getMessage());
+                Log::error("Push failed for {$sub->endpoint}: ".$e->getMessage());
             }
         }
 

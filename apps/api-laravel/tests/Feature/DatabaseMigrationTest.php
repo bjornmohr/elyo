@@ -2,12 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Company;
+use App\Models\Team;
+use App\Models\User;
+use App\Models\WellbeingEntry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
-use App\Models\Company;
-use App\Models\User;
-use App\Models\Team;
-use App\Models\WellbeingEntry;
 
 class DatabaseMigrationTest extends TestCase
 {

@@ -2,20 +2,20 @@
 
 namespace App\Models;
 
+use App\Enums\PartnerVerificationStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
-use App\Enums\PartnerVerificationStatus;
 
 class Partner extends Authenticatable
 {
-    use HasFactory, HasApiTokens;
+    use HasApiTokens, HasFactory;
 
     protected $fillable = [
         'email', 'password_hash', 'name', 'type', 'categories',
         'description', 'address', 'city', 'lat', 'lng', 'website',
         'phone', 'minimum_level', 'nachweis_url', 'verification_status',
-        'rejection_reason', 'reviewed_at', 'reviewed_by_id'
+        'rejection_reason', 'reviewed_at', 'reviewed_by_id',
     ];
 
     protected $hidden = [

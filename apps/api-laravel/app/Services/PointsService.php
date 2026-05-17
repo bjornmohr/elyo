@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\PointSetting;
+use App\Models\PointTransaction;
 use App\Models\User;
 use App\Models\UserPoints;
-use App\Models\PointTransaction;
-use App\Models\PointSetting;
 use App\Models\WellbeingEntry;
 use Carbon\Carbon;
 
@@ -23,7 +23,9 @@ class PointsService
     {
         $points = self::resolvePointMap()[$reason] ?? 0;
 
-        if ($points === 0) return;
+        if ($points === 0) {
+            return;
+        }
 
         PointTransaction::create([
             'user_id' => $user->id,
@@ -47,7 +49,7 @@ class PointsService
             ['user_id' => $user->id],
             [
                 'streak' => $streak,
-                'last_checkin' => Carbon::now()
+                'last_checkin' => Carbon::now(),
             ]
         );
 
@@ -75,6 +77,7 @@ class PointsService
             if ($current->equalTo((clone $previous)->subDay())) {
                 $streak++;
                 $previous = $current;
+
                 continue;
             }
             break;

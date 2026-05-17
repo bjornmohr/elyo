@@ -3,8 +3,8 @@
 namespace Database\Factories;
 
 use App\Models\SurveyAnswer;
-use App\Models\SurveyResponse;
 use App\Models\SurveyQuestion;
+use App\Models\SurveyResponse;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class SurveyAnswerFactory extends Factory

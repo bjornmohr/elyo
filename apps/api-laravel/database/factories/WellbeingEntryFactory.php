@@ -2,9 +2,8 @@
 
 namespace Database\Factories;
 
-use App\Models\WellbeingEntry;
 use App\Models\User;
-use App\Models\Company;
+use App\Models\WellbeingEntry;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class WellbeingEntryFactory extends Factory

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Company\CreateMeasureRequest;
 use App\Http\Requests\Company\PatchMeasureRequest;
@@ -16,7 +17,7 @@ class MeasureController extends Controller
     {
         $user = $request->user();
         $user->loadMissing('roles');
-        $isManager = $user->hasRole('COMPANY_MANAGER') && !$user->hasAnyRole([\App\Enums\Role::COMPANY_ADMIN, \App\Enums\Role::COMPANY_OWNER]);
+        $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
         $managedTeamId = $isManager
             ? Team::where('manager_id', $user->id)->where('company_id', $user->company_id)->value('id')
             : null;
@@ -24,7 +25,7 @@ class MeasureController extends Controller
         $query = Measure::where('company_id', $user->company_id);
 
         if ($isManager) {
-            if (!$managedTeamId) {
+            if (! $managedTeamId) {
                 return MeasureResource::collection(collect());
             }
             $query->where(function ($q) use ($managedTeamId) {
@@ -44,12 +45,12 @@ class MeasureController extends Controller
     {
         $user = $request->user();
         $user->loadMissing('roles');
-        $isManager = $user->hasRole('COMPANY_MANAGER') && !$user->hasAnyRole([\App\Enums\Role::COMPANY_ADMIN, \App\Enums\Role::COMPANY_OWNER]);
+        $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
         $teamId = $request->teamId ?? null;
 
         if ($isManager) {
             $managedTeamId = Team::where('manager_id', $user->id)->where('company_id', $user->company_id)->value('id');
-            if (!$managedTeamId) {
+            if (! $managedTeamId) {
                 abort(403);
             }
             $teamId = $managedTeamId;
@@ -75,7 +76,7 @@ class MeasureController extends Controller
     {
         $user = $request->user();
         $user->loadMissing('roles');
-        $isManager = $user->hasRole('COMPANY_MANAGER') && !$user->hasAnyRole([\App\Enums\Role::COMPANY_ADMIN, \App\Enums\Role::COMPANY_OWNER]);
+        $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
         $managedTeamId = $isManager
             ? Team::where('manager_id', $user->id)->where('company_id', $user->company_id)->value('id')
             : null;
@@ -84,7 +85,7 @@ class MeasureController extends Controller
             ->where('company_id', $user->company_id)
             ->firstOrFail();
 
-        if ($isManager && (!$managedTeamId || (int) $measure->team_id !== (int) $managedTeamId)) {
+        if ($isManager && (! $managedTeamId || (int) $measure->team_id !== (int) $managedTeamId)) {
             abort(403);
         }
 
@@ -96,13 +97,17 @@ class MeasureController extends Controller
         $newStatus = $request->status;
         $allowed = $validTransitions[$measure->status] ?? [];
 
-        if (!in_array($newStatus, $allowed)) {
+        if (! in_array($newStatus, $allowed)) {
             return response()->json(['error' => 'invalid_transition'], 400);
         }
 
         $updateData = ['status' => $newStatus];
-        if ($newStatus === 'ACTIVE') $updateData['started_at'] = now();
-        if ($newStatus === 'COMPLETED') $updateData['completed_at'] = now();
+        if ($newStatus === 'ACTIVE') {
+            $updateData['started_at'] = now();
+        }
+        if ($newStatus === 'COMPLETED') {
+            $updateData['completed_at'] = now();
+        }
 
         $measure->update($updateData);
 

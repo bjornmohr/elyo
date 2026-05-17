@@ -12,7 +12,7 @@ class SurveyResponse extends Model
     use HasFactory;
 
     protected $fillable = [
-        'submitted_at', 'company_id', 'survey_id', 'user_id'
+        'submitted_at', 'company_id', 'survey_id', 'user_id',
     ];
 
     protected $casts = [

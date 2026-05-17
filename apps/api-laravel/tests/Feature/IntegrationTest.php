@@ -2,10 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Enums\PartnerVerificationStatus;
+use App\Enums\Role;
 use App\Models\Partner;
 use App\Models\User;
-use App\Enums\Role;
-use App\Enums\PartnerVerificationStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -60,7 +60,7 @@ class IntegrationTest extends TestCase
 
         $response = $this->actingAs($admin)
             ->patchJson("/api/admin/partners/{$partner->id}", [
-                'action' => 'approve'
+                'action' => 'approve',
             ]);
 
         $response->assertStatus(200);

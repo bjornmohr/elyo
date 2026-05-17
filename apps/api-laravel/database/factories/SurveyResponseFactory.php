@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Models\SurveyResponse;
-use App\Models\Survey;
 use App\Models\Company;
+use App\Models\Survey;
+use App\Models\SurveyResponse;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 

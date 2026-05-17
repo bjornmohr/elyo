@@ -2,19 +2,19 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\PartnerVerificationStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AdminPartnerActionRequest;
 use App\Models\Partner;
-use App\Enums\PartnerVerificationStatus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AdminPartnerController extends Controller
 {
     private const TRANSITIONS = [
-        'approve'   => ['from' => [PartnerVerificationStatus::PENDING_REVIEW], 'to' => PartnerVerificationStatus::VERIFIED],
-        'reject'    => ['from' => [PartnerVerificationStatus::PENDING_REVIEW], 'to' => PartnerVerificationStatus::REJECTED],
-        'suspend'   => ['from' => [PartnerVerificationStatus::VERIFIED],       'to' => PartnerVerificationStatus::SUSPENDED],
+        'approve' => ['from' => [PartnerVerificationStatus::PENDING_REVIEW], 'to' => PartnerVerificationStatus::VERIFIED],
+        'reject' => ['from' => [PartnerVerificationStatus::PENDING_REVIEW], 'to' => PartnerVerificationStatus::REJECTED],
+        'suspend' => ['from' => [PartnerVerificationStatus::VERIFIED],       'to' => PartnerVerificationStatus::SUSPENDED],
         'unsuspend' => ['from' => [PartnerVerificationStatus::SUSPENDED],      'to' => PartnerVerificationStatus::VERIFIED],
     ];
 
@@ -41,7 +41,7 @@ class AdminPartnerController extends Controller
         $action = $request->action;
         $transition = self::TRANSITIONS[$action];
 
-        if (!in_array($partner->verification_status, $transition['from'])) {
+        if (! in_array($partner->verification_status, $transition['from'])) {
             return response()->json(['error' => 'invalid_transition'], 400);
         }
 

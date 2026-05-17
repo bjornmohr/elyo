@@ -18,7 +18,7 @@ class MeasureResource extends JsonResource
             'suggestedAt' => $this->suggested_at,
             'startedAt' => $this->started_at,
             'completedAt' => $this->completed_at,
-            'team' => $this->whenLoaded('team', function() {
+            'team' => $this->whenLoaded('team', function () {
                 return ['name' => $this->team->name];
             }),
         ];

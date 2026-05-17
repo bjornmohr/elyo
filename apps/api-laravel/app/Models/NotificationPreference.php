@@ -11,12 +11,14 @@ class NotificationPreference extends Model
     use HasFactory;
 
     protected $primaryKey = 'user_id';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
         'user_id', 'checkin_reminder', 'checkin_reminder_time',
-        'weekly_summary', 'partner_updates'
+        'weekly_summary', 'partner_updates',
     ];
 
     protected $casts = [

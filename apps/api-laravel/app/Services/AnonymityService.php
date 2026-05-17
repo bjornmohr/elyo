@@ -3,10 +3,10 @@
 namespace App\Services;
 
 use App\Enums\Role;
-use App\Models\WellbeingEntry;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
+use App\Models\WellbeingEntry;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class AnonymityService
 {
@@ -21,21 +21,21 @@ class AnonymityService
 
         $query = WellbeingEntry::where('company_id', $companyId);
 
-        if (!empty($options['teamId'])) {
+        if (! empty($options['teamId'])) {
             $query->whereHas('user', function ($q) use ($options) {
                 $q->where('team_id', $options['teamId']);
             });
         }
 
-        if (!empty($options['periodKey'])) {
+        if (! empty($options['periodKey'])) {
             $query->where('period_key', $options['periodKey']);
         }
 
-        if (!empty($options['fromDate'])) {
+        if (! empty($options['fromDate'])) {
             $query->where('created_at', '>=', $options['fromDate']);
         }
 
-        if (!empty($options['toDate'])) {
+        if (! empty($options['toDate'])) {
             $query->where('created_at', '<=', $options['toDate']);
         }
 
@@ -92,7 +92,7 @@ class AnonymityService
 
         $query = WellbeingEntry::where('company_id', $companyId);
 
-        if (!empty($options['teamId'])) {
+        if (! empty($options['teamId'])) {
             $query->whereHas('user', function ($q) use ($options) {
                 $q->where('team_id', $options['teamId']);
             });
@@ -111,8 +111,8 @@ class AnonymityService
             ->limit($limit)
             ->get();
 
-        return $raw->filter(fn($item) => $item->response_count >= $threshold)
-            ->map(fn($item) => [
+        return $raw->filter(fn ($item) => $item->response_count >= $threshold)
+            ->map(fn ($item) => [
                 'period' => $item->period_key,
                 'avgScore' => round($item->avg_score, 1),
                 'avgMood' => round($item->avg_mood, 1),
@@ -147,7 +147,7 @@ class AnonymityService
         $currentPeriod = $this->currentPeriodKey();
         $checkedInThisPeriod = WellbeingEntry::where('company_id', $companyId)
             ->where('period_key', $currentPeriod)
-            ->when(!empty($options['teamId']), function ($query) use ($options) {
+            ->when(! empty($options['teamId']), function ($query) use ($options) {
                 $query->whereHas('user', fn ($q) => $q->where('team_id', $options['teamId']));
             })
             ->distinct('user_id')
@@ -155,7 +155,7 @@ class AnonymityService
 
         // Get last 4 periods present in the DB for this company
         $periodKeys = WellbeingEntry::where('company_id', $companyId)
-            ->when(!empty($options['teamId']), function ($query) use ($options) {
+            ->when(! empty($options['teamId']), function ($query) use ($options) {
                 $query->whereHas('user', fn ($q) => $q->where('team_id', $options['teamId']));
             })
             ->orderBy('period_key', 'desc')
@@ -167,7 +167,7 @@ class AnonymityService
         if ($periodKeys->count() >= 3) {
             $continuousUsers = WellbeingEntry::where('company_id', $companyId)
                 ->whereIn('period_key', $periodKeys)
-                ->when(!empty($options['teamId']), function ($query) use ($options) {
+                ->when(! empty($options['teamId']), function ($query) use ($options) {
                     $query->whereHas('user', fn ($q) => $q->where('team_id', $options['teamId']));
                 })
                 ->groupBy('user_id')
@@ -190,7 +190,7 @@ class AnonymityService
         return User::where('company_id', $companyId)
             ->where('status', 'active')
             ->whereHas('roles', fn ($query) => $query->where('role', Role::EMPLOYEE->value))
-            ->when(!empty($options['teamId']), fn ($query) => $query->where('team_id', $options['teamId']))
+            ->when(! empty($options['teamId']), fn ($query) => $query->where('team_id', $options['teamId']))
             ->count();
     }
 
@@ -200,6 +200,7 @@ class AnonymityService
     public function currentPeriodKey(): string
     {
         $now = Carbon::now();
-        return $now->format('Y') . '-W' . str_pad($now->weekOfYear, 2, '0', STR_PAD_LEFT);
+
+        return $now->format('Y').'-W'.str_pad($now->weekOfYear, 2, '0', STR_PAD_LEFT);
     }
 }

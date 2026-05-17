@@ -11,7 +11,7 @@ class PointTransaction extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id', 'points', 'reason'
+        'user_id', 'points', 'reason',
     ];
 
     protected $casts = [

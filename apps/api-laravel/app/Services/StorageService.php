@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class StorageService
@@ -14,6 +14,7 @@ class StorageService
     public function store(UploadedFile $file, string $directory = 'documents'): string
     {
         $path = $file->store($directory, 'public');
+
         return Storage::disk('public')->url($path);
     }
 

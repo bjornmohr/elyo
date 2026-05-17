@@ -11,11 +11,12 @@ class WearableConnection extends Model
     use HasFactory;
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
         'id', 'user_id', 'source', 'access_token', 'refresh_token',
-        'expires_at', 'is_active', 'connected_at'
+        'expires_at', 'is_active', 'connected_at',
     ];
 
     protected $casts = [

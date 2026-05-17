@@ -2,11 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
-use App\Models\UserRole;
+use App\Enums\Role;
 use App\Models\Company;
 use App\Models\InviteToken;
-use App\Enums\Role;
+use App\Models\User;
+use App\Models\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -20,6 +20,7 @@ class AuthTest extends TestCase
             'company_id' => $companyId,
         ]);
         UserRole::create(['user_id' => $user->id, 'role' => $role]);
+
         return $user;
     }
 
@@ -27,6 +28,7 @@ class AuthTest extends TestCase
     {
         $company = Company::factory()->create();
         $admin = $this->createUserWithRole(Role::COMPANY_ADMIN, $company->id);
+
         return [$company, $admin];
     }
 
@@ -34,6 +36,7 @@ class AuthTest extends TestCase
     {
         $user = User::factory()->platformAdmin()->create();
         UserRole::create(['user_id' => $user->id, 'role' => Role::ELYO_ADMIN]);
+
         return $user;
     }
 

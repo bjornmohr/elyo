@@ -12,7 +12,7 @@ class WellbeingEntry extends Model
 
     protected $fillable = [
         'mood', 'stress', 'energy', 'score', 'note',
-        'period_key', 'company_id', 'user_id'
+        'period_key', 'company_id', 'user_id',
     ];
 
     protected $casts = [

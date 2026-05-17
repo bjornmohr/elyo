@@ -16,7 +16,7 @@ class TeamResource extends JsonResource
             'color' => $this->color,
             'memberCount' => $this->whenCounted('members'),
             'managerId' => $this->manager_id,
-            'manager' => $this->whenLoaded('manager', function() {
+            'manager' => $this->whenLoaded('manager', function () {
                 return ['name' => $this->manager->name];
             }),
             'metrics' => $this->when(isset($this->metrics), $this->metrics),

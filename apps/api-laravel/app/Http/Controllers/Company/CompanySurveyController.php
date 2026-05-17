@@ -8,7 +8,6 @@ use App\Http\Requests\Company\PatchSurveyRequest;
 use App\Http\Resources\Company\SurveyResource;
 use App\Http\Resources\Company\SurveyResultsResource;
 use App\Models\Survey;
-use App\Models\SurveyQuestion;
 use App\Models\SurveyAnswer;
 use App\Services\AnonymityService;
 use Illuminate\Http\Request;
@@ -91,7 +90,7 @@ class CompanySurveyController extends Controller
 
         $survey = Survey::where('id', $id)
             ->where('company_id', $user->company_id)
-            ->with(['questions' => fn($q) => $q->orderBy('order', 'asc')])
+            ->with(['questions' => fn ($q) => $q->orderBy('order', 'asc')])
             ->withCount('responses')
             ->firstOrFail();
 
@@ -120,7 +119,7 @@ class CompanySurveyController extends Controller
                 $agg = SurveyAnswer::where('question_id', $q->id)
                     ->selectRaw('AVG(scale_value) as avg_value')
                     ->first();
-                $result['avgValue'] = $agg->avg_value ? (float)round($agg->avg_value, 1) : null;
+                $result['avgValue'] = $agg->avg_value ? (float) round($agg->avg_value, 1) : null;
                 $result['scaleMinLabel'] = $q->scale_min_label;
                 $result['scaleMaxLabel'] = $q->scale_max_label;
             } elseif ($q->type->value === 'YES_NO') {

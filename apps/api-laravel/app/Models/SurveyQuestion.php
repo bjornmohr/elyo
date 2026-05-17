@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\QuestionType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Enums\QuestionType;
 
 class SurveyQuestion extends Model
 {
@@ -14,7 +14,7 @@ class SurveyQuestion extends Model
 
     protected $fillable = [
         'text', 'type', 'order', 'is_required', 'options',
-        'scale_min_label', 'scale_max_label', 'survey_id'
+        'scale_min_label', 'scale_max_label', 'survey_id',
     ];
 
     protected $casts = [

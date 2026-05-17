@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\WearableConnection;
 use App\Models\WearableSync;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class WearableService
@@ -45,7 +44,9 @@ class WearableService
             ->where('source', 'terra')
             ->first();
 
-        if (!$connection) return;
+        if (! $connection) {
+            return;
+        }
 
         // Simplified mapping logic
         if ($type === 'daily') {

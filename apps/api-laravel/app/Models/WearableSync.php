@@ -11,11 +11,12 @@ class WearableSync extends Model
     use HasFactory;
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
         'id', 'user_id', 'source', 'date', 'steps', 'heart_rate',
-        'sleep_hours', 'recovery_score', 'hrv', 'readiness', 'synced_at'
+        'sleep_hours', 'recovery_score', 'hrv', 'readiness', 'synced_at',
     ];
 
     protected $casts = [

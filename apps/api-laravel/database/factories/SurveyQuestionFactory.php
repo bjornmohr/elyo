@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Models\SurveyQuestion;
-use App\Models\Survey;
 use App\Enums\QuestionType;
+use App\Models\Survey;
+use App\Models\SurveyQuestion;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class SurveyQuestionFactory extends Factory

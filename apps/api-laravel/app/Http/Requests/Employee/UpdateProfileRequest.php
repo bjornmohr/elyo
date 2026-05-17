@@ -15,7 +15,7 @@ class UpdateProfileRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'min:2', 'max:80'],
-            'birthYear' => ['nullable', 'integer', 'min:1900', 'max:' . now()->year],
+            'birthYear' => ['nullable', 'integer', 'min:1900', 'max:'.now()->year],
             'biologicalSex' => ['nullable', 'string', 'in:MALE,FEMALE,OTHER,PREFER_NOT_TO_SAY'],
             'activityLevel' => ['nullable', 'string', 'max:80'],
             'sleepQuality' => ['nullable', 'string', 'max:80'],

@@ -18,7 +18,7 @@ class User extends Authenticatable
     protected array $pendingRoles = [];
 
     protected $fillable = [
-        'name', 'email', 'password', 'company_id', 'status','team_id', 'last_login_at',
+        'name', 'email', 'password', 'company_id', 'status', 'team_id', 'last_login_at',
     ];
 
     protected $hidden = [
@@ -131,12 +131,14 @@ class User extends Authenticatable
     public function hasRole(Role|string $role): bool
     {
         $value = $role instanceof Role ? $role->value : $role;
+
         return $this->roles->contains('role', Role::from($value));
     }
 
     public function hasAnyRole(array $roles): bool
     {
         $values = array_map(fn ($r) => $r instanceof Role ? $r : Role::from($r), $roles);
+
         return $this->roles->whereIn('role', $values)->isNotEmpty();
     }
 
@@ -174,10 +176,19 @@ class User extends Authenticatable
     public function allowedPortals(): array
     {
         $portals = [];
-        if ($this->hasAnyRole(Role::adminPortalRoles())) $portals[] = 'admin';
-        if ($this->isCompanyUser()) $portals[] = 'company';
-        if ($this->isEmployee()) $portals[] = 'employee';
-        if ($this->hasRole(Role::PARTNER)) $portals[] = 'partner';
+        if ($this->hasAnyRole(Role::adminPortalRoles())) {
+            $portals[] = 'admin';
+        }
+        if ($this->isCompanyUser()) {
+            $portals[] = 'company';
+        }
+        if ($this->isEmployee()) {
+            $portals[] = 'employee';
+        }
+        if ($this->hasRole(Role::PARTNER)) {
+            $portals[] = 'partner';
+        }
+
         return $portals;
     }
 

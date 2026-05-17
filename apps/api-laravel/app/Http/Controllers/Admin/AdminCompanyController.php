@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\InviteToken;
-use App\Enums\Role;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -47,7 +48,7 @@ class AdminCompanyController extends Controller
     {
         $request->validate([
             'name' => 'sometimes|string|max:255',
-            'slug' => 'sometimes|string|max:255|unique:companies,slug,' . $company->id,
+            'slug' => 'sometimes|string|max:255|unique:companies,slug,'.$company->id,
             'status' => 'sometimes|string|in:active,inactive,suspended',
             'anonymity_threshold' => 'sometimes|integer|min:1',
         ]);
@@ -64,7 +65,7 @@ class AdminCompanyController extends Controller
         ]);
 
         // Check if email already belongs to a different company
-        $existingUser = \App\Models\User::where('email', $request->email)->first();
+        $existingUser = User::where('email', $request->email)->first();
         if ($existingUser && $existingUser->company_id && $existingUser->company_id !== $company->id) {
             return response()->json([
                 'error' => ['code' => 'COMPANY_CONFLICT', 'message' => 'Diese E-Mail gehört bereits zu einem anderen Unternehmen.'],

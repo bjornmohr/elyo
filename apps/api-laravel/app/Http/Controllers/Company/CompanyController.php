@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Company\AggregatedMetricsResource;
-use App\Http\Resources\Company\TrendPointResource;
 use App\Http\Resources\Company\TeamResource;
-use App\Services\AnonymityService;
+use App\Http\Resources\Company\TrendPointResource;
 use App\Models\Team;
+use App\Services\AnonymityService;
 use Illuminate\Http\Request;
 
 class CompanyController extends Controller
@@ -27,28 +28,28 @@ class CompanyController extends Controller
         $threshold = $company->anonymity_threshold ?? AnonymityService::DEFAULT_THRESHOLD;
 
         $user->loadMissing('roles');
-        $isManager = $user->hasRole('COMPANY_MANAGER') && !$user->hasAnyRole([\App\Enums\Role::COMPANY_ADMIN, \App\Enums\Role::COMPANY_OWNER]);
+        $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
         $managedTeamId = null;
         if ($isManager) {
-             $managedTeam = Team::where('manager_id', $user->id)->where('company_id', $companyId)->first();
-             $managedTeamId = $managedTeam?->id;
+            $managedTeam = Team::where('manager_id', $user->id)->where('company_id', $companyId)->first();
+            $managedTeamId = $managedTeam?->id;
         }
 
-        if ($isManager && !$managedTeamId) {
+        if ($isManager && ! $managedTeamId) {
             return response()->json([
-                'error' => 'Kein Team zugewiesen. Bitte wenden Sie sich an Ihren Administrator.'
+                'error' => 'Kein Team zugewiesen. Bitte wenden Sie sich an Ihren Administrator.',
             ], 403);
         }
 
         $metrics = $this->anonymityService->getAggregatedMetrics($companyId, [
             'teamId' => $isManager ? $managedTeamId : null,
-            'threshold' => $threshold
+            'threshold' => $threshold,
         ]);
 
         $trend = $this->anonymityService->getTrendData($companyId, [
             'teamId' => $isManager ? $managedTeamId : null,
             'threshold' => $threshold,
-            'limit' => 12
+            'limit' => 12,
         ]);
 
         $teamQuery = Team::where('company_id', $companyId);
@@ -58,13 +59,13 @@ class CompanyController extends Controller
         $teams = $teamQuery->withCount([
             'members' => fn ($query) => $query
                 ->where('status', 'active')
-                ->whereHas('roles', fn ($roleQuery) => $roleQuery->where('role', \App\Enums\Role::EMPLOYEE->value)),
+                ->whereHas('roles', fn ($roleQuery) => $roleQuery->where('role', Role::EMPLOYEE->value)),
         ])->get();
 
         foreach ($teams as $team) {
             $teamMetrics = $this->anonymityService->getAggregatedMetrics($companyId, [
                 'teamId' => $team->id,
-                'threshold' => $threshold
+                'threshold' => $threshold,
             ]);
             $team->metrics = $teamMetrics;
         }

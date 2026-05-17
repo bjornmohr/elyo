@@ -2,18 +2,18 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
-use App\Models\Company;
-use App\Models\WellbeingEntry;
-use App\Models\Survey;
-use App\Models\SurveyQuestion;
-use App\Models\SurveyResponse;
-use App\Models\SurveyAnswer;
-use App\Models\Measure;
-use App\Models\Team;
+use App\Enums\QuestionType;
 use App\Enums\Role;
 use App\Enums\SurveyStatus;
-use App\Enums\QuestionType;
+use App\Models\Company;
+use App\Models\Measure;
+use App\Models\Survey;
+use App\Models\SurveyAnswer;
+use App\Models\SurveyQuestion;
+use App\Models\SurveyResponse;
+use App\Models\Team;
+use App\Models\User;
+use App\Models\WellbeingEntry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -24,6 +24,7 @@ class EmployeeTest extends TestCase
     use RefreshDatabase;
 
     protected User $employee;
+
     protected Company $company;
 
     protected function setUp(): void
@@ -208,8 +209,8 @@ class EmployeeTest extends TestCase
                     [
                         'questionId' => $question->id,
                         'scaleValue' => 8,
-                    ]
-                ]
+                    ],
+                ],
             ]);
 
         $response->assertStatus(200)

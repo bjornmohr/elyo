@@ -11,10 +11,11 @@ class HealthDocument extends Model
     use HasFactory;
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
-        'id', 'user_id', 'type', 'file_name', 'uploaded_at'
+        'id', 'user_id', 'type', 'file_name', 'uploaded_at',
     ];
 
     protected $casts = [

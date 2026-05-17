@@ -1,25 +1,33 @@
 <?php
 
-use App\Http\Controllers\Auth\AuthController;
-use App\Http\Controllers\Auth\InviteController;
 use App\Http\Controllers\Admin\AdminCompanyController;
 use App\Http\Controllers\Admin\AdminPartnerController;
 use App\Http\Controllers\Admin\AdminPointsController;
+use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\InviteController;
+use App\Http\Controllers\Company\CompanyController;
 use App\Http\Controllers\Company\CompanyInvitationController;
+use App\Http\Controllers\Company\CompanySurveyController;
+use App\Http\Controllers\Company\MeasureController;
+use App\Http\Controllers\Company\ReportController;
+use App\Http\Controllers\Company\TeamController;
+use App\Http\Controllers\Employee\EmployeeController;
+use App\Http\Controllers\Employee\SurveyController;
 use App\Http\Controllers\Partner\PartnerAuthController;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 
 // Health check
 Route::get('/health', function () {
     try {
         DB::connection()->getPdo();
+
         return response()->json([
             'status' => 'up',
             'database' => 'connected',
         ]);
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         return response()->json([
             'status' => 'down',
             'database' => 'disconnected',
@@ -54,47 +62,47 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Company portal routes (COMPANY_OWNER, COMPANY_ADMIN, COMPANY_MANAGER)
     Route::middleware('role:COMPANY_OWNER,COMPANY_ADMIN,COMPANY_MANAGER')->prefix('company')->group(function () {
-        Route::get('/dashboard', [\App\Http\Controllers\Company\CompanyController::class, 'dashboard']);
+        Route::get('/dashboard', [CompanyController::class, 'dashboard']);
         Route::get('/users', [CompanyInvitationController::class, 'users']);
         Route::get('/invitations', [CompanyInvitationController::class, 'invitations']);
         Route::post('/invitations', [CompanyInvitationController::class, 'storeInvitation']);
         Route::delete('/invitations/{invite}', [CompanyInvitationController::class, 'destroyInvitation']);
 
-        Route::get('/teams', [\App\Http\Controllers\Company\TeamController::class, 'index']);
-        Route::post('/teams', [\App\Http\Controllers\Company\TeamController::class, 'store']);
-        Route::get('/teams/{id}', [\App\Http\Controllers\Company\TeamController::class, 'show']);
-        Route::put('/teams/{id}', [\App\Http\Controllers\Company\TeamController::class, 'update']);
-        Route::delete('/teams/{id}', [\App\Http\Controllers\Company\TeamController::class, 'destroy']);
-        Route::get('/teams/{teamId}/members', [\App\Http\Controllers\Company\TeamController::class, 'members']);
+        Route::get('/teams', [TeamController::class, 'index']);
+        Route::post('/teams', [TeamController::class, 'store']);
+        Route::get('/teams/{id}', [TeamController::class, 'show']);
+        Route::put('/teams/{id}', [TeamController::class, 'update']);
+        Route::delete('/teams/{id}', [TeamController::class, 'destroy']);
+        Route::get('/teams/{teamId}/members', [TeamController::class, 'members']);
 
-        Route::get('/surveys', [\App\Http\Controllers\Company\CompanySurveyController::class, 'index']);
-        Route::post('/surveys', [\App\Http\Controllers\Company\CompanySurveyController::class, 'store']);
-        Route::patch('/surveys/{id}', [\App\Http\Controllers\Company\CompanySurveyController::class, 'update']);
-        Route::delete('/surveys/{id}', [\App\Http\Controllers\Company\CompanySurveyController::class, 'destroy']);
-        Route::get('/surveys/{id}/results', [\App\Http\Controllers\Company\CompanySurveyController::class, 'results']);
+        Route::get('/surveys', [CompanySurveyController::class, 'index']);
+        Route::post('/surveys', [CompanySurveyController::class, 'store']);
+        Route::patch('/surveys/{id}', [CompanySurveyController::class, 'update']);
+        Route::delete('/surveys/{id}', [CompanySurveyController::class, 'destroy']);
+        Route::get('/surveys/{id}/results', [CompanySurveyController::class, 'results']);
 
-        Route::get('/measures', [\App\Http\Controllers\Company\MeasureController::class, 'index']);
-        Route::post('/measures', [\App\Http\Controllers\Company\MeasureController::class, 'store']);
-        Route::patch('/measures/{id}', [\App\Http\Controllers\Company\MeasureController::class, 'update']);
+        Route::get('/measures', [MeasureController::class, 'index']);
+        Route::post('/measures', [MeasureController::class, 'store']);
+        Route::patch('/measures/{id}', [MeasureController::class, 'update']);
 
-        Route::get('/reports', [\App\Http\Controllers\Company\ReportController::class, 'index']);
+        Route::get('/reports', [ReportController::class, 'index']);
     });
 
     // Employee routes (EMPLOYEE only)
     Route::middleware('role:EMPLOYEE')->prefix('employee')->group(function () {
-        Route::get('/dashboard', [\App\Http\Controllers\Employee\EmployeeController::class, 'dashboard']);
-        Route::get('/checkin/status', [\App\Http\Controllers\Employee\EmployeeController::class, 'checkinStatus']);
-        Route::post('/checkin', [\App\Http\Controllers\Employee\EmployeeController::class, 'checkin']);
-        Route::get('/history', [\App\Http\Controllers\Employee\EmployeeController::class, 'history']);
-        Route::get('/profile', [\App\Http\Controllers\Employee\EmployeeController::class, 'getProfile']);
-        Route::put('/profile', [\App\Http\Controllers\Employee\EmployeeController::class, 'updateProfile']);
-        Route::post('/documents', [\App\Http\Controllers\Employee\EmployeeController::class, 'uploadDocument']);
-        Route::get('/measures', [\App\Http\Controllers\Employee\EmployeeController::class, 'measures']);
+        Route::get('/dashboard', [EmployeeController::class, 'dashboard']);
+        Route::get('/checkin/status', [EmployeeController::class, 'checkinStatus']);
+        Route::post('/checkin', [EmployeeController::class, 'checkin']);
+        Route::get('/history', [EmployeeController::class, 'history']);
+        Route::get('/profile', [EmployeeController::class, 'getProfile']);
+        Route::put('/profile', [EmployeeController::class, 'updateProfile']);
+        Route::post('/documents', [EmployeeController::class, 'uploadDocument']);
+        Route::get('/measures', [EmployeeController::class, 'measures']);
 
-        Route::get('/surveys', [\App\Http\Controllers\Employee\SurveyController::class, 'index']);
-        Route::get('/surveys/{id}', [\App\Http\Controllers\Employee\SurveyController::class, 'show']);
-        Route::get('/surveys/{id}/result', [\App\Http\Controllers\Employee\SurveyController::class, 'result']);
-        Route::post('/surveys/{id}/respond', [\App\Http\Controllers\Employee\SurveyController::class, 'respond']);
+        Route::get('/surveys', [SurveyController::class, 'index']);
+        Route::get('/surveys/{id}', [SurveyController::class, 'show']);
+        Route::get('/surveys/{id}/result', [SurveyController::class, 'result']);
+        Route::post('/surveys/{id}/respond', [SurveyController::class, 'respond']);
     });
 });
 

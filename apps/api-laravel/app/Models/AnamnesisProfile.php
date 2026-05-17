@@ -11,12 +11,13 @@ class AnamnesisProfile extends Model
     use HasFactory;
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
         'id', 'user_id', 'completion_pct', 'birth_year', 'biological_sex',
         'activity_level', 'sleep_quality', 'stress_tendency',
-        'smoking_status', 'nutrition_type', 'chronic_patterns', 'has_medication'
+        'smoking_status', 'nutrition_type', 'chronic_patterns', 'has_medication',
     ];
 
     protected $casts = [

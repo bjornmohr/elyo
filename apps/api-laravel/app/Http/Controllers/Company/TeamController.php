@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Company;
 
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Company\CreateTeamRequest;
 use App\Http\Resources\Company\TeamResource;
 use App\Models\Team;
-use App\Models\User;
 use Illuminate\Http\Request;
 
 class TeamController extends Controller
@@ -15,7 +15,7 @@ class TeamController extends Controller
     {
         $user = $request->user();
         $user->loadMissing('roles');
-        $isManager = $user->hasRole('COMPANY_MANAGER') && !$user->hasAnyRole([\App\Enums\Role::COMPANY_ADMIN, \App\Enums\Role::COMPANY_OWNER]);
+        $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
 
         $query = Team::where('company_id', $user->company_id);
 
@@ -40,7 +40,7 @@ class TeamController extends Controller
             'description' => $validated['description'] ?? null,
             'color' => $validated['color'] ?? null,
             'manager_id' => $validated['managerId'] ?? null,
-            'company_id' => $request->user()->company_id
+            'company_id' => $request->user()->company_id,
         ]);
 
         return new TeamResource($team->loadCount('members')->load('manager:id,name'));
@@ -53,7 +53,7 @@ class TeamController extends Controller
             ->firstOrFail();
 
         $request->user()->loadMissing('roles');
-        if ($request->user()->hasRole('COMPANY_MANAGER') && !$request->user()->hasAnyRole([\App\Enums\Role::COMPANY_ADMIN, \App\Enums\Role::COMPANY_OWNER]) && $team->manager_id !== $request->user()->id) {
+        if ($request->user()->hasRole('COMPANY_MANAGER') && ! $request->user()->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]) && $team->manager_id !== $request->user()->id) {
             abort(403);
         }
 
@@ -80,7 +80,7 @@ class TeamController extends Controller
     public function destroy(Request $request, $id)
     {
         $request->user()->loadMissing('roles');
-        if (!$request->user()->hasAnyRole([\App\Enums\Role::COMPANY_ADMIN, \App\Enums\Role::COMPANY_OWNER])) {
+        if (! $request->user()->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER])) {
             abort(403);
         }
 

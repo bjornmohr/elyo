@@ -11,11 +11,12 @@ class UserDocument extends Model
     use HasFactory;
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
         'id', 'user_id', 'file_name', 'blob_url', 'blob_key',
-        'mime_type', 'size', 'uploaded_at'
+        'mime_type', 'size', 'uploaded_at',
     ];
 
     protected $casts = [

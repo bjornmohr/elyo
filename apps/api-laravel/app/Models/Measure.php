@@ -13,7 +13,7 @@ class Measure extends Model
     protected $fillable = [
         'company_id', 'team_id', 'title', 'category',
         'description', 'status', 'suggested_at', 'started_at',
-        'completed_at', 'created_by'
+        'completed_at', 'created_by',
     ];
 
     protected $casts = [

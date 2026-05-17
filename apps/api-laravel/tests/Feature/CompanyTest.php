@@ -2,17 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Enums\QuestionType;
+use App\Enums\Role;
 use App\Models\Company;
-use App\Models\User;
-use App\Models\Team;
-use App\Models\WellbeingEntry;
+use App\Models\Measure;
 use App\Models\Survey;
+use App\Models\SurveyAnswer;
 use App\Models\SurveyQuestion;
 use App\Models\SurveyResponse;
-use App\Models\SurveyAnswer;
-use App\Models\Measure;
-use App\Enums\Role;
-use App\Services\AnonymityService;
+use App\Models\Team;
+use App\Models\User;
+use App\Models\WellbeingEntry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -21,8 +21,11 @@ class CompanyTest extends TestCase
     use RefreshDatabase;
 
     protected $company;
+
     protected $admin;
+
     protected $manager;
+
     protected $team;
 
     protected function setUp(): void
@@ -184,7 +187,7 @@ class CompanyTest extends TestCase
         $survey = Survey::factory()->create(['company_id' => $this->company->id]);
         $question = SurveyQuestion::factory()->create([
             'survey_id' => $survey->id,
-            'type' => \App\Enums\QuestionType::SCALE,
+            'type' => QuestionType::SCALE,
         ]);
 
         // 2 responses (below threshold of 3)
@@ -193,7 +196,7 @@ class CompanyTest extends TestCase
             SurveyAnswer::factory()->create([
                 'response_id' => $resp->id,
                 'question_id' => $question->id,
-                'scale_value' => 10
+                'scale_value' => 10,
             ]);
         }
 
@@ -206,7 +209,7 @@ class CompanyTest extends TestCase
         SurveyAnswer::factory()->create([
             'response_id' => $resp3->id,
             'question_id' => $question->id,
-            'scale_value' => 4
+            'scale_value' => 4,
         ]);
 
         $response = $this->actingAs($this->admin)->getJson("/api/company/surveys/{$survey->id}/results");
@@ -229,14 +232,14 @@ class CompanyTest extends TestCase
 
         // Valid transition: ACTIVE -> COMPLETED
         $response = $this->actingAs($this->admin)->patchJson("/api/company/measures/{$measureId}", [
-            'status' => 'COMPLETED'
+            'status' => 'COMPLETED',
         ]);
         $response->assertStatus(200);
         $response->assertJsonPath('data.status', 'COMPLETED');
 
         // Invalid transition: COMPLETED -> ACTIVE (not in VALID_TRANSITIONS)
         $response = $this->actingAs($this->admin)->patchJson("/api/company/measures/{$measureId}", [
-            'status' => 'ACTIVE'
+            'status' => 'ACTIVE',
         ]);
         $response->assertStatus(400);
     }

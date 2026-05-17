@@ -11,7 +11,7 @@ class UserPoints extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id', 'total', 'level', 'streak', 'last_checkin'
+        'user_id', 'total', 'level', 'streak', 'last_checkin',
     ];
 
     protected $casts = [

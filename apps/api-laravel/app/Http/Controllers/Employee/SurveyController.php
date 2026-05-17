@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers\Employee;
 
+use App\Enums\SurveyStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\SurveyRespondRequest;
-use App\Http\Resources\Employee\SurveyResource;
 use App\Http\Resources\Employee\SurveyDetailResource;
+use App\Http\Resources\Employee\SurveyResource;
 use App\Models\Survey;
-use App\Models\SurveyResponse;
 use App\Models\SurveyAnswer;
-use App\Enums\SurveyStatus;
-use Illuminate\Http\Request;
+use App\Models\SurveyResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class SurveyController extends Controller
 {
@@ -41,10 +41,10 @@ class SurveyController extends Controller
         $survey = Survey::where('id', $id)
             ->where('company_id', $user->company_id)
             ->where('status', SurveyStatus::ACTIVE)
-            ->with(['questions' => fn($q) => $q->orderBy('order', 'asc')])
+            ->with(['questions' => fn ($q) => $q->orderBy('order', 'asc')])
             ->first();
 
-        if (!$survey) {
+        if (! $survey) {
             return response()->json(['error' => 'Not found'], 404);
         }
 
@@ -63,10 +63,10 @@ class SurveyController extends Controller
         $user = $request->user();
         $survey = Survey::where('id', $id)
             ->where('company_id', $user->company_id)
-            ->with(['questions' => fn($q) => $q->orderBy('order', 'asc')])
+            ->with(['questions' => fn ($q) => $q->orderBy('order', 'asc')])
             ->first();
 
-        if (!$survey) {
+        if (! $survey) {
             return response()->json(['error' => 'Not found'], 404);
         }
 
@@ -75,7 +75,7 @@ class SurveyController extends Controller
             ->with('answers')
             ->first();
 
-        if (!$response) {
+        if (! $response) {
             return response()->json(['error' => 'No result for this survey'], 404);
         }
 
@@ -89,6 +89,7 @@ class SurveyController extends Controller
                 'submittedAt' => $response->submitted_at?->toIso8601String(),
                 'questions' => $survey->questions->map(function ($question) use ($answersByQuestion) {
                     $answer = $answersByQuestion->get($question->id);
+
                     return [
                         'id' => $question->id,
                         'text' => $question->text,
@@ -114,7 +115,7 @@ class SurveyController extends Controller
             ->with('questions')
             ->first();
 
-        if (!$survey) {
+        if (! $survey) {
             return response()->json(['error' => 'Survey not found or not active'], 404);
         }
 
@@ -130,7 +131,7 @@ class SurveyController extends Controller
         $answers = $request->validated()['answers'];
 
         foreach ($answers as $a) {
-            if (!in_array($a['questionId'], $validQuestionIds)) {
+            if (! in_array($a['questionId'], $validQuestionIds)) {
                 return response()->json(['error' => "Invalid questionId: {$a['questionId']}"], 400);
             }
         }

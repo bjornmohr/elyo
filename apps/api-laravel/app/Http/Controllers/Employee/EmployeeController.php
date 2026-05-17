@@ -5,16 +5,16 @@ namespace App\Http\Controllers\Employee;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\CheckinRequest;
 use App\Http\Requests\Employee\UpdateProfileRequest;
-use App\Http\Resources\Employee\WellbeingEntryResource;
 use App\Http\Resources\Company\MeasureResource;
+use App\Http\Resources\Employee\WellbeingEntryResource;
 use App\Models\AnamnesisProfile;
 use App\Models\Measure;
 use App\Models\UserDocument;
 use App\Models\WellbeingEntry;
-use App\Services\WellbeingService;
 use App\Services\PointsService;
-use Illuminate\Http\Request;
+use App\Services\WellbeingService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class EmployeeController extends Controller
@@ -61,7 +61,7 @@ class EmployeeController extends Controller
     {
         $user = $request->user();
 
-        if (!$user->company_id) {
+        if (! $user->company_id) {
             return response()->json(['error' => 'Employee must belong to a company'], 403);
         }
 
@@ -84,7 +84,7 @@ class EmployeeController extends Controller
             }
         } catch (\Exception $e) {
             // Log error but don't fail the checkin
-            \Log::error('[CHECKIN] Points award failed: ' . $e->getMessage());
+            \Log::error('[CHECKIN] Points award failed: '.$e->getMessage());
         }
 
         return response()->json([
@@ -119,7 +119,7 @@ class EmployeeController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'anamnesis' => $anamnesis ? $this->anamnesisPayload($anamnesis) : null,
-                'anamnesisDue' => !$anamnesis || $anamnesis->updated_at->lte(now()->subMonths(6)),
+                'anamnesisDue' => ! $anamnesis || $anamnesis->updated_at->lte(now()->subMonths(6)),
                 'documents' => $user->documents()
                     ->latest('uploaded_at')
                     ->get()
@@ -130,7 +130,7 @@ class EmployeeController extends Controller
                         'size' => $document->size,
                         'uploadedAt' => $document->uploaded_at?->toIso8601String(),
                     ]),
-            ]
+            ],
         ]);
     }
 
@@ -156,7 +156,7 @@ class EmployeeController extends Controller
         $existingProfile = $user->anamnesisProfile;
         $profile = AnamnesisProfile::updateOrCreate(['user_id' => $user->id], $profileData);
 
-        if (!$existingProfile && $profile->completion_pct >= 80) {
+        if (! $existingProfile && $profile->completion_pct >= 80) {
             $this->pointsService->awardPoints($user, 'anamnesis_completed');
         }
 
@@ -167,7 +167,7 @@ class EmployeeController extends Controller
                 'email' => $user->email,
                 'anamnesis' => $this->anamnesisPayload($profile),
                 'anamnesisDue' => false,
-            ]
+            ],
         ]);
     }
 
