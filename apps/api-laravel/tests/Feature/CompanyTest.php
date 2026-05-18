@@ -189,10 +189,19 @@ class CompanyTest extends TestCase
             'survey_id' => $survey->id,
             'type' => QuestionType::SCALE,
         ]);
+        $employees = User::factory()->count(3)->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
 
         // 2 responses (below threshold of 3)
         for ($i = 0; $i < 2; $i++) {
-            $resp = SurveyResponse::factory()->create(['survey_id' => $survey->id, 'company_id' => $this->company->id]);
+            $resp = SurveyResponse::factory()->create([
+                'survey_id' => $survey->id,
+                'company_id' => $this->company->id,
+                'user_id' => $employees[$i]->id,
+            ]);
             SurveyAnswer::factory()->create([
                 'response_id' => $resp->id,
                 'question_id' => $question->id,
@@ -205,7 +214,11 @@ class CompanyTest extends TestCase
         $response->assertJsonPath('isAboveThreshold', false);
 
         // 3rd response
-        $resp3 = SurveyResponse::factory()->create(['survey_id' => $survey->id, 'company_id' => $this->company->id]);
+        $resp3 = SurveyResponse::factory()->create([
+            'survey_id' => $survey->id,
+            'company_id' => $this->company->id,
+            'user_id' => $employees[2]->id,
+        ]);
         SurveyAnswer::factory()->create([
             'response_id' => $resp3->id,
             'question_id' => $question->id,
@@ -216,6 +229,103 @@ class CompanyTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonPath('data.isAboveThreshold', true);
         $this->assertEquals(8.0, $response->json('data.questions.0.avgValue')); // (10+10+4)/3 = 8
+    }
+
+    public function test_manager_only_sees_survey_results_for_their_team()
+    {
+        $otherTeam = Team::factory()->create(['company_id' => $this->company->id]);
+        $survey = Survey::factory()->create(['company_id' => $this->company->id, 'status' => 'ACTIVE']);
+        $question = SurveyQuestion::factory()->create([
+            'survey_id' => $survey->id,
+            'type' => QuestionType::SCALE,
+        ]);
+
+        $managedEmployees = User::factory()->count(3)->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $otherEmployees = User::factory()->count(3)->create([
+            'company_id' => $this->company->id,
+            'team_id' => $otherTeam->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+
+        foreach ($managedEmployees as $employee) {
+            $response = SurveyResponse::factory()->create([
+                'survey_id' => $survey->id,
+                'company_id' => $this->company->id,
+                'user_id' => $employee->id,
+            ]);
+            SurveyAnswer::factory()->create([
+                'response_id' => $response->id,
+                'question_id' => $question->id,
+                'scale_value' => 4,
+            ]);
+        }
+
+        foreach ($otherEmployees as $employee) {
+            $response = SurveyResponse::factory()->create([
+                'survey_id' => $survey->id,
+                'company_id' => $this->company->id,
+                'user_id' => $employee->id,
+            ]);
+            SurveyAnswer::factory()->create([
+                'response_id' => $response->id,
+                'question_id' => $question->id,
+                'scale_value' => 10,
+            ]);
+        }
+
+        $managerResponse = $this->actingAs($this->manager)->getJson("/api/company/surveys/{$survey->id}/results");
+        $managerResponse->assertStatus(200);
+        $this->assertEquals(4.0, $managerResponse->json('data.questions.0.avgValue'));
+        $managerResponse->assertJsonPath('data.participation.responseCount', 3);
+
+        $adminResponse = $this->actingAs($this->admin)->getJson("/api/company/surveys/{$survey->id}/results");
+        $adminResponse->assertStatus(200);
+        $this->assertEquals(7.0, $adminResponse->json('data.questions.0.avgValue'));
+        $adminResponse->assertJsonPath('data.participation.responseCount', 6);
+    }
+
+    public function test_draft_surveys_can_be_edited_and_activated_by_allowed_owner()
+    {
+        $survey = Survey::factory()->create([
+            'company_id' => $this->company->id,
+            'created_by' => $this->manager->id,
+            'status' => 'DRAFT',
+        ]);
+        $survey->teams()->sync([$this->team->id]);
+        SurveyQuestion::factory()->create([
+            'survey_id' => $survey->id,
+            'type' => QuestionType::SCALE,
+        ]);
+
+        $response = $this->actingAs($this->manager)->patchJson("/api/company/surveys/{$survey->id}", [
+            'title' => 'Updated draft survey',
+            'questions' => [
+                [
+                    'text' => 'Updated question?',
+                    'type' => 'YES_NO',
+                    'order' => 0,
+                    'isRequired' => true,
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.title', 'Updated draft survey');
+        $response->assertJsonPath('data.questionsCount', 1);
+
+        $response = $this->actingAs($this->manager)->postJson("/api/company/surveys/{$survey->id}/activate");
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.status', 'ACTIVE');
+
+        $response = $this->actingAs($this->manager)->patchJson("/api/company/surveys/{$survey->id}", [
+            'title' => 'Should not update',
+        ]);
+
+        $response->assertStatus(403);
     }
 
     public function test_measure_creation_and_transitions()

@@ -15,7 +15,7 @@ class Survey extends Model
 
     protected $fillable = [
         'title', 'description', 'status', 'starts_at',
-        'ends_at', 'is_anonymous', 'company_id',
+        'ends_at', 'is_anonymous', 'company_id', 'created_by',
     ];
 
     protected $casts = [
@@ -28,6 +28,11 @@ class Survey extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function teams(): BelongsToMany

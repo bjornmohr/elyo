@@ -77,7 +77,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/surveys', [CompanySurveyController::class, 'index']);
         Route::post('/surveys', [CompanySurveyController::class, 'store']);
+        Route::get('/surveys/{id}', [CompanySurveyController::class, 'show']);
         Route::patch('/surveys/{id}', [CompanySurveyController::class, 'update']);
+        Route::post('/surveys/{id}/activate', [CompanySurveyController::class, 'activate']);
         Route::delete('/surveys/{id}', [CompanySurveyController::class, 'destroy']);
         Route::get('/surveys/{id}/results', [CompanySurveyController::class, 'results']);
 
