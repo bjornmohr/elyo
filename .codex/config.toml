@@ -1,0 +1,5 @@
+# Repo-local Codex configuration placeholder.
+# Keep personal defaults in ~/.codex/config.toml.
+# Keep project rules in AGENTS.md.
+#
+# Add repo-specific Codex settings here only when needed.

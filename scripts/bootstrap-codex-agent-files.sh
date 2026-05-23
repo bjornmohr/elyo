@@ -1,0 +1,873 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Bootstrap Codex agent files and local skills for ELYO_TARGET.
+# Run from the root of ELYO_TARGET.
+
+ROOT_DIR="$(pwd)"
+
+if [ ! -d "apps" ] && [ ! -f "docker-compose.yml" ]; then
+  echo "ERROR: This script should be run from the root of ELYO_TARGET."
+  echo "Current directory: ${ROOT_DIR}"
+  exit 1
+fi
+
+echo "Bootstrapping Codex agent files in: ${ROOT_DIR}"
+
+mkdir -p \
+  scripts \
+  docs/ai-context \
+  docs/ai-tasks \
+  docs/ai-results \
+  docs/ai-handoff \
+  docs/ai-prompts \
+  .codex/skills/elyo-architecture-review/references \
+  .codex/skills/elyo-architecture-review/scripts \
+  .codex/skills/elyo-architecture-review/assets \
+  .codex/skills/elyo-laravel-api-task/references \
+  .codex/skills/elyo-laravel-api-task/scripts \
+  .codex/skills/elyo-laravel-api-task/assets \
+  .codex/skills/elyo-angular-task/references \
+  .codex/skills/elyo-angular-task/scripts \
+  .codex/skills/elyo-angular-task/assets \
+  .codex/skills/elyo-privacy-review/references \
+  .codex/skills/elyo-privacy-review/scripts \
+  .codex/skills/elyo-privacy-review/assets \
+  .codex/skills/elyo-handoff-summary/references \
+  .codex/skills/elyo-handoff-summary/scripts \
+  .codex/skills/elyo-handoff-summary/assets
+
+write_if_missing() {
+  local file="$1"
+
+  if [ -f "$file" ]; then
+    echo "SKIP existing: $file"
+    cat >/dev/null
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$file")"
+  cat > "$file"
+  echo "CREATE: $file"
+}
+
+write_if_missing "AGENTS.md" <<'EOF'
+# ELYO Agent Instructions
+
+## Project Context
+
+This repository is ELYO_TARGET.
+
+The legacy reference codebase may exist at ../ELYO and must be treated as read-only.
+
+Target architecture:
+- Angular frontend in apps/web-angular
+- Laravel API in apps/api-laravel
+- PostgreSQL as primary database
+- Redis for cache, sessions and queues
+- Docker Compose for local development
+- Mailpit for local mail testing
+- n8n for integrations only, not business logic
+
+## Non-negotiable Rules
+
+- Do not modify ../ELYO.
+- Do not introduce microservices.
+- Do not switch PostgreSQL to MySQL or MariaDB.
+- Do not create medical diagnosis or therapy claims.
+- Do not expose individual employee health data to company, HR or manager users.
+- Keep business logic in Laravel, not in Angular and not in n8n.
+- Use OpenAPI as the contract between frontend and backend.
+- Prefer small, reviewable patches.
+- Do not change unrelated areas.
+- Mark unknowns explicitly.
+- Do not invent legacy behavior.
+
+## Backend Rules
+
+Laravel lives in:
+
+    apps/api-laravel
+
+Use:
+- Controllers for HTTP entry points
+- Form Requests for validation
+- Resources for API responses
+- Services for domain logic
+- Policies and middleware for authorization
+- Feature tests for API behavior
+
+Important validation commands:
+
+    docker compose exec api php artisan test
+    docker compose exec api php artisan route:list
+
+If migrations change:
+
+    docker compose exec api php artisan migrate:fresh
+
+## Frontend Rules
+
+Angular lives in:
+
+    apps/web-angular
+
+Use:
+- Feature folders
+- Angular services for API calls
+- Guards for role access
+- Environment config for API base URL
+- No direct fetch calls inside components
+
+Important validation command:
+
+    docker compose exec web npm run build
+
+## Docker Rules
+
+The local stack must remain valid.
+
+Before or after infrastructure changes, run:
+
+    docker compose config
+
+Do not use localhost for inter-container communication.
+
+Use service names such as:
+- postgres
+- redis
+- mailpit
+- api
+- web
+
+## Health Data and Company Reporting Rules
+
+Company users may only see aggregated data.
+
+Never expose:
+- individual employee health records
+- raw free-text survey answers
+- individual wellbeing entries
+- identifiable survey responses
+- personal medical documents
+
+Respect anonymity thresholds when aggregating data.
+
+For survey results:
+- Global anonymity threshold must be met before showing results.
+- Small answer buckets must not reveal tiny groups.
+- Text answers must not be shown raw to company users.
+
+## Output Expectations
+
+For every task, report:
+
+1. Files changed
+2. Behavior changed
+3. Commands run
+4. Test/build result
+5. Open questions
+6. Intentional deviations, if any
+
+## Review Expectations
+
+Before considering a task done, check:
+
+- Does it preserve architecture?
+- Does it preserve portal boundaries?
+- Does it preserve company/team/user scoping?
+- Does it avoid leaking health data?
+- Are tests included for changed backend behavior?
+- Does Angular still build?
+- Is OpenAPI updated if API behavior changed?
+EOF
+
+write_if_missing "docs/ai-context/architecture-decisions.md" <<'EOF'
+# Architecture Decisions
+
+## Current Target
+
+ELYO_TARGET is the target implementation.
+
+The legacy app may exist at ../ELYO and is read-only reference material.
+
+## Stack
+
+- Frontend: Angular
+- Backend: Laravel API
+- Database: PostgreSQL
+- Cache/queues/sessions: Redis
+- Local development: Docker Compose
+- Mail testing: Mailpit
+- Integrations: n8n, but not for core business rules
+
+## Architectural Rules
+
+- API-first.
+- Angular talks to Laravel only through API endpoints.
+- Laravel owns business logic.
+- PostgreSQL remains the primary database.
+- OpenAPI documents API contracts.
+- Docker Compose must remain valid.
+- Features should be migrated and hardened in vertical slices.
+
+## Avoid
+
+- Microservices for the MVP.
+- Business logic in n8n.
+- Business logic hidden inside Angular components.
+- Direct frontend access to database-like structures.
+- Medical diagnosis or therapy wording.
+EOF
+
+write_if_missing "docs/ai-context/auth-and-roles.md" <<'EOF'
+# Auth and Roles
+
+## Current Decision
+
+A user belongs to exactly one company.
+
+A user belongs to at most one team through users.team_id.
+
+A user must never be assigned to multiple companies.
+
+## Portal Context
+
+- app.* means employee portal
+- company.* means company or HR portal
+- partner.* is lower MVP priority
+
+## Roles
+
+- EMPLOYEE
+- COMPANY_MANAGER
+- COMPANY_ADMIN
+- ELYO_ADMIN
+- PARTNER
+
+## Rules
+
+- EMPLOYEE can access only their own data.
+- COMPANY_MANAGER can access only assigned team scope.
+- COMPANY_ADMIN can access company-level aggregated data.
+- ELYO_ADMIN can access platform administration.
+- PARTNER must be isolated from company and employee data unless explicitly designed otherwise.
+
+## Guardrails
+
+Company and manager users must never see individual employee health data.
+
+Company dashboards only show aggregated data above anonymity threshold.
+EOF
+
+write_if_missing "docs/ai-context/health-data-guardrails.md" <<'EOF'
+# Health Data Guardrails
+
+## Non-negotiable Rules
+
+- No diagnosis wording.
+- No therapy promises.
+- No individual employee health data in company views.
+- No raw free-text health answers in company views.
+- No identifiable survey responses in company views.
+- No individual document access for company users.
+
+## Safe Language
+
+Prefer:
+- orientation
+- self-reflection
+- resources
+- burden indicators
+- general measures
+- aggregated trends
+
+Avoid:
+- diagnosis
+- treatment
+- cure
+- medically certain claims
+- individual risk classification for HR
+
+## Survey Results
+
+Survey results shown to company users must be aggregated.
+
+Apply:
+- global anonymity threshold
+- bucket-level suppression for small groups
+- no raw text output
+- no misleading charts when data is suppressed
+EOF
+
+write_if_missing "docs/ai-context/api-contract-rules.md" <<'EOF'
+# API Contract Rules
+
+## General
+
+The API contract lives in:
+
+    docs/api/openapi.yaml
+
+Update OpenAPI when:
+- a route is added
+- a route is removed
+- request body changes
+- response body changes
+- error behavior changes
+- auth/role behavior changes
+
+## Error Format
+
+Use a consistent error format:
+
+    {
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "Validation failed.",
+        "details": {}
+      }
+    }
+
+## API Design
+
+- Use Laravel Resources for response shape.
+- Use Form Requests for validation.
+- Use middleware, policies or gates for role checks.
+- Do not leak internal exception details.
+- Use stable response keys.
+EOF
+
+write_if_missing "docs/ai-context/current-known-issues.md" <<'EOF'
+# Current Known Issues
+
+## Active Focus
+
+- Survey results overview was added recently.
+- Current user observation: code behaves as programmed.
+- Next likely focus: privacy hardening, tests and documentation alignment.
+
+## Open Checks
+
+- Verify bucket-level suppression in survey results.
+- Verify unique constraint for one survey response per user per survey.
+- Verify manager team scoping.
+- Verify OpenAPI matches implemented endpoints.
+- Verify Angular survey results UI handles suppressed data correctly.
+EOF
+
+write_if_missing "docs/ai-tasks/TEMPLATE.md" <<'EOF'
+# Task: <Short Title>
+
+## Goal
+
+<What should work after this task?>
+
+## Context
+
+Relevant files:
+- <path>
+- <path>
+
+Relevant docs:
+- <path>
+- <path>
+
+## Scope
+
+Change only:
+- <path or folder>
+
+Do not change:
+- <path or folder>
+
+## Requirements
+
+1. <Requirement>
+2. <Requirement>
+3. <Requirement>
+
+## Constraints
+
+- Keep the patch minimal.
+- Do not change unrelated areas.
+- Do not invent missing legacy behavior.
+- Mark unknowns explicitly.
+
+## Validation
+
+Run:
+
+    <command>
+
+Expected:
+
+- <expected result>
+
+## Output Required
+
+At the end, report:
+
+1. Files changed
+2. Behavior changed
+3. Commands run
+4. Test/build result
+5. Open questions
+EOF
+
+write_if_missing "docs/ai-prompts/codex-plan-mode.md" <<'EOF'
+Read AGENTS.md and the specified task file.
+
+Create an implementation plan only.
+
+Do not modify files.
+
+The plan must include:
+1. Files to inspect
+2. Files likely to change
+3. Risks
+4. Test strategy
+5. Open questions
+EOF
+
+write_if_missing "docs/ai-prompts/codex-patch-mode.md" <<'EOF'
+Read AGENTS.md and the specified task file.
+
+Implement the smallest safe patch.
+
+Do not change unrelated files.
+
+Run the validation commands from the task if possible.
+
+At the end, report:
+1. Files changed
+2. Behavior changed
+3. Commands run
+4. Test/build result
+5. Open questions
+EOF
+
+write_if_missing "docs/ai-prompts/codex-review-mode.md" <<'EOF'
+Read AGENTS.md and review the current git diff.
+
+Do not modify files.
+
+Review against:
+1. Architecture rules
+2. Security and privacy rules
+3. Health data guardrails
+4. Role and portal boundaries
+5. Test coverage
+6. OpenAPI consistency
+7. Unnecessary changes
+
+Return:
+- Must-fix issues
+- Should-fix issues
+- Nice-to-have improvements
+- Verdict
+EOF
+
+write_if_missing "scripts/codex-task.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+TASK_FILE="${1:-}"
+
+if [ -z "$TASK_FILE" ]; then
+  echo "Usage: ./scripts/codex-task.sh docs/ai-tasks/<task>.md"
+  exit 1
+fi
+
+if [ ! -f "$TASK_FILE" ]; then
+  echo "Task file not found: $TASK_FILE"
+  exit 1
+fi
+
+codex "Read AGENTS.md and execute ${TASK_FILE}. Keep changes minimal. Run the validation commands from the task if possible. At the end, summarize files changed, commands run, test/build results, and open questions."
+EOF
+
+write_if_missing "scripts/codex-plan.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+TASK_FILE="${1:-}"
+
+if [ -z "$TASK_FILE" ]; then
+  echo "Usage: ./scripts/codex-plan.sh docs/ai-tasks/<task>.md"
+  exit 1
+fi
+
+if [ ! -f "$TASK_FILE" ]; then
+  echo "Task file not found: $TASK_FILE"
+  exit 1
+fi
+
+codex "Read AGENTS.md and ${TASK_FILE}. Create an implementation plan only. Do not modify files."
+EOF
+
+write_if_missing "scripts/codex-review.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+mkdir -p docs/ai-results
+
+git diff > docs/ai-results/latest.diff
+git diff --stat > docs/ai-results/latest.diffstat.txt
+
+codex "Read AGENTS.md and review the current git diff. Do not modify files. Focus on architecture, privacy, tests, API contract consistency, and unnecessary changes."
+EOF
+
+write_if_missing "scripts/create-handoff.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+mkdir -p docs/ai-handoff
+
+{
+  echo "# ELYO Current Handoff"
+  echo
+  echo "## Date"
+  date
+  echo
+  echo "## Working Directory"
+  pwd
+  echo
+  echo "## Git Branch"
+  git branch --show-current 2>/dev/null || true
+  echo
+  echo "## Git Status"
+  git status --short 2>/dev/null || true
+  echo
+  echo "## Recent Commits"
+  git log --oneline -10 2>/dev/null || true
+  echo
+  echo "## Docker Compose Config Check"
+  docker compose config >/tmp/elyo-compose-check.txt 2>&1 && echo "docker compose config: OK" || cat /tmp/elyo-compose-check.txt
+  echo
+  echo "## Laravel Routes"
+  docker compose exec -T api php artisan route:list 2>/dev/null || true
+  echo
+  echo "## Laravel Tests"
+  docker compose exec -T api php artisan test 2>/dev/null || true
+  echo
+  echo "## Angular Build"
+  docker compose exec -T web npm run build 2>/dev/null || true
+} > docs/ai-handoff/current-status.md
+
+git diff > docs/ai-handoff/current-diff.patch || true
+git diff --stat > docs/ai-handoff/current-diff-stat.txt || true
+
+echo "Created:"
+echo "- docs/ai-handoff/current-status.md"
+echo "- docs/ai-handoff/current-diff.patch"
+echo "- docs/ai-handoff/current-diff-stat.txt"
+EOF
+
+chmod +x scripts/codex-task.sh scripts/codex-plan.sh scripts/codex-review.sh scripts/create-handoff.sh
+
+write_if_missing ".codex/skills/elyo-architecture-review/SKILL.md" <<'EOF'
+---
+name: elyo-architecture-review
+description: Review ELYO changes against the target Angular/Laravel/PostgreSQL architecture, Docker constraints, and migration rules.
+---
+
+# ELYO Architecture Review Skill
+
+Use this skill when reviewing broad changes, refactors, Docker changes, API structure, data model changes, or migration work.
+
+## Review Focus
+
+Check that changes preserve:
+
+- Angular frontend in apps/web-angular
+- Laravel API in apps/api-laravel
+- PostgreSQL as primary database
+- Redis only for cache, sessions and queues
+- n8n only for integrations, not business logic
+- Docker Compose as local runtime
+- OpenAPI as frontend/backend contract
+- legacy ../ELYO as read-only reference
+
+## Hard Rejections
+
+Flag as must-fix if a change:
+
+- modifies ../ELYO
+- introduces microservices
+- switches database away from PostgreSQL
+- moves business logic into Angular
+- moves business logic into n8n
+- weakens health-data privacy
+- bypasses Laravel authorization
+- hardcodes secrets
+- breaks docker compose config
+
+## Output Format
+
+Return:
+
+1. Verdict
+2. Must-fix issues
+3. Should-fix issues
+4. Nice-to-have improvements
+5. Missing tests
+6. Suggested next task
+EOF
+
+write_if_missing ".codex/skills/elyo-laravel-api-task/SKILL.md" <<'EOF'
+---
+name: elyo-laravel-api-task
+description: Implement or review Laravel API changes for ELYO using controllers, requests, resources, services, policies and feature tests.
+---
+
+# ELYO Laravel API Task Skill
+
+Use this skill for Laravel backend implementation tasks.
+
+## Backend Location
+
+    apps/api-laravel
+
+## Expected Structure
+
+Use:
+
+- Controllers for HTTP entry points
+- Form Requests for validation
+- Resources for response shape
+- Services for domain logic
+- Middleware, policies or gates for authorization
+- Feature tests for API behavior
+- Migrations for schema changes
+
+## Required Checks
+
+Before finishing:
+
+    docker compose exec api php artisan test
+
+If migrations change:
+
+    docker compose exec api php artisan migrate:fresh
+
+If routes change:
+
+    docker compose exec api php artisan route:list
+
+## API Rules
+
+- Keep error responses consistent.
+- Update docs/api/openapi.yaml when route behavior changes.
+- Never leak internal exceptions.
+- Never expose individual employee health data to company users.
+- Enforce company, team and user scoping.
+
+## Output Format
+
+Report:
+
+1. Files changed
+2. API behavior changed
+3. Validation logic changed
+4. Authorization logic changed
+5. Tests added or updated
+6. Commands run and results
+7. Open questions
+EOF
+
+write_if_missing ".codex/skills/elyo-angular-task/SKILL.md" <<'EOF'
+---
+name: elyo-angular-task
+description: Implement or review Angular feature work for ELYO while keeping API access in services, role checks in guards, and business logic out of components.
+---
+
+# ELYO Angular Task Skill
+
+Use this skill for Angular frontend implementation tasks.
+
+## Frontend Location
+
+    apps/web-angular
+
+## Rules
+
+- Use Angular services for API calls.
+- Do not use direct fetch calls inside components.
+- Use environment config for API base URL.
+- Use guards for role restrictions.
+- Keep components focused on presentation and user interaction.
+- Do not invent backend data.
+- Do not show placeholder charts unless clearly marked.
+- Do not display individual employee health data in company views.
+
+## Required Check
+
+Before finishing:
+
+    docker compose exec web npm run build
+
+## Review Focus
+
+Check:
+
+- role guards
+- API service usage
+- loading states
+- error states
+- empty states
+- privacy-safe display logic
+- no misleading charts for suppressed data
+
+## Output Format
+
+Report:
+
+1. Files changed
+2. UI behavior changed
+3. API services changed
+4. Guards or routing changed
+5. Build result
+6. Open questions
+EOF
+
+write_if_missing ".codex/skills/elyo-privacy-review/SKILL.md" <<'EOF'
+---
+name: elyo-privacy-review
+description: Review ELYO health-data and company-reporting features for privacy, anonymity thresholds, aggregation safety and non-diagnostic wording.
+---
+
+# ELYO Privacy Review Skill
+
+Use this skill for any code or UI that touches:
+
+- wellbeing data
+- surveys
+- survey results
+- health documents
+- anamnesis profiles
+- company dashboards
+- reports
+- recommendations
+- measures hub
+
+## Non-negotiable Rules
+
+Company, HR and manager users must never see individual employee health data.
+
+Do not expose:
+
+- raw health records
+- raw free-text answers
+- identifiable survey responses
+- personal documents
+- individual wellbeing entries
+- small groups below anonymity threshold
+
+## Survey Results Rules
+
+Check:
+
+- global anonymity threshold
+- bucket-level suppression
+- no raw text answers
+- no tiny subgroup exposure
+- no misleading percentages when data is suppressed
+- safe handling of YES_NO minority groups
+- safe handling of MULTIPLE_CHOICE small buckets
+- safe handling of SCALE distributions
+
+## Wording Rules
+
+Prefer:
+
+- indication
+- orientation
+- trend
+- aggregated view
+- general measure
+- resource
+- self-reflection
+
+Avoid:
+
+- diagnosis
+- treatment
+- therapy promise
+- cure
+- individual risk claim
+- medical certainty
+
+## Output Format
+
+Return:
+
+1. Privacy verdict
+2. Must-fix leaks
+3. Ambiguous risks
+4. Wording issues
+5. Missing tests
+6. Suggested mitigation
+EOF
+
+write_if_missing ".codex/skills/elyo-handoff-summary/SKILL.md" <<'EOF'
+---
+name: elyo-handoff-summary
+description: Create a concise project handoff from git status, diffs, Docker status, Laravel tests, Angular build and current documentation.
+---
+
+# ELYO Handoff Summary Skill
+
+Use this skill when creating a project state handoff for review.
+
+## Inputs to Inspect
+
+Prefer:
+
+- AGENTS.md
+- docs/ai-context/*
+- docs/ai-tasks/*
+- docs/ai-handoff/current-status.md
+- docs/ai-handoff/current-diff.patch
+- docs/api/openapi.yaml
+- docs/migration/*
+- git status
+- git diff
+- docker compose config
+- Laravel test output
+- Angular build output
+
+## Output
+
+Create or update:
+
+    docs/ai-handoff/current-summary.md
+
+Include:
+
+1. Current functional state
+2. Recent changes
+3. Test/build status
+4. Risks
+5. Architecture concerns
+6. Privacy concerns
+7. Recommended next Codex task
+8. Files most relevant for next review
+EOF
+
+write_if_missing ".codex/config.toml" <<'EOF'
+# Repo-local Codex configuration placeholder.
+# Keep personal defaults in ~/.codex/config.toml.
+# Keep project rules in AGENTS.md.
+#
+# Add repo-specific Codex settings here only when needed.
+EOF
+
+echo
+echo "Bootstrap complete."
+echo
+echo "Next useful commands:"
+echo "  ./scripts/create-handoff.sh"
+echo "  ./scripts/codex-plan.sh docs/ai-tasks/TEMPLATE.md"
+echo "  ./scripts/codex-task.sh docs/ai-tasks/<task>.md"
+echo "  ./scripts/codex-review.sh"
