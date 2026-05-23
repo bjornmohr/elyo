@@ -176,61 +176,101 @@ import { NotificationService } from '../../../../shared/notifications/notificati
                 <div class="flex items-start justify-between gap-4">
                   <div>
                     <h3 class="font-semibold text-gray-900">{{ question.text }}</h3>
-                    <p class="text-xs text-gray-500 mt-1">{{ question.answerCount }} aggregierte Antworten</p>
+                    @if (question.answerCount !== null && question.answerCount !== undefined) {
+                      <p class="text-xs text-gray-500 mt-1">{{ question.answerCount }} aggregierte Antworten</p>
+                    } @else {
+                      <p class="text-xs text-gray-500 mt-1">Antwortzahl anonymisiert</p>
+                    }
                   </div>
                   <span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">{{ question.type }}</span>
                 </div>
 
                 @if (question.type === 'SCALE') {
-                  <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div class="rounded-lg bg-teal-50 p-3">
-                      <div class="text-xs text-teal-700">Durchschnitt</div>
-                      <div class="text-2xl font-semibold text-teal-800">{{ question.avgValue ?? '—' }}</div>
-                    </div>
-                    <div class="rounded-lg bg-stone-50 p-3">
-                      <div class="text-xs text-gray-400">Minimum</div>
-                      <div class="font-semibold">{{ question.minValue ?? '—' }}</div>
-                    </div>
-                    <div class="rounded-lg bg-stone-50 p-3">
-                      <div class="text-xs text-gray-400">Maximum</div>
-                      <div class="font-semibold">{{ question.maxValue ?? '—' }}</div>
-                    </div>
-                  </div>
-                  <div class="mt-4 flex items-end gap-1 h-24">
-                    @for (bucket of question.distribution ?? []; track bucket.value) {
-                      <div class="flex-1 flex flex-col justify-end items-center gap-1">
-                        <div class="w-full rounded-t bg-teal-500" [style.height.%]="bucket.percentage || 4"></div>
-                        <span class="text-[10px] text-gray-400">{{ bucket.value }}</span>
+                  @if (!question.isSuppressed) {
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div class="rounded-lg bg-teal-50 p-3">
+                        <div class="text-xs text-teal-700">Durchschnitt</div>
+                        <div class="text-2xl font-semibold text-teal-800">{{ question.avgValue ?? '—' }}</div>
                       </div>
-                    }
-                  </div>
+                      <div class="rounded-lg bg-stone-50 p-3">
+                        <div class="text-xs text-gray-400">Minimum</div>
+                        <div class="font-semibold">{{ question.minValue ?? '—' }}</div>
+                      </div>
+                      <div class="rounded-lg bg-stone-50 p-3">
+                        <div class="text-xs text-gray-400">Maximum</div>
+                        <div class="font-semibold">{{ question.maxValue ?? '—' }}</div>
+                      </div>
+                    </div>
+                  }
+                  @if (!question.isSuppressed) {
+                    <div class="mt-4 flex items-end gap-1 h-24">
+                      @for (bucket of question.distribution ?? []; track bucket.value) {
+                        <div class="flex-1 flex flex-col justify-end items-center gap-1">
+                          <div class="w-full rounded-t bg-teal-500" [style.height.%]="bucket.percentage || 4"></div>
+                          <span class="text-[10px] text-gray-400">{{ bucket.value }}</span>
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <p class="mt-3 text-sm text-gray-500">
+                      @if (question.suppressionReason === 'QUESTION_THRESHOLD_NOT_MET') {
+                        Zu wenige Antworten für eine anonyme Auswertung dieser Frage.
+                      } @else {
+                        Einzelne Skalenwerte werden zum Schutz kleiner Antwortgruppen nicht angezeigt.
+                      }
+                    </p>
+                  }
                 } @else if (question.type === 'YES_NO') {
-                  <div class="mt-4 grid grid-cols-2 gap-3">
-                    <div class="rounded-lg bg-green-50 p-3 text-green-800">
-                      <div class="text-xs">Ja</div>
-                      <div class="text-xl font-semibold">{{ question.trueCount }} · {{ question.truePercentage }}%</div>
-                    </div>
-                    <div class="rounded-lg bg-red-50 p-3 text-red-800">
-                      <div class="text-xs">Nein</div>
-                      <div class="text-xl font-semibold">{{ question.falseCount }} · {{ question.falsePercentage }}%</div>
-                    </div>
-                  </div>
-                } @else if (question.type === 'MULTIPLE_CHOICE') {
-                  <div class="mt-4 space-y-2">
-                    @for (option of question.options ?? []; track option.value) {
-                      <div>
-                        <div class="flex justify-between text-xs text-gray-500 mb-1">
-                          <span>{{ option.value || 'Keine Angabe' }}</span>
-                          <span>{{ option.count }} · {{ option.percentage }}%</span>
-                        </div>
-                        <div class="h-2 rounded-full bg-gray-100 overflow-hidden">
-                          <div class="h-full bg-teal-500" [style.width.%]="option.percentage"></div>
-                        </div>
+                  @if (question.isSuppressed) {
+                    <p class="mt-4 text-sm text-gray-500">
+                      @if (question.suppressionReason === 'QUESTION_THRESHOLD_NOT_MET') {
+                        Zu wenige Antworten für eine anonyme Auswertung dieser Frage.
+                      } @else {
+                        Die genaue Ja/Nein-Verteilung wird zum Schutz kleiner Antwortgruppen nicht angezeigt.
+                      }
+                    </p>
+                  } @else {
+                    <div class="mt-4 grid grid-cols-2 gap-3">
+                      <div class="rounded-lg bg-green-50 p-3 text-green-800">
+                        <div class="text-xs">Ja</div>
+                        <div class="text-xl font-semibold">{{ question.trueCount }} · {{ question.truePercentage }}%</div>
                       </div>
-                    }
-                  </div>
+                      <div class="rounded-lg bg-red-50 p-3 text-red-800">
+                        <div class="text-xs">Nein</div>
+                        <div class="text-xl font-semibold">{{ question.falseCount }} · {{ question.falsePercentage }}%</div>
+                      </div>
+                    </div>
+                  }
+                } @else if (question.type === 'MULTIPLE_CHOICE') {
+                  @if (question.isSuppressed) {
+                    <p class="mt-4 text-sm text-gray-500">
+                      @if (question.suppressionReason === 'QUESTION_THRESHOLD_NOT_MET') {
+                        Zu wenige Antworten für eine anonyme Auswertung dieser Frage.
+                      } @else {
+                        Die Antwortverteilung wird zum Schutz kleiner Antwortgruppen nicht angezeigt.
+                      }
+                    </p>
+                  } @else {
+                    <div class="mt-4 space-y-2">
+                      @for (option of question.options ?? []; track option.value) {
+                        <div>
+                          <div class="flex justify-between text-xs text-gray-500 mb-1">
+                            <span>{{ option.value || 'Keine Angabe' }}</span>
+                            <span>{{ option.count }} · {{ option.percentage }}%</span>
+                          </div>
+                          <div class="h-2 rounded-full bg-gray-100 overflow-hidden">
+                            <div class="h-full bg-teal-500" [style.width.%]="option.percentage"></div>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  }
                 } @else {
-                  <p class="mt-4 text-sm text-gray-500">Freitextantworten werden zum Schutz der Anonymität nicht einzeln angezeigt.</p>
+                  @if (question.isSuppressed) {
+                    <p class="mt-4 text-sm text-gray-500">Zu wenige Antworten für eine anonyme Auswertung dieser Frage.</p>
+                  } @else {
+                    <p class="mt-4 text-sm text-gray-500">Freitextantworten werden zum Schutz der Anonymität nicht einzeln angezeigt.</p>
+                  }
                 }
               </article>
             }

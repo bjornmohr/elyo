@@ -628,11 +628,118 @@ paths:
                     type: object
                     properties:
                       survey: { type: object }
+                      scope:
+                        type: object
+                        nullable: true
+                        properties:
+                          type: { type: string, enum: [company, teams] }
+                          teamIds:
+                            type: array
+                            nullable: true
+                            items: { type: integer }
+                      participation:
+                        type: object
+                        nullable: true
+                        properties:
+                          eligibleCount: { type: integer }
+                          responseCount: { type: integer }
+                          rate: { type: number }
                       responseCount: { type: integer }
+                      minRequired:
+                        type: integer
+                        nullable: true
                       isAboveThreshold: { type: boolean }
-                      questions: { type: array, items: { type: object } }
+                      questions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            questionId: { type: integer }
+                            text: { type: string }
+                            type: { type: string, enum: [SCALE, MULTIPLE_CHOICE, TEXT, YES_NO] }
+                            answerCount:
+                              type: integer
+                              nullable: true
+                              description: Null when the question-level anonymity threshold is not met.
+                            avgValue:
+                              type: number
+                              nullable: true
+                              description: Null when SCALE buckets are suppressed.
+                            minValue:
+                              type: integer
+                              nullable: true
+                              description: Null when SCALE buckets are suppressed.
+                            maxValue:
+                              type: integer
+                              nullable: true
+                              description: Null when SCALE buckets are suppressed.
+                            scaleMinLabel:
+                              type: string
+                              nullable: true
+                            scaleMaxLabel:
+                              type: string
+                              nullable: true
+                            isSuppressed:
+                              type: boolean
+                              description: True when one or more small answer buckets are hidden.
+                            suppressedCount:
+                              type: integer
+                              nullable: true
+                              description: Total answers hidden inside visible-safe suppressed buckets. Null when suppressed metadata could allow inference.
+                            suppressionReason:
+                              type: string
+                              nullable: true
+                              enum: [QUESTION_THRESHOLD_NOT_MET, DISTRIBUTION_SUPPRESSED]
+                              description: Optional reason returned when a question or distribution is suppressed.
+                            distribution:
+                              type: array
+                              description: Distribution buckets. For SCALE and MULTIPLE_CHOICE results, this is an empty array when any bucket is suppressed.
+                              items:
+                                type: object
+                                properties:
+                                  value: { type: integer }
+                                  count: { type: integer }
+                                  percentage: { type: number }
+                            trueCount:
+                              type: integer
+                              nullable: true
+                              description: Null when YES_NO split is suppressed.
+                            falseCount:
+                              type: integer
+                              nullable: true
+                              description: Null when YES_NO split is suppressed.
+                            truePercentage:
+                              type: number
+                              nullable: true
+                            falsePercentage:
+                              type: number
+                              nullable: true
+                            options:
+                              type: array
+                              description: MULTIPLE_CHOICE options. Empty when the distribution is suppressed because any option bucket is below the anonymity threshold.
+                              items:
+                                type: object
+                                properties:
+                                  value: { type: string, nullable: true }
+                                  count: { type: integer }
+                                  percentage: { type: number }
         403:
           description: Threshold not met
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  minRequired: { type: integer }
+                  current: { type: integer }
+                  participation:
+                    type: object
+                    properties:
+                      eligibleCount: { type: integer }
+                      responseCount: { type: integer }
+                      rate: { type: number }
+                  isAboveThreshold: { type: boolean }
 
   /company/measures:
     get:
