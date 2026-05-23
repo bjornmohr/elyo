@@ -1,0 +1,7 @@
+# AI handoff snapshots
+docs/ai-handoff/current-*.md
+docs/ai-handoff/current-*.patch
+docs/ai-handoff/current-*.txt
+docs/ai-results/latest.diff
+docs/ai-results/latest.diffstat.txt
+EOF
