@@ -31,6 +31,10 @@ class ReportController extends Controller
             ? $managedTeam?->id
             : $request->query('teamId');
 
+        if (! $isManager && $teamId !== null && ! Team::where('id', $teamId)->where('company_id', $user->company_id)->exists()) {
+            abort(403);
+        }
+
         $company = $user->company;
         $threshold = $company->anonymity_threshold ?? AnonymityService::DEFAULT_THRESHOLD;
 

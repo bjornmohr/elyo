@@ -41,6 +41,15 @@ class PointsService
         $userPoints->increment('total', $points);
     }
 
+    public function awardPointsOnce(User $user, string $reason): void
+    {
+        if (PointTransaction::where('user_id', $user->id)->where('reason', $reason)->exists()) {
+            return;
+        }
+
+        $this->awardPoints($user, $reason);
+    }
+
     public function updateStreak(User $user): int
     {
         $streak = $this->calculateStreak($user);
@@ -59,9 +68,13 @@ class PointsService
     public function calculateStreak(User $user): int
     {
         $days = WellbeingEntry::where('user_id', $user->id)
-            ->orderByDesc('created_at')
-            ->get(['created_at'])
-            ->map(fn ($entry) => $entry->created_at->toDateString())
+            ->where('company_id', $user->company_id)
+            ->where('period_key', 'like', '____-__-__')
+            ->orderByDesc('period_key')
+            ->distinct()
+            ->pluck('period_key')
+            ->filter(fn (string $periodKey) => $this->isValidDailyPeriodKey($periodKey))
+            ->filter(fn (string $periodKey) => $this->isWorkdayPeriodKey($periodKey))
             ->unique()
             ->values();
 
@@ -74,7 +87,7 @@ class PointsService
 
         for ($i = 1; $i < $days->count(); $i++) {
             $current = Carbon::parse($days[$i])->startOfDay();
-            if ($current->equalTo((clone $previous)->subDay())) {
+            if ($current->equalTo($this->previousExpectedWorkday($previous))) {
                 $streak++;
                 $previous = $current;
 
@@ -84,6 +97,41 @@ class PointsService
         }
 
         return $streak;
+    }
+
+    public function isValidDailyPeriodKey(string $periodKey): bool
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $periodKey) !== 1) {
+            return false;
+        }
+
+        try {
+            $date = Carbon::createFromFormat('Y-m-d', $periodKey);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return $date instanceof Carbon && $date->format('Y-m-d') === $periodKey;
+    }
+
+    public function isWorkdayPeriodKey(string $periodKey): bool
+    {
+        if (! $this->isValidDailyPeriodKey($periodKey)) {
+            return false;
+        }
+
+        return Carbon::createFromFormat('Y-m-d', $periodKey)->isWeekday();
+    }
+
+    public function previousExpectedWorkday(Carbon $date): Carbon
+    {
+        $previous = (clone $date)->subDay()->startOfDay();
+
+        while (! $previous->isWeekday()) {
+            $previous->subDay();
+        }
+
+        return $previous;
     }
 
     public static function resolvePointMap(): array

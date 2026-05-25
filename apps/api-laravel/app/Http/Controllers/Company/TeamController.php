@@ -103,6 +103,10 @@ class TeamController extends Controller
             ->where('company_id', $user->company_id)
             ->firstOrFail();
 
+        if ($user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]) && $team->manager_id !== $user->id) {
+            abort(403);
+        }
+
         // TODO: team membership needs a proper join table or team_id on users
         $members = collect([]);
 

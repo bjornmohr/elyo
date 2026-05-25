@@ -75,6 +75,33 @@ components:
         note: { type: string, nullable: true }
         periodKey: { type: string }
         createdAt: { type: string, format: date-time }
+    EmployeeCheckinStatusResponse:
+      type: object
+      required: [completed, entry]
+      properties:
+        completed:
+          type: boolean
+        entry:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/WellbeingEntry'
+
+    CheckinAlreadyDoneError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [CHECKIN_ALREADY_DONE]
+              example: CHECKIN_ALREADY_DONE
+            message:
+              type: string
+              example: Der Check-in wurde heute bereits abgeschlossen.
+
 
     Measure:
       type: object
@@ -140,6 +167,8 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/WellbeingEntry' }
                   streakCount: { type: integer }
+                  points: { type: integer }
+                  todayCheckinCompleted: { type: boolean }
         401:
           description: Unauthorized
 
@@ -170,6 +199,51 @@ paths:
                   success: { type: boolean }
                   score: { type: number }
                   periodKey: { type: string }
+        409:
+          description: Check-in already completed for the authenticated employee and current daily period.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckinAlreadyDoneError'
+              example:
+                error:
+                  code: CHECKIN_ALREADY_DONE
+                  message: Der Check-in wurde heute bereits abgeschlossen.
+
+  /employee/checkin/status:
+    get:
+      tags: [Employee]
+      summary: Get daily check-in status
+      description: Returns whether the authenticated employee has already completed the check-in for the current daily period.
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Daily check-in status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeCheckinStatusResponse'
+              examples:
+                completed:
+                  summary: Check-in already completed
+                  value:
+                    completed: true
+                    entry:
+                      id: "01JY0000000000000000000001"
+                      mood: 8
+                      stress: 3
+                      energy: 7
+                      score: 7.7
+                      note: "Guter Start in den Tag."
+                      periodKey: "2026-05-25"
+                      createdAt: "2026-05-25T08:00:00Z"
+                notCompleted:
+                  summary: No check-in for the current daily period
+                  value:
+                    completed: false
+                    entry: null
+        401:
+          description: Unauthorized
 
   /employee/history:
     get:

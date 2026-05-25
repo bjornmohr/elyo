@@ -13,9 +13,14 @@ class CompanyInvitationController extends Controller
 {
     public function users(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        $user = $request->user();
+        $companyId = $user->company_id;
+        $user->loadMissing('roles');
+        $isManager = $this->isManagerOnly($user);
+        $managedTeamIds = $isManager ? $this->managedTeamIds($user) : [];
 
         $users = User::where('company_id', $companyId)
+            ->when($isManager, fn ($query) => $query->whereIn('team_id', $managedTeamIds))
             ->with('roles')
             ->orderBy('name')
             ->get()
@@ -33,9 +38,14 @@ class CompanyInvitationController extends Controller
 
     public function invitations(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        $user = $request->user();
+        $companyId = $user->company_id;
+        $user->loadMissing('roles');
 
         $invites = InviteToken::where('company_id', $companyId)
+            ->when($this->isManagerOnly($user), fn ($query) => $query
+                ->where('invited_by_user_id', $user->id)
+                ->where('role', Role::EMPLOYEE->value))
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(fn ($i) => [
@@ -61,10 +71,9 @@ class CompanyInvitationController extends Controller
         $companyId = $user->company_id;
         $role = Role::from($request->role);
 
-        // COMPANY_MANAGER can only invite EMPLOYEE
-        if ($user->hasRole(Role::COMPANY_MANAGER) && $role !== Role::EMPLOYEE) {
+        if ($this->isManagerOnly($user)) {
             return response()->json([
-                'error' => ['code' => 'FORBIDDEN', 'message' => 'Sie dürfen nur Mitarbeiter einladen.'],
+                'error' => ['code' => 'FORBIDDEN', 'message' => 'Manager-Einladungen benötigen eine Team-Zuordnung.'],
             ], 403);
         }
 
@@ -102,8 +111,15 @@ class CompanyInvitationController extends Controller
     public function destroyInvitation(Request $request, InviteToken $invite)
     {
         $companyId = $request->user()->company_id;
+        $request->user()->loadMissing('roles');
 
         if ($invite->company_id !== $companyId) {
+            return response()->json([
+                'error' => ['code' => 'FORBIDDEN', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        if ($this->isManagerOnly($request->user()) && ((int) $invite->invited_by_user_id !== (int) $request->user()->id || $invite->role !== Role::EMPLOYEE)) {
             return response()->json([
                 'error' => ['code' => 'FORBIDDEN', 'message' => 'Unauthorized.'],
             ], 403);
@@ -118,5 +134,15 @@ class CompanyInvitationController extends Controller
         $invite->update(['status' => 'revoked']);
 
         return response()->json(['message' => 'Einladung widerrufen.']);
+    }
+
+    private function isManagerOnly($user): bool
+    {
+        return $user->hasRole(Role::COMPANY_MANAGER) && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
+    }
+
+    private function managedTeamIds($user): array
+    {
+        return $user->managedTeams()->pluck('id')->map(fn ($id) => (int) $id)->all();
     }
 }

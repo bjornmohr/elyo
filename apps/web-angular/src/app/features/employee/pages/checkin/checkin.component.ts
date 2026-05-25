@@ -26,7 +26,7 @@ import { NotificationService } from '../../../../shared/notifications/notificati
         <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 text-center space-y-4">
           <div class="text-5xl">✓</div>
           <h2 class="text-2xl font-bold text-slate-800">Check-in bereits abgeschlossen</h2>
-          <p class="text-slate-500">Du kannst nur einen Wohlbefinden-Check-in pro Tag abgeben. Komm morgen für den nächsten zurück.</p>
+          <p class="text-slate-500">Für heute liegt bereits ein Check-in vor.</p>
           <a routerLink="/employee" class="inline-block bg-teal-600 text-white px-6 py-3 rounded-2xl font-bold">Zurück zur Übersicht</a>
         </div>
       } @else {
@@ -166,6 +166,7 @@ export class CheckinComponent implements OnInit {
       },
       error: err => {
         if (err.status === 409) {
+          this.notifications.error('Für heute liegt bereits ein Check-in vor.');
           this.alreadyDone.set(true);
         } else {
           const message = 'Check-in konnte nicht gespeichert werden.';
