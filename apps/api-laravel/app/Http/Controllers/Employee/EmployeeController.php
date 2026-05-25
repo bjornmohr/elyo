@@ -10,7 +10,6 @@ use App\Http\Resources\Employee\WellbeingEntryResource;
 use App\Models\AnamnesisProfile;
 use App\Models\Measure;
 use App\Models\UserDocument;
-use App\Models\WellbeingEntry;
 use App\Services\PointsService;
 use App\Services\WellbeingService;
 use Illuminate\Http\JsonResponse;
@@ -28,6 +27,7 @@ class EmployeeController extends Controller
     {
         $user = $request->user();
         $entries = $user->wellbeingEntries()
+            ->where('company_id', $user->company_id)
             ->orderBy('created_at', 'desc')
             ->take(7)
             ->get();
@@ -40,14 +40,14 @@ class EmployeeController extends Controller
             'entries' => WellbeingEntryResource::collection($entries->reverse()),
             'streakCount' => $streakCount,
             'points' => $user->userPoints?->total ?? 0,
-            'todayCheckinCompleted' => $this->hasCheckinToday($user),
+            'todayCheckinCompleted' => $this->wellbeingService->hasDailyCheckin($user),
         ]);
     }
 
     public function checkinStatus(Request $request): JsonResponse
     {
         $entry = $request->user()->wellbeingEntries()
-            ->where('period_key', now()->toDateString())
+            ->where('period_key', $this->wellbeingService->getPeriodKey($request->user()))
             ->latest()
             ->first();
 
@@ -65,7 +65,7 @@ class EmployeeController extends Controller
             return response()->json(['error' => 'Employee must belong to a company'], 403);
         }
 
-        if ($this->hasCheckinToday($user)) {
+        if ($this->wellbeingService->hasDailyCheckin($user)) {
             return response()->json([
                 'error' => ['code' => 'CHECKIN_ALREADY_DONE', 'message' => 'Der Check-in wurde heute bereits abgeschlossen.'],
             ], 409);
@@ -73,14 +73,20 @@ class EmployeeController extends Controller
 
         $entry = $this->wellbeingService->submitCheckin($user, $request->validated());
 
+        if (! $entry) {
+            return response()->json([
+                'error' => ['code' => 'CHECKIN_ALREADY_DONE', 'message' => 'Der Check-in wurde heute bereits abgeschlossen.'],
+            ], 409);
+        }
+
         try {
             $this->pointsService->awardPoints($user, 'daily_checkin');
             $streak = $this->pointsService->updateStreak($user);
 
             if ($streak === 7) {
-                $this->pointsService->awardPoints($user, 'streak_7days');
+                $this->pointsService->awardPointsOnce($user, 'streak_7days');
             } elseif ($streak === 30) {
-                $this->pointsService->awardPoints($user, 'streak_30days');
+                $this->pointsService->awardPointsOnce($user, 'streak_30days');
             }
         } catch (\Exception $e) {
             // Log error but don't fail the checkin
@@ -98,6 +104,7 @@ class EmployeeController extends Controller
     {
         $limit = $request->query('limit', 20);
         $entries = $request->user()->wellbeingEntries()
+            ->where('company_id', $request->user()->company_id)
             ->orderBy('created_at', 'asc')
             ->take($limit)
             ->get();
@@ -221,13 +228,6 @@ class EmployeeController extends Controller
             ->get();
 
         return response()->json(['data' => MeasureResource::collection($measures)]);
-    }
-
-    private function hasCheckinToday($user): bool
-    {
-        return WellbeingEntry::where('user_id', $user->id)
-            ->where('period_key', now()->toDateString())
-            ->exists();
     }
 
     private function calculateAnamnesisCompletion(array $profileData): int

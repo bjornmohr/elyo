@@ -7,15 +7,20 @@ use App\Enums\Role;
 use App\Enums\SurveyStatus;
 use App\Models\Company;
 use App\Models\Measure;
+use App\Models\PointTransaction;
 use App\Models\Survey;
 use App\Models\SurveyAnswer;
 use App\Models\SurveyQuestion;
 use App\Models\SurveyResponse;
 use App\Models\Team;
 use App\Models\User;
+use App\Models\UserPoints;
 use App\Models\WellbeingEntry;
+use App\Services\WellbeingService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -59,6 +64,8 @@ class EmployeeTest extends TestCase
 
     public function test_employee_can_submit_checkin()
     {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+
         $response = $this->actingAs($this->employee, 'sanctum')
             ->postJson('/api/employee/checkin', [
                 'mood' => 8,
@@ -75,6 +82,7 @@ class EmployeeTest extends TestCase
 
         $this->assertDatabaseHas('wellbeing_entries', [
             'user_id' => $this->employee->id,
+            'period_key' => '2026-05-25',
             'mood' => 8,
             'stress' => 3,
             'energy' => 7,
@@ -83,6 +91,8 @@ class EmployeeTest extends TestCase
 
     public function test_employee_can_submit_checkin_only_once_per_day()
     {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+
         $payload = [
             'mood' => 8,
             'stress' => 3,
@@ -102,6 +112,350 @@ class EmployeeTest extends TestCase
             ->getJson('/api/employee/checkin/status')
             ->assertStatus(200)
             ->assertJsonPath('completed', true);
+    }
+
+    public function test_existing_daily_wellbeing_entry_blocks_new_checkin()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-25');
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson('/api/employee/checkin', [
+                'mood' => 8,
+                'stress' => 3,
+                'energy' => 7,
+            ])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'CHECKIN_ALREADY_DONE');
+
+        $this->assertSame(1, WellbeingEntry::where('user_id', $this->employee->id)
+            ->where('period_key', '2026-05-25')
+            ->count());
+    }
+
+    public function test_rejected_duplicate_checkin_does_not_award_points_or_update_streak()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-25');
+        UserPoints::create([
+            'user_id' => $this->employee->id,
+            'total' => 99,
+            'streak' => 5,
+            'last_checkin' => Carbon::parse('2026-05-24 09:00:00'),
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson('/api/employee/checkin', [
+                'mood' => 8,
+                'stress' => 3,
+                'energy' => 7,
+            ])
+            ->assertStatus(409);
+
+        $this->assertDatabaseMissing('point_transactions', [
+            'user_id' => $this->employee->id,
+            'reason' => 'daily_checkin',
+        ]);
+        $this->assertDatabaseHas('user_points', [
+            'user_id' => $this->employee->id,
+            'total' => 99,
+            'streak' => 5,
+        ]);
+    }
+
+    public function test_submit_checkin_returns_null_when_database_unique_constraint_is_hit()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-25');
+
+        $service = new class extends WellbeingService
+        {
+            public function hasDailyCheckin(User $user, ?string $periodKey = null): bool
+            {
+                return false;
+            }
+        };
+
+        DB::beginTransaction();
+
+        try {
+            $result = $service->submitCheckin($this->employee, [
+                'mood' => 8,
+                'stress' => 3,
+                'energy' => 7,
+            ]);
+        } finally {
+            DB::rollBack();
+        }
+
+        $this->assertNull($result);
+        $this->assertSame(1, WellbeingEntry::where([
+            'user_id' => $this->employee->id,
+            'company_id' => $this->company->id,
+            'period_key' => '2026-05-25',
+        ])->count());
+    }
+
+    public function test_daily_streak_is_one_when_only_today_exists()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-25');
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/dashboard')
+            ->assertStatus(200)
+            ->assertJsonPath('streakCount', 1);
+    }
+
+    public function test_workday_streak_counts_friday_and_monday_as_consecutive()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-25');
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-22');
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/dashboard')
+            ->assertStatus(200)
+            ->assertJsonPath('streakCount', 2);
+    }
+
+    public function test_workday_streak_counts_thursday_friday_and_monday()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-25');
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-22');
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-21');
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/dashboard')
+            ->assertStatus(200)
+            ->assertJsonPath('streakCount', 3);
+    }
+
+    public function test_workday_streak_is_one_when_friday_is_missing()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-25');
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-21');
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/dashboard')
+            ->assertStatus(200)
+            ->assertJsonPath('streakCount', 1);
+    }
+
+    public function test_weekend_entries_do_not_extend_workday_streak()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-25');
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-24');
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-23');
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-22');
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/dashboard')
+            ->assertStatus(200)
+            ->assertJsonPath('streakCount', 2);
+    }
+
+    public function test_weekend_gaps_do_not_break_workday_streak()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-25');
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-22');
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/dashboard')
+            ->assertStatus(200)
+            ->assertJsonPath('streakCount', 2);
+    }
+
+    public function test_malformed_daily_period_keys_do_not_affect_workday_streak()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $this->createDailyWellbeingEntry($this->employee, '2026-99-99');
+        $this->createDailyWellbeingEntry($this->employee, '2026-02-31');
+        $this->createDailyWellbeingEntry($this->employee, '2026-00-10');
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-25');
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-22');
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/dashboard')
+            ->assertStatus(200)
+            ->assertJsonPath('streakCount', 2);
+    }
+
+    public function test_weekend_only_checkins_do_not_produce_workday_streak()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-24');
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-23');
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/dashboard')
+            ->assertStatus(200)
+            ->assertJsonPath('streakCount', 0);
+    }
+
+    public function test_daily_streak_uses_seeded_wellbeing_entries_without_point_transactions()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-25');
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-22');
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-21');
+
+        $this->assertSame(0, PointTransaction::where('user_id', $this->employee->id)->count());
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/dashboard')
+            ->assertStatus(200)
+            ->assertJsonPath('streakCount', 3);
+    }
+
+    public function test_streak_7days_milestone_is_awarded_when_user_reaches_seven_workdays()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $this->createPreviousWorkdayEntries($this->employee, '2026-05-25', 6);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson('/api/employee/checkin', [
+                'mood' => 8,
+                'stress' => 3,
+                'energy' => 7,
+            ])
+            ->assertStatus(200);
+
+        $this->assertDatabaseHas('point_transactions', [
+            'user_id' => $this->employee->id,
+            'reason' => 'daily_checkin',
+            'points' => 10,
+        ]);
+        $this->assertDatabaseHas('point_transactions', [
+            'user_id' => $this->employee->id,
+            'reason' => 'streak_7days',
+            'points' => 50,
+        ]);
+        $this->assertDatabaseHas('user_points', [
+            'user_id' => $this->employee->id,
+            'total' => 60,
+            'streak' => 7,
+        ]);
+    }
+
+    public function test_streak_7days_milestone_is_not_awarded_again_for_same_user()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $this->createPreviousWorkdayEntries($this->employee, '2026-05-25', 6);
+        PointTransaction::create([
+            'user_id' => $this->employee->id,
+            'reason' => 'streak_7days',
+            'points' => 50,
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson('/api/employee/checkin', [
+                'mood' => 8,
+                'stress' => 3,
+                'energy' => 7,
+            ])
+            ->assertStatus(200);
+
+        $this->assertSame(1, PointTransaction::where('user_id', $this->employee->id)
+            ->where('reason', 'streak_7days')
+            ->count());
+        $this->assertDatabaseHas('point_transactions', [
+            'user_id' => $this->employee->id,
+            'reason' => 'daily_checkin',
+            'points' => 10,
+        ]);
+    }
+
+    public function test_streak_30days_milestone_is_not_awarded_again_for_same_user()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $this->createPreviousWorkdayEntries($this->employee, '2026-05-25', 29);
+        PointTransaction::create([
+            'user_id' => $this->employee->id,
+            'reason' => 'streak_30days',
+            'points' => 200,
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson('/api/employee/checkin', [
+                'mood' => 8,
+                'stress' => 3,
+                'energy' => 7,
+            ])
+            ->assertStatus(200);
+
+        $this->assertSame(1, PointTransaction::where('user_id', $this->employee->id)
+            ->where('reason', 'streak_30days')
+            ->count());
+        $this->assertDatabaseHas('point_transactions', [
+            'user_id' => $this->employee->id,
+            'reason' => 'daily_checkin',
+            'points' => 10,
+        ]);
+    }
+
+    public function test_another_users_milestone_transaction_does_not_block_current_user()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $otherUser = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        PointTransaction::create([
+            'user_id' => $otherUser->id,
+            'reason' => 'streak_7days',
+            'points' => 50,
+        ]);
+        $this->createPreviousWorkdayEntries($this->employee, '2026-05-25', 6);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson('/api/employee/checkin', [
+                'mood' => 8,
+                'stress' => 3,
+                'energy' => 7,
+            ])
+            ->assertStatus(200);
+
+        $this->assertDatabaseHas('point_transactions', [
+            'user_id' => $this->employee->id,
+            'reason' => 'streak_7days',
+            'points' => 50,
+        ]);
+    }
+
+    public function test_daily_streak_ignores_entries_from_another_user()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $otherUser = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-25');
+        $this->createDailyWellbeingEntry($otherUser, '2026-05-24');
+        $this->createDailyWellbeingEntry($otherUser, '2026-05-23');
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/dashboard')
+            ->assertStatus(200)
+            ->assertJsonPath('streakCount', 1);
+    }
+
+    public function test_daily_streak_ignores_entries_from_another_company()
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $otherCompany = Company::factory()->create();
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-25');
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-24', $otherCompany);
+        $this->createDailyWellbeingEntry($this->employee, '2026-05-23', $otherCompany);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/dashboard')
+            ->assertStatus(200)
+            ->assertJsonPath('streakCount', 1);
     }
 
     public function test_employee_can_get_history()
@@ -306,5 +660,29 @@ class EmployeeTest extends TestCase
             'user_id' => $this->employee->id,
             'file_name' => 'report.pdf',
         ]);
+    }
+
+    private function createDailyWellbeingEntry(User $user, string $periodKey, ?Company $company = null): WellbeingEntry
+    {
+        return WellbeingEntry::factory()->create([
+            'user_id' => $user->id,
+            'company_id' => ($company ?? $this->company)->id,
+            'period_key' => $periodKey,
+            'created_at' => Carbon::parse('2026-05-25 08:00:00'),
+            'updated_at' => Carbon::parse('2026-05-25 08:00:00'),
+        ]);
+    }
+
+    private function createPreviousWorkdayEntries(User $user, string $periodKey, int $count): void
+    {
+        $date = Carbon::parse($periodKey)->startOfDay();
+
+        for ($i = 0; $i < $count; $i++) {
+            do {
+                $date->subDay();
+            } while ($date->isWeekend());
+
+            $this->createDailyWellbeingEntry($user, $date->toDateString());
+        }
     }
 }

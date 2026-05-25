@@ -41,6 +41,7 @@ class SurveyController extends Controller
         $survey = Survey::where('id', $id)
             ->where('company_id', $user->company_id)
             ->where('status', SurveyStatus::ACTIVE)
+            ->where(fn ($query) => $this->accessibleSurveyScope($query, $user))
             ->with(['questions' => fn ($q) => $q->orderBy('order', 'asc')])
             ->first();
 
@@ -112,6 +113,7 @@ class SurveyController extends Controller
         $survey = Survey::where('id', $id)
             ->where('company_id', $user->company_id)
             ->where('status', SurveyStatus::ACTIVE)
+            ->where(fn ($query) => $this->accessibleSurveyScope($query, $user))
             ->with('questions')
             ->first();
 
@@ -155,5 +157,13 @@ class SurveyController extends Controller
         }
 
         return response()->json(['ok' => true]);
+    }
+
+    private function accessibleSurveyScope($query, $user): void
+    {
+        $query->whereDoesntHave('teams');
+        if ($user->team_id) {
+            $query->orWhereHas('teams', fn ($teamQuery) => $teamQuery->where('teams.id', $user->team_id));
+        }
     }
 }
