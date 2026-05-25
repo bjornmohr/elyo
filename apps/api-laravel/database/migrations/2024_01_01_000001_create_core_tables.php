@@ -23,13 +23,13 @@ return new class extends Migration
             $table->string('name');
             $table->string('email')->unique();
             $table->string('password');
-            $table->unsignedBigInteger('company_id')->nullable();
+            $table->unsignedBigInteger('company_id');
             $table->string('status')->default('active');
             $table->timestamp('last_login_at')->nullable();
             $table->unsignedBigInteger('team_id')->nullable();
             $table->timestamps();
             $table->index(['company_id', 'team_id']);
-            $table->foreign('company_id')->references('id')->on('companies')->onDelete('set null');
+            $table->foreign('company_id')->references('id')->on('companies')->restrictOnDelete();
         });
 
         Schema::table('companies', function (Blueprint $table) {
@@ -48,7 +48,7 @@ return new class extends Migration
 
         Schema::create('invite_tokens', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('company_id')->nullable();
+            $table->unsignedBigInteger('company_id');
             $table->string('email');
             $table->string('role');
             $table->string('token_hash')->unique();

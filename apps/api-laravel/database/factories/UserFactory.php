@@ -24,7 +24,14 @@ class UserFactory extends Factory
     public function platformAdmin(): static
     {
         return $this->state(fn () => [
-            'company_id' => null,
+            'company_id' => Company::query()->firstOrCreate(
+                ['slug' => 'elyo-platform'],
+                [
+                    'name' => 'ELYO Platform',
+                    'status' => 'active',
+                    'anonymity_threshold' => 5,
+                ],
+            )->id,
         ]);
     }
 }

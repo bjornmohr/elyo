@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Company;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -17,9 +18,19 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
+        $testCompany = Company::query()->firstOrCreate(
+            ['slug' => 'test-company'],
+            [
+                'name' => 'Test Company',
+                'status' => 'active',
+                'anonymity_threshold' => 5,
+            ],
+        );
+
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
+            'company_id' => $testCompany->id,
         ]);
 
         $this->call(PointSettingsSeeder::class);

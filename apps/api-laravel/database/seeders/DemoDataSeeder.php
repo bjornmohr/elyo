@@ -26,8 +26,20 @@ class DemoDataSeeder extends Seeder
 
         $companyId = DB::table('companies')->where('slug', 'demo-gmbh')->value('id');
 
+        DB::table('companies')->updateOrInsert(
+            ['slug' => 'elyo-platform'],
+            [
+                'name' => 'ELYO Platform',
+                'status' => 'active',
+                'anonymity_threshold' => 5,
+                'updated_at' => $now,
+                'created_at' => $now,
+            ]
+        );
+        $platformCompanyId = DB::table('companies')->where('slug', 'elyo-platform')->value('id');
+
         $adminId = $this->upsertUser('admin@demo.de', 'Anna Admin', $password, $companyId, null, 'COMPANY_ADMIN', $now);
-        $supportId = $this->upsertUser('support@elyo.de', 'Elyo Support', $password, null, null, 'ELYO_SUPPORT', $now);
+        $this->upsertUser('support@elyo.de', 'Elyo Support', $password, $platformCompanyId, null, 'ELYO_SUPPORT', $now);
 
         $teamId = DB::table('teams')->where('company_id', $companyId)->where('name', 'Product & Engineering')->value('id');
         if (! $teamId) {
@@ -205,7 +217,7 @@ class DemoDataSeeder extends Seeder
         $this->command?->info('Demo data seeded: admin@demo.de, manager@demo.de, employee1@demo.de / demo1234');
     }
 
-    private function upsertUser(string $email, string $name, string $password, ?int $companyId, ?int $teamId, string $role, mixed $lastLoginAt): int
+    private function upsertUser(string $email, string $name, string $password, int $companyId, ?int $teamId, string $role, mixed $lastLoginAt): int
     {
         DB::table('users')->updateOrInsert(
             ['email' => $email],
