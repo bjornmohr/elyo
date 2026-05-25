@@ -126,3 +126,19 @@ Before considering a task done, check:
 - Are tests included for changed backend behavior?
 - Does Angular still build?
 - Is OpenAPI updated if API behavior changed?
+
+## Codex Workflow
+
+For programming tasks, follow the workflow described in:
+
+    docs/ai-context/codex-workflow.md
+
+Default process:
+
+1. Create a task file in docs/ai-tasks/.
+2. Run plan mode before patch mode.
+3. Keep patches small.
+4. Run validation commands.
+5. Create handoff files.
+6. Review diff before commit.
+7. Do not mix unrelated cleanup into feature/refactor commits.
