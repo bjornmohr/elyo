@@ -6,19 +6,27 @@ use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\InviteToken;
 use App\Models\User;
+use App\Services\Invitations\CompanyInvitationService;
+use App\Services\Invitations\InvitationDomainException;
+use App\Services\Invitations\InviteTeamValidator;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class CompanyInvitationController extends Controller
 {
+    public function __construct(
+        private readonly CompanyInvitationService $invitationService,
+        private readonly InviteTeamValidator $teamValidator,
+    ) {
+    }
+
     public function users(Request $request)
     {
         $user = $request->user();
         $companyId = $user->company_id;
         $user->loadMissing('roles');
-        $isManager = $this->isManagerOnly($user);
-        $managedTeamIds = $isManager ? $this->managedTeamIds($user) : [];
+        $isManager = $this->teamValidator->isManagerOnly($user);
+        $managedTeamIds = $isManager ? $this->teamValidator->managedTeamIds($user) : [];
 
         $users = User::where('company_id', $companyId)
             ->when($isManager, fn ($query) => $query->whereIn('team_id', $managedTeamIds))
@@ -44,7 +52,7 @@ class CompanyInvitationController extends Controller
         $user->loadMissing('roles');
 
         $invites = InviteToken::where('company_id', $companyId)
-            ->when($this->isManagerOnly($user), fn ($query) => $query
+            ->when($this->teamValidator->isManagerOnly($user), fn ($query) => $query
                 ->where('invited_by_user_id', $user->id)
                 ->where('role', Role::EMPLOYEE->value))
             ->orderBy('created_at', 'desc')
@@ -74,45 +82,18 @@ class CompanyInvitationController extends Controller
             ],
         ]);
 
-        $user = $request->user();
-        $companyId = $user->company_id;
-        $role = Role::from($request->role);
-        $teamId = $request->input('teamId');
-        $teamId = $teamId === null ? null : (int) $teamId;
-
-        if ($this->isManagerOnly($user)) {
-            if ($role !== Role::EMPLOYEE) {
-                return response()->json([
-                    'error' => ['code' => 'FORBIDDEN', 'message' => 'Manager dürfen nur Mitarbeiter einladen.'],
-                ], 403);
-            }
-
-            if ($teamId === null || ! in_array($teamId, $this->managedTeamIds($user), true)) {
-                return response()->json([
-                    'error' => ['code' => 'FORBIDDEN', 'message' => 'Manager dürfen nur in verwaltete Teams einladen.'],
-                ], 403);
-            }
-        }
-
-        // Check if email already belongs to a different company
-        $existingUser = User::where('email', $request->email)->first();
-        if ($existingUser && $existingUser->company_id && $existingUser->company_id !== $companyId) {
+        try {
+            $result = $this->invitationService->createInvitation(
+                $request->user(),
+                $request->only(['email', 'role', 'teamId']),
+            );
+        } catch (InvitationDomainException $exception) {
             return response()->json([
-                'error' => ['code' => 'COMPANY_CONFLICT', 'message' => 'Diese E-Mail gehört bereits zu einem anderen Unternehmen.'],
-            ], 422);
+                'error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()],
+            ], $exception->statusCode);
         }
 
-        $rawToken = Str::random(64);
-
-        $invite = InviteToken::create([
-            'company_id' => $companyId,
-            'team_id' => $teamId,
-            'email' => $request->email,
-            'role' => $role,
-            'token_hash' => hash('sha256', $rawToken),
-            'invited_by_user_id' => $user->id,
-            'expires_at' => now()->addDays(7),
-        ]);
+        $invite = $result['invite'];
 
         return response()->json([
             'data' => [
@@ -122,7 +103,7 @@ class CompanyInvitationController extends Controller
                 'teamId' => $invite->team_id,
                 'status' => $invite->status,
                 'expires_at' => $invite->expires_at->toIso8601String(),
-                'invite_token' => $rawToken, // DEV only
+                'invite_token' => $result['rawToken'], // DEV only
             ],
         ], 201);
     }
@@ -138,7 +119,10 @@ class CompanyInvitationController extends Controller
             ], 403);
         }
 
-        if ($this->isManagerOnly($request->user()) && ((int) $invite->invited_by_user_id !== (int) $request->user()->id || $invite->role !== Role::EMPLOYEE)) {
+        if (
+            $this->teamValidator->isManagerOnly($request->user())
+            && ((int) $invite->invited_by_user_id !== (int) $request->user()->id || $invite->role !== Role::EMPLOYEE)
+        ) {
             return response()->json([
                 'error' => ['code' => 'FORBIDDEN', 'message' => 'Unauthorized.'],
             ], 403);
@@ -153,15 +137,5 @@ class CompanyInvitationController extends Controller
         $invite->update(['status' => 'revoked']);
 
         return response()->json(['message' => 'Einladung widerrufen.']);
-    }
-
-    private function isManagerOnly($user): bool
-    {
-        return $user->hasRole(Role::COMPANY_MANAGER) && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
-    }
-
-    private function managedTeamIds($user): array
-    {
-        return $user->managedTeams()->pluck('id')->map(fn ($id) => (int) $id)->all();
     }
 }

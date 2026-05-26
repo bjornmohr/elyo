@@ -4,15 +4,17 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\InviteToken;
-use App\Models\Team;
-use App\Models\User;
-use App\Models\UserRole;
+use App\Services\Invitations\InvitationDomainException;
+use App\Services\Invitations\InviteAcceptanceService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password;
 
 class InviteController extends Controller
 {
+    public function __construct(private readonly InviteAcceptanceService $inviteAcceptanceService)
+    {
+    }
+
     public function verify(Request $request)
     {
         $request->validate(['token' => 'required|string']);
@@ -49,101 +51,18 @@ class InviteController extends Controller
             'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
-        $tokenHash = hash('sha256', $request->input('token'));
-
-        $invite = InviteToken::with('company')
-            ->where('token_hash', $tokenHash)
-            ->where('status', 'pending')
-            ->where('expires_at', '>', now())
-            ->first();
-
-        if (! $invite) {
+        try {
+            $user = $this->inviteAcceptanceService->accept(
+                $request->input('token'),
+                $request->input('name'),
+                $request->input('password'),
+            );
+        } catch (InvitationDomainException $exception) {
             return response()->json([
-                'error' => ['code' => 'INVALID_INVITE', 'message' => 'Einladung ungültig oder abgelaufen.'],
-            ], 422);
+                'error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()],
+            ], $exception->statusCode);
         }
 
-        if ($invite->team_id !== null && ! Team::where('id', $invite->team_id)
-            ->where('company_id', $invite->company_id)
-            ->exists()) {
-            return response()->json([
-                'error' => ['code' => 'INVALID_INVITE_TEAM', 'message' => 'Die Team-Zuordnung dieser Einladung ist ungültig.'],
-            ], 422);
-        }
-
-        // Check if user already exists
-        $existingUser = User::where('email', $invite->email)->first();
-
-        if ($existingUser) {
-            // User exists with a different company — reject
-            if ($existingUser->company_id && $invite->company_id && $existingUser->company_id !== $invite->company_id) {
-                return response()->json([
-                    'error' => ['code' => 'COMPANY_CONFLICT', 'message' => 'Dieses Konto gehört bereits zu einem anderen Unternehmen.'],
-                ], 422);
-            }
-
-            if ($invite->team_id !== null && $existingUser->team_id !== null && (int) $existingUser->team_id !== (int) $invite->team_id) {
-                return response()->json([
-                    'error' => ['code' => 'TEAM_CONFLICT', 'message' => 'Dieses Konto ist bereits einem anderen Team zugeordnet.'],
-                ], 422);
-            }
-
-            $existingUser = DB::transaction(function () use ($existingUser, $invite) {
-                // User exists in same company — add missing role
-                if (! $existingUser->hasRole($invite->role)) {
-                    UserRole::create([
-                        'user_id' => $existingUser->id,
-                        'role' => $invite->role,
-                    ]);
-                }
-
-                if ($invite->team_id !== null && $existingUser->team_id === null) {
-                    $existingUser->update(['team_id' => $invite->team_id]);
-                }
-
-                $invite->update(['status' => 'accepted', 'accepted_at' => now()]);
-
-                return $existingUser;
-            });
-
-            $existingUser->load('roles', 'company');
-            $token = $existingUser->createToken('auth_token')->plainTextToken;
-
-            return response()->json([
-                'access_token' => $token,
-                'token_type' => 'Bearer',
-                'user' => [
-                    'id' => $existingUser->id,
-                    'email' => $existingUser->email,
-                    'name' => $existingUser->name,
-                    'roles' => $existingUser->roleNames(),
-                    'companyId' => $existingUser->company_id,
-                    'teamId' => $existingUser->team_id,
-                ],
-            ]);
-        }
-
-        // Create new user
-        $user = DB::transaction(function () use ($invite, $request) {
-            $user = User::create([
-                'name' => $request->name,
-                'email' => $invite->email,
-                'password' => $request->password,
-                'company_id' => $invite->company_id,
-                'team_id' => $invite->team_id,
-            ]);
-
-            UserRole::create([
-                'user_id' => $user->id,
-                'role' => $invite->role,
-            ]);
-
-            $invite->update(['status' => 'accepted', 'accepted_at' => now()]);
-
-            return $user;
-        });
-
-        $user->load('roles', 'company');
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
