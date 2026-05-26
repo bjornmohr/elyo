@@ -20,8 +20,8 @@ class SurveyResultsAggregationService
         if ($responseCount < $threshold) {
             return [
                 'isAboveThreshold' => false,
-                'responseCount' => $responseCount,
-                'participation' => $participation,
+                'responseCount' => null,
+                'participation' => null,
             ];
         }
 
@@ -80,6 +80,7 @@ class SurveyResultsAggregationService
                 $result['isSuppressed'] = $suppressedCount > 0;
                 $result['suppressedCount'] = $suppressedCount > 0 ? null : 0;
                 if ($suppressedCount > 0) {
+                    $result['answerCount'] = null;
                     $result['suppressionReason'] = 'DISTRIBUTION_SUPPRESSED';
                 }
                 $result['distribution'] = $suppressedCount > 0
@@ -96,11 +97,15 @@ class SurveyResultsAggregationService
                 $falseCount = $answerCount - $trueCount;
                 $isSuppressed = $this->isSmallBucket($trueCount, $threshold) || $this->isSmallBucket($falseCount, $threshold);
                 $result['isSuppressed'] = $isSuppressed;
+                $result['answerCount'] = $isSuppressed ? null : $answerCount;
                 $result['suppressedCount'] = $isSuppressed ? null : 0;
                 $result['trueCount'] = $isSuppressed ? null : $trueCount;
                 $result['falseCount'] = $isSuppressed ? null : $falseCount;
                 $result['truePercentage'] = ! $isSuppressed && $answerCount > 0 ? round(($trueCount / $answerCount) * 100, 1) : null;
                 $result['falsePercentage'] = ! $isSuppressed && $answerCount > 0 ? round(($falseCount / $answerCount) * 100, 1) : null;
+                if ($isSuppressed) {
+                    $result['suppressionReason'] = 'DISTRIBUTION_SUPPRESSED';
+                }
             } elseif ($q->type->value === 'MULTIPLE_CHOICE') {
                 $choiceBuckets = (clone $answerQuery)
                     ->groupBy('choice_value')
@@ -123,6 +128,7 @@ class SurveyResultsAggregationService
                 $result['isSuppressed'] = $isSuppressed;
                 $result['suppressedCount'] = $isSuppressed ? null : 0;
                 if ($isSuppressed) {
+                    $result['answerCount'] = null;
                     $result['suppressionReason'] = 'DISTRIBUTION_SUPPRESSED';
                 }
             }

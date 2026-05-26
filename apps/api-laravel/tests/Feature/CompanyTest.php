@@ -73,8 +73,13 @@ class CompanyTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonPath('company.isAboveThreshold', false);
-        $response->assertJsonPath('company.responseCount', 2);
-        $response->assertJsonPath('company.avgScore', 0);
+        $response->assertJsonPath('company.responseCount', null);
+        $response->assertJsonPath('company.respondentCount', null);
+        $response->assertJsonPath('company.eligibleEmployeeCount', null);
+        $response->assertJsonPath('company.participationRate', null);
+        $response->assertJsonPath('company.avgScore', null);
+        $response->assertJsonPath('company.suppressionReason', 'ANONYMITY_THRESHOLD_NOT_MET');
+        $response->assertJsonMissingPath('teams.0.memberCount');
 
         // 2. Above threshold
         $emp3 = User::factory()->create([
@@ -97,6 +102,7 @@ class CompanyTest extends TestCase
         $response->assertJsonPath('company.responseCount', 3);
         // (8.5 + 8.5 + 5.0) / 3 = 22 / 3 = 7.333 -> 7.3
         $response->assertJsonPath('company.avgScore', 7.3);
+        $response->assertJsonMissingPath('trend.0.respondents');
     }
 
     public function test_company_dashboard_participation_counts_distinct_active_employees()
@@ -118,11 +124,11 @@ class CompanyTest extends TestCase
         $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
 
         $response->assertStatus(200);
-        $response->assertJsonPath('company.responseCount', 10);
-        $response->assertJsonPath('company.respondentCount', 1);
-        $response->assertJsonPath('company.eligibleEmployeeCount', 3);
-        $response->assertJsonPath('company.participationRate', 33);
         $response->assertJsonPath('company.isAboveThreshold', false);
+        $response->assertJsonPath('company.responseCount', null);
+        $response->assertJsonPath('company.respondentCount', null);
+        $response->assertJsonPath('company.eligibleEmployeeCount', null);
+        $response->assertJsonPath('company.participationRate', null);
     }
 
     public function test_company_dashboard_participation_is_capped_at_one_hundred_percent()
@@ -158,13 +164,21 @@ class CompanyTest extends TestCase
         $otherTeam = Team::factory()->create(['company_id' => $this->company->id, 'name' => 'Sales']);
 
         // Manager's team entries
-        $emps1 = User::factory()->count(3)->create(['company_id' => $this->company->id, 'team_id' => $this->team->id]);
+        $emps1 = User::factory()->count(3)->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
         foreach ($emps1 as $emp) {
             WellbeingEntry::factory()->create(['user_id' => $emp->id, 'company_id' => $this->company->id, 'score' => 8.0]);
         }
 
         // Other team entries
-        $emps2 = User::factory()->count(3)->create(['company_id' => $this->company->id, 'team_id' => $otherTeam->id]);
+        $emps2 = User::factory()->count(3)->create([
+            'company_id' => $this->company->id,
+            'team_id' => $otherTeam->id,
+            'role' => Role::EMPLOYEE,
+        ]);
         foreach ($emps2 as $emp) {
             WellbeingEntry::factory()->create(['user_id' => $emp->id, 'company_id' => $this->company->id, 'score' => 2.0]);
         }
@@ -212,6 +226,9 @@ class CompanyTest extends TestCase
         $response = $this->actingAs($this->admin)->getJson("/api/company/surveys/{$survey->id}/results");
         $response->assertStatus(403);
         $response->assertJsonPath('isAboveThreshold', false);
+        $response->assertJsonPath('suppressionReason', 'ANONYMITY_THRESHOLD_NOT_MET');
+        $response->assertJsonMissingPath('current');
+        $response->assertJsonMissingPath('participation');
 
         // 3rd response
         $resp3 = SurveyResponse::factory()->create([
@@ -254,6 +271,7 @@ class CompanyTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonPath('data.questions.0.isSuppressed', false);
+        $response->assertJsonPath('data.questions.0.answerCount', 6);
         $response->assertJsonPath('data.questions.0.suppressedCount', 0);
         $this->assertEquals(7.0, $response->json('data.questions.0.avgValue'));
         $response->assertJsonPath('data.questions.0.minValue', 4);
@@ -344,9 +362,11 @@ class CompanyTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonPath('data.questions.0.isSuppressed', true);
+        $response->assertJsonPath('data.questions.0.answerCount', null);
         $response->assertJsonPath('data.questions.0.suppressedCount', null);
         $response->assertJsonPath('data.questions.0.suppressionReason', 'DISTRIBUTION_SUPPRESSED');
         $response->assertJsonPath('data.questions.0.options', []);
+        $response->assertJsonMissing(['answerCount' => 4]);
         $response->assertJsonMissing(['value' => 'Keep visible']);
         $response->assertJsonMissing(['value' => 'Hide small']);
     }
@@ -375,6 +395,7 @@ class CompanyTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonPath('data.questions.0.isSuppressed', false);
+        $response->assertJsonPath('data.questions.0.answerCount', 6);
         $response->assertJsonPath('data.questions.0.suppressedCount', 0);
         $response->assertJsonCount(2, 'data.questions.0.options');
         $response->assertJsonFragment(['value' => 'Option A', 'count' => 3, 'percentage' => 50]);
@@ -404,13 +425,47 @@ class CompanyTest extends TestCase
         $response = $this->actingAs($this->admin)->getJson("/api/company/surveys/{$survey->id}/results");
 
         $response->assertStatus(200);
-        $response->assertJsonPath('data.questions.0.answerCount', 4);
+        $response->assertJsonPath('data.questions.0.answerCount', null);
         $response->assertJsonPath('data.questions.0.isSuppressed', true);
         $response->assertJsonPath('data.questions.0.suppressedCount', null);
+        $response->assertJsonPath('data.questions.0.suppressionReason', 'DISTRIBUTION_SUPPRESSED');
         $response->assertJsonPath('data.questions.0.trueCount', null);
         $response->assertJsonPath('data.questions.0.falseCount', null);
         $response->assertJsonPath('data.questions.0.truePercentage', null);
         $response->assertJsonPath('data.questions.0.falsePercentage', null);
+        $response->assertJsonMissing(['answerCount' => 4]);
+    }
+
+    public function test_survey_results_show_yes_no_split_when_all_buckets_meet_threshold()
+    {
+        $survey = Survey::factory()->create(['company_id' => $this->company->id, 'status' => 'ACTIVE']);
+        $question = SurveyQuestion::factory()->create([
+            'survey_id' => $survey->id,
+            'type' => QuestionType::YES_NO,
+        ]);
+        $employees = User::factory()->count(6)->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+
+        foreach ($employees as $index => $employee) {
+            $this->createSurveyAnswer($survey, $question, $employee, [
+                'bool_value' => $index < 3,
+            ]);
+        }
+
+        $response = $this->actingAs($this->admin)->getJson("/api/company/surveys/{$survey->id}/results");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.questions.0.answerCount', 6);
+        $response->assertJsonPath('data.questions.0.isSuppressed', false);
+        $response->assertJsonPath('data.questions.0.suppressedCount', 0);
+        $response->assertJsonPath('data.questions.0.trueCount', 3);
+        $response->assertJsonPath('data.questions.0.falseCount', 3);
+        $response->assertJsonPath('data.questions.0.truePercentage', 50);
+        $response->assertJsonPath('data.questions.0.falsePercentage', 50);
+        $response->assertJsonMissing(['suppressionReason' => 'DISTRIBUTION_SUPPRESSED']);
     }
 
     public function test_survey_results_suppress_small_scale_distribution_buckets()
@@ -436,12 +491,14 @@ class CompanyTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonPath('data.questions.0.isSuppressed', true);
+        $response->assertJsonPath('data.questions.0.answerCount', null);
         $response->assertJsonPath('data.questions.0.suppressedCount', null);
         $response->assertJsonPath('data.questions.0.suppressionReason', 'DISTRIBUTION_SUPPRESSED');
         $response->assertJsonPath('data.questions.0.avgValue', null);
         $response->assertJsonPath('data.questions.0.minValue', null);
         $response->assertJsonPath('data.questions.0.maxValue', null);
         $response->assertJsonPath('data.questions.0.distribution', []);
+        $response->assertJsonMissing(['answerCount' => 4]);
         $response->assertJsonMissing(['value' => 8]);
         $response->assertJsonMissing(['value' => 2]);
     }
@@ -494,6 +551,56 @@ class CompanyTest extends TestCase
         $this->assertArrayNotHasKey('options', $questionResult);
         $this->assertArrayNotHasKey('trueCount', $questionResult);
         $this->assertArrayNotHasKey('falseCount', $questionResult);
+    }
+
+    public function test_reports_require_distinct_respondents_for_trend_points()
+    {
+        $activeEmployee = User::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $inactiveEmployees = User::factory()->count(2)->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'status' => 'inactive',
+            'role' => Role::EMPLOYEE,
+        ]);
+
+        foreach ($inactiveEmployees->prepend($activeEmployee) as $employee) {
+            WellbeingEntry::factory()->create([
+                'user_id' => $employee->id,
+                'company_id' => $this->company->id,
+                'score' => 8.0,
+                'period_key' => '2026-W20',
+            ]);
+        }
+
+        $response = $this->actingAs($this->admin)->getJson('/api/company/reports');
+
+        $response->assertStatus(200);
+        $response->assertJsonCount(0, 'data');
+
+        $employees = User::factory()->count(2)->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+
+        foreach ($employees as $employee) {
+            WellbeingEntry::factory()->create([
+                'user_id' => $employee->id,
+                'company_id' => $this->company->id,
+                'score' => 8.0,
+                'period_key' => '2026-W20',
+            ]);
+        }
+
+        $response = $this->actingAs($this->admin)->getJson('/api/company/reports');
+
+        $response->assertStatus(200);
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonMissingPath('data.0.respondents');
     }
 
     public function test_draft_surveys_can_be_edited_and_activated_by_allowed_owner()

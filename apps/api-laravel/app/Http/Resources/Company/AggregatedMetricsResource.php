@@ -19,6 +19,7 @@ class AggregatedMetricsResource extends JsonResource
             'eligibleEmployeeCount' => $this['eligibleEmployeeCount'],
             'participationRate' => $this['participationRate'],
             'isAboveThreshold' => $this['isAboveThreshold'],
+            'suppressionReason' => $this['suppressionReason'] ?? null,
         ];
     }
 }

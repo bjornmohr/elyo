@@ -512,50 +512,55 @@ paths:
                   company:
                     type: object
                     properties:
-                      data:
-                        type: object
-                        properties:
-                          avgMood: { type: number }
-                          avgStress: { type: number }
-                          avgEnergy: { type: number }
-                          avgScore: { type: number }
-                          responseCount: { type: integer }
-                          isAboveThreshold: { type: boolean }
+                      avgMood: { type: number, nullable: true }
+                      avgStress: { type: number, nullable: true }
+                      avgEnergy: { type: number, nullable: true }
+                      avgScore: { type: number, nullable: true }
+                      responseCount: { type: integer, nullable: true }
+                      respondentCount: { type: integer, nullable: true }
+                      eligibleEmployeeCount: { type: integer, nullable: true }
+                      participationRate: { type: integer, nullable: true }
+                      isAboveThreshold: { type: boolean }
+                      suppressionReason:
+                        type: string
+                        nullable: true
+                        enum: [ANONYMITY_THRESHOLD_NOT_MET]
                   trend:
-                    type: object
-                    properties:
-                      data:
-                        type: array
-                        items:
-                          type: object
-                          properties:
-                            period: { type: string }
-                            avgScore: { type: number }
-                            avgMood: { type: number }
-                            avgStress: { type: number }
-                            avgEnergy: { type: number }
-                            respondents: { type: integer }
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        period: { type: string }
+                        avgScore: { type: number }
+                        avgMood: { type: number }
+                        avgStress: { type: number }
+                        avgEnergy: { type: number }
                   teams:
-                    type: object
-                    properties:
-                      data:
-                        type: array
-                        items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        description: { type: string, nullable: true }
+                        color: { type: string, nullable: true }
+                        managerId: { type: integer, nullable: true }
+                        metrics:
                           type: object
                           properties:
-                            id: { type: string }
-                            name: { type: string }
-                            description: { type: string, nullable: true }
-                            color: { type: string, nullable: true }
-                            memberCount: { type: integer }
-                            metrics:
-                              type: object
-                              properties:
-                                isAboveThreshold: { type: boolean }
-                                responseCount: { type: integer }
-                                avgScore: { type: number }
-                                avgMood: { type: number }
-                                avgStress: { type: number }
+                            isAboveThreshold: { type: boolean }
+                            responseCount: { type: integer, nullable: true }
+                            respondentCount: { type: integer, nullable: true }
+                            eligibleEmployeeCount: { type: integer, nullable: true }
+                            participationRate: { type: integer, nullable: true }
+                            avgScore: { type: number, nullable: true }
+                            avgMood: { type: number, nullable: true }
+                            avgStress: { type: number, nullable: true }
+                            avgEnergy: { type: number, nullable: true }
+                            suppressionReason:
+                              type: string
+                              nullable: true
+                              enum: [ANONYMITY_THRESHOLD_NOT_MET]
 
   /company/invitations:
     get:
@@ -906,7 +911,7 @@ paths:
                             answerCount:
                               type: integer
                               nullable: true
-                              description: Null when the question-level anonymity threshold is not met.
+                              description: Null when the question-level anonymity threshold is not met or when a SCALE, YES_NO, or MULTIPLE_CHOICE distribution is suppressed because any non-zero bucket is below the anonymity threshold.
                             avgValue:
                               type: number
                               nullable: true
@@ -927,7 +932,7 @@ paths:
                               nullable: true
                             isSuppressed:
                               type: boolean
-                              description: True when one or more small answer buckets are hidden.
+                              description: True when the question result or one or more non-zero answer buckets are hidden.
                             suppressedCount:
                               type: integer
                               nullable: true
@@ -939,7 +944,7 @@ paths:
                               description: Optional reason returned when a question or distribution is suppressed.
                             distribution:
                               type: array
-                              description: Distribution buckets. For SCALE and MULTIPLE_CHOICE results, this is an empty array when any bucket is suppressed.
+                              description: SCALE distribution buckets. Empty when any non-zero bucket is below the anonymity threshold; answerCount is also null in that case.
                               items:
                                 type: object
                                 properties:
@@ -949,11 +954,11 @@ paths:
                             trueCount:
                               type: integer
                               nullable: true
-                              description: Null when YES_NO split is suppressed.
+                              description: Null when the YES_NO split is suppressed because either non-zero bucket is below the anonymity threshold; answerCount is also null in that case.
                             falseCount:
                               type: integer
                               nullable: true
-                              description: Null when YES_NO split is suppressed.
+                              description: Null when the YES_NO split is suppressed because either non-zero bucket is below the anonymity threshold; answerCount is also null in that case.
                             truePercentage:
                               type: number
                               nullable: true
@@ -962,7 +967,7 @@ paths:
                               nullable: true
                             options:
                               type: array
-                              description: MULTIPLE_CHOICE options. Empty when the distribution is suppressed because any option bucket is below the anonymity threshold.
+                              description: MULTIPLE_CHOICE options. Empty when the distribution is suppressed because any non-zero option bucket is below the anonymity threshold; answerCount is also null in that case.
                               items:
                                 type: object
                                 properties:
@@ -978,14 +983,10 @@ paths:
                 properties:
                   error: { type: string }
                   minRequired: { type: integer }
-                  current: { type: integer }
-                  participation:
-                    type: object
-                    properties:
-                      eligibleCount: { type: integer }
-                      responseCount: { type: integer }
-                      rate: { type: number }
                   isAboveThreshold: { type: boolean }
+                  suppressionReason:
+                    type: string
+                    enum: [ANONYMITY_THRESHOLD_NOT_MET]
 
   /company/measures:
     get:
@@ -1032,6 +1033,21 @@ paths:
       responses:
         200:
           description: Trend data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        period: { type: string }
+                        avgScore: { type: number }
+                        avgMood: { type: number }
+                        avgStress: { type: number }
+                        avgEnergy: { type: number }
 
   /admin/partners:
     get:

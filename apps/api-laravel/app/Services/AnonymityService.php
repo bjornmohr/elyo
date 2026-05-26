@@ -21,11 +21,11 @@ class AnonymityService
 
         $query = WellbeingEntry::where('company_id', $companyId);
 
-        if (! empty($options['teamId'])) {
-            $query->whereHas('user', function ($q) use ($options) {
-                $q->where('team_id', $options['teamId']);
-            });
-        }
+        $query->whereHas('user', function ($q) use ($options) {
+            $q->where('status', 'active')
+                ->whereHas('roles', fn ($roleQuery) => $roleQuery->where('role', Role::EMPLOYEE->value))
+                ->when(! empty($options['teamId']), fn ($teamQuery) => $teamQuery->where('team_id', $options['teamId']));
+        });
 
         if (! empty($options['periodKey'])) {
             $query->where('period_key', $options['periodKey']);
@@ -57,15 +57,16 @@ class AnonymityService
 
         if ($respondentCount < $threshold) {
             return [
-                'avgMood' => 0,
-                'avgStress' => 0,
-                'avgEnergy' => 0,
-                'avgScore' => 0,
-                'responseCount' => $responseCount,
-                'respondentCount' => $respondentCount,
-                'eligibleEmployeeCount' => $eligibleEmployeeCount,
-                'participationRate' => $participationRate,
+                'avgMood' => null,
+                'avgStress' => null,
+                'avgEnergy' => null,
+                'avgScore' => null,
+                'responseCount' => null,
+                'respondentCount' => null,
+                'eligibleEmployeeCount' => null,
+                'participationRate' => null,
                 'isAboveThreshold' => false,
+                'suppressionReason' => 'ANONYMITY_THRESHOLD_NOT_MET',
             ];
         }
 
@@ -79,6 +80,7 @@ class AnonymityService
             'eligibleEmployeeCount' => $eligibleEmployeeCount,
             'participationRate' => $participationRate,
             'isAboveThreshold' => true,
+            'suppressionReason' => null,
         ];
     }
 
@@ -92,11 +94,11 @@ class AnonymityService
 
         $query = WellbeingEntry::where('company_id', $companyId);
 
-        if (! empty($options['teamId'])) {
-            $query->whereHas('user', function ($q) use ($options) {
-                $q->where('team_id', $options['teamId']);
-            });
-        }
+        $query->whereHas('user', function ($q) use ($options) {
+            $q->where('status', 'active')
+                ->whereHas('roles', fn ($roleQuery) => $roleQuery->where('role', Role::EMPLOYEE->value))
+                ->when(! empty($options['teamId']), fn ($teamQuery) => $teamQuery->where('team_id', $options['teamId']));
+        });
 
         $raw = $query->groupBy('period_key')
             ->selectRaw('
@@ -105,20 +107,19 @@ class AnonymityService
                 AVG(mood) as avg_mood,
                 AVG(stress) as avg_stress,
                 AVG(energy) as avg_energy,
-                COUNT(id) as response_count
+                COUNT(DISTINCT user_id) as respondent_count
             ')
             ->orderBy('period_key', 'desc')
             ->limit($limit)
             ->get();
 
-        return $raw->filter(fn ($item) => $item->response_count >= $threshold)
+        return $raw->filter(fn ($item) => $item->respondent_count >= $threshold)
             ->map(fn ($item) => [
                 'period' => $item->period_key,
                 'avgScore' => round($item->avg_score, 1),
                 'avgMood' => round($item->avg_mood, 1),
                 'avgStress' => round($item->avg_stress, 1),
                 'avgEnergy' => round($item->avg_energy, 1),
-                'respondents' => (int) $item->response_count,
             ])
             ->reverse()
             ->values()

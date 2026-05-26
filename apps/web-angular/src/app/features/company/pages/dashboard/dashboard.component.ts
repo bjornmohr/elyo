@@ -30,7 +30,7 @@ import { ApiClient } from '../../../../core/services/api-client.service';
           <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h3 class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2">Gesamtscore</h3>
             <p class="text-4xl font-bold text-teal-600">{{ scoreLabel() }}</p>
-            <p class="text-xs text-gray-400 mt-2">{{ data()?.company?.responseCount || 0 }} check-ins this period</p>
+            <p class="text-xs text-gray-400 mt-2">{{ responseCountLabel() }}</p>
           </div>
 
           <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -103,11 +103,24 @@ export class CompanyDashboardComponent implements OnInit {
 
   participantLabel() {
     const company = this.data()?.company;
-    const respondents = company?.respondentCount ?? 0;
-    const eligible = company?.eligibleEmployeeCount ?? 0;
+    if (company?.isAboveThreshold === false) {
+      return 'Aus Datenschutzgründen erst ab ausreichender Gruppengröße sichtbar';
+    }
+
+    const respondents = company?.respondentCount;
+    const eligible = company?.eligibleEmployeeCount;
     return eligible > 0
       ? `${respondents} von ${eligible} aktiven Mitarbeitenden`
       : 'Keine aktiven Mitarbeitenden';
+  }
+
+  responseCountLabel() {
+    const company = this.data()?.company;
+    if (company?.isAboveThreshold === false || company?.responseCount === null) {
+      return 'Durch Anonymitätsschwelle geschützt';
+    }
+
+    return `${company?.responseCount ?? 0} Check-ins in diesem Zeitraum`;
   }
 
   trendBars() {

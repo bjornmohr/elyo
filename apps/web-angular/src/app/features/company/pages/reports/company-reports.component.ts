@@ -22,7 +22,6 @@ import { ApiClient } from '../../../../core/services/api-client.service';
               <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Mood</th>
               <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Stress</th>
               <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Energie</th>
-              <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Antworten</th>
             </tr></thead>
             <tbody>
               @for (point of trend(); track point.period) {
@@ -32,7 +31,6 @@ import { ApiClient } from '../../../../core/services/api-client.service';
                   <td class="px-4 py-3">{{ point.avgMood }}</td>
                   <td class="px-4 py-3">{{ point.avgStress }}</td>
                   <td class="px-4 py-3">{{ point.avgEnergy }}</td>
-                  <td class="px-4 py-3">{{ point.respondents }}</td>
                 </tr>
               }
             </tbody>

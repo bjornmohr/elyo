@@ -188,9 +188,8 @@ class CompanySurveyController extends Controller
             return response()->json([
                 'error' => 'Zu wenige Antworten für anonyme Auswertung.',
                 'minRequired' => $threshold,
-                'current' => $results['responseCount'],
-                'participation' => $results['participation'],
                 'isAboveThreshold' => false,
+                'suppressionReason' => 'ANONYMITY_THRESHOLD_NOT_MET',
             ], 403);
         }
 

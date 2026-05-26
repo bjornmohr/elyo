@@ -15,7 +15,6 @@ class TrendPointResource extends JsonResource
             'avgMood' => $this['avgMood'],
             'avgStress' => $this['avgStress'],
             'avgEnergy' => $this['avgEnergy'],
-            'respondents' => $this['respondents'],
         ];
     }
 }
