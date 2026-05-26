@@ -53,6 +53,12 @@ import { NotificationService } from '../../../../shared/notifications/notificati
               class="w-full px-4 py-2.5 rounded-xl border bg-stone-50 text-sm text-gray-900 outline-none transition-colors focus:border-teal-500 border-gray-200" />
           </div>
 
+          <label class="flex items-center gap-3 text-sm text-gray-700">
+            <input type="checkbox" formControlName="teamLayerEnabled"
+              class="h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+            Teamlayer aktivieren
+          </label>
+
           <button type="submit" [disabled]="form.invalid || loading() || success()"
             class="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold text-white transition-all duration-200"
             [style.background]="loading() ? '#9ca3af' : 'linear-gradient(135deg, #14b8a6, #0d9488)'"
@@ -78,6 +84,7 @@ export class AdminCompaniesCreateComponent {
     name: ['', [Validators.required]],
     slug: [''],
     adminEmail: ['', [Validators.required, Validators.email]],
+    teamLayerEnabled: [false],
   });
 
   loading = signal(false);
@@ -90,9 +97,13 @@ export class AdminCompaniesCreateComponent {
     this.loading.set(true);
     this.error.set(null);
 
-    const { name, slug } = this.form.value;
+    const { name, slug, teamLayerEnabled } = this.form.value;
 
-    this.api.post<{ data: any }>('/admin/companies', { name, slug: slug || undefined }).subscribe({
+    this.api.post<{ data: any }>('/admin/companies', {
+      name,
+      slug: slug || undefined,
+      team_layer_enabled: teamLayerEnabled ?? false,
+    }).subscribe({
       next: (res) => {
         const companyId = res.data.id;
         // Invite first company admin

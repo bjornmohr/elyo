@@ -20,6 +20,7 @@ export class AuthStore {
   activePortal = computed(() => this.state().activePortal);
   allowedPortals = computed(() => this.state().allowedPortals);
   roles = computed(() => this.state().user?.roles ?? []);
+  teamLayerEnabled = computed(() => this.state().user?.teamLayerEnabled ?? false);
 
   setUser(user: User | null) {
     this.state.update(s => ({ ...s, user }));

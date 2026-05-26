@@ -74,6 +74,7 @@ class InviteController extends Controller
                 'name' => $user->name,
                 'roles' => $user->roleNames(),
                 'companyId' => $user->company_id,
+                'teamLayerEnabled' => (bool) ($user->company?->team_layer_enabled ?? false),
                 'teamId' => $user->team_id,
             ],
         ]);

@@ -19,6 +19,7 @@ class DemoDataSeeder extends Seeder
                 'name' => 'Demo GmbH',
                 'status' => 'active',
                 'anonymity_threshold' => 3,
+                'team_layer_enabled' => true,
                 'updated_at' => $now,
                 'created_at' => $now,
             ]
@@ -32,6 +33,7 @@ class DemoDataSeeder extends Seeder
                 'name' => 'ELYO Platform',
                 'status' => 'active',
                 'anonymity_threshold' => 5,
+                'team_layer_enabled' => false,
                 'updated_at' => $now,
                 'created_at' => $now,
             ]

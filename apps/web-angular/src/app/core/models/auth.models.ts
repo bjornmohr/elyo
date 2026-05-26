@@ -17,6 +17,7 @@ export interface User {
   roles: string[];
   companyId?: number | null;
   companyName?: string | null;
+  teamLayerEnabled?: boolean;
 }
 
 export interface LoginResponse {

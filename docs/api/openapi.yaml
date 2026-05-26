@@ -64,6 +64,47 @@ components:
         role: { type: string, enum: [COMPANY_ADMIN, COMPANY_MANAGER, EMPLOYEE, ELYO_ADMIN] }
         isActive: { type: boolean }
 
+    AdminCompany:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+        status: { type: string, enum: [active, inactive, suspended] }
+        anonymity_threshold: { type: integer }
+        team_layer_enabled:
+          type: boolean
+          description: Whether this company uses team-level affiliation and team-scoped manager workflows.
+        users_count: { type: integer, nullable: true }
+        created_by_elyo_admin_id: { type: integer, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AdminCompanyCreatePayload:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 255 }
+        slug: { type: string, maxLength: 255, nullable: true }
+        anonymity_threshold: { type: integer, minimum: 1 }
+        team_layer_enabled:
+          type: boolean
+          description: Defaults to false on create when omitted.
+
+    AdminCompanyUpdatePayload:
+      type: object
+      properties:
+        name: { type: string, maxLength: 255 }
+        slug:
+          type: string
+          maxLength: 255
+          description: Optional on update, but must be a non-null string when provided.
+        status: { type: string, enum: [active, inactive, suspended] }
+        anonymity_threshold: { type: integer, minimum: 1 }
+        team_layer_enabled:
+          type: boolean
+          description: Whether this company uses team-level affiliation and team-scoped manager workflows.
+
     WellbeingEntry:
       type: object
       properties:
@@ -125,6 +166,86 @@ components:
         verificationStatus: { type: string, enum: [PENDING_DOCS, PENDING_REVIEW, VERIFIED, SUSPENDED, REJECTED] }
 
 paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+                requested_portal: { type: string, enum: [admin, company, employee, partner], nullable: true }
+      responses:
+        200:
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token: { type: string }
+                  token_type: { type: string, example: Bearer }
+                  user:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      email: { type: string, format: email }
+                      name: { type: string }
+                      roles:
+                        type: array
+                        items: { type: string }
+                      companyId: { type: integer, nullable: true }
+                      companyName: { type: string, nullable: true }
+                      teamId: { type: integer, nullable: true }
+                      teamName: { type: string, nullable: true }
+                      teamLayerEnabled:
+                        type: boolean
+                        description: Whether this company uses team-level affiliation and team-scoped manager workflows.
+                  activePortal: { type: string, nullable: true }
+                  allowedPortals:
+                    type: array
+                    items: { type: string }
+        403:
+          description: Requested portal is forbidden
+        422:
+          description: Invalid credentials
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current authenticated user
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  email: { type: string, format: email }
+                  name: { type: string }
+                  roles:
+                    type: array
+                    items: { type: string }
+                  companyId: { type: integer, nullable: true }
+                  companyName: { type: string, nullable: true }
+                  teamLayerEnabled:
+                    type: boolean
+                    description: Whether this company uses team-level affiliation and team-scoped manager workflows.
+                  teamId: { type: integer, nullable: true }
+                  teamName: { type: string, nullable: true }
+                  allowedPortals:
+                    type: array
+                    items: { type: string }
+
   /auth/register:
     post:
       tags: [Auth]
@@ -186,6 +307,9 @@ paths:
                         type: array
                         items: { type: string }
                       companyId: { type: integer }
+                      teamLayerEnabled:
+                        type: boolean
+                        description: Whether this company uses team-level affiliation and team-scoped manager workflows.
                       teamId: { type: integer, nullable: true }
         422:
           description: Invalid invite, company conflict, team conflict, or invalid persisted invite team
@@ -596,7 +720,7 @@ paths:
     post:
       tags: [Company]
       summary: Create a company invitation
-      description: teamId is an optional same-company team affiliation for the invited user. Admins may set it for supported company-internal roles. Managers may only invite employees into teams they manage.
+      description: teamId is an optional same-company team affiliation for the invited user. When the company team layer is disabled, teamId must be omitted/null and COMPANY_MANAGER invitations are rejected. When enabled, admins may set teamId for supported company-internal roles, and managers may only invite employees into teams they manage.
       security: [{ Sanctum: [] }]
       requestBody:
         required: true
@@ -634,9 +758,9 @@ paths:
                       expires_at: { type: string, format: date-time }
                       invite_token: { type: string }
         403:
-          description: Forbidden for manager role invites or unmanaged team access
+          description: Forbidden for manager role invites, unmanaged team access, or disabled team-layer manager workflows
         422:
-          description: Validation error for invalid teamId or company email conflict
+          description: Validation error for invalid teamId, disabled team-layer teamId payloads, or company email conflict
 
   /company/invitations/{id}:
     delete:
@@ -1048,6 +1172,88 @@ paths:
                         avgMood: { type: number }
                         avgStress: { type: number }
                         avgEnergy: { type: number }
+
+  /admin/companies:
+    get:
+      tags: [Admin]
+      summary: List companies
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Companies
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/AdminCompany' }
+    post:
+      tags: [Admin]
+      summary: Create company
+      security: [{ Sanctum: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminCompanyCreatePayload' }
+      responses:
+        201:
+          description: Created company
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AdminCompany' }
+        422:
+          description: Validation error
+
+  /admin/companies/{company}:
+    get:
+      tags: [Admin]
+      summary: Show company
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: company
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Company
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AdminCompany' }
+    put:
+      tags: [Admin]
+      summary: Update company
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: company
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminCompanyUpdatePayload' }
+      responses:
+        200:
+          description: Updated company
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AdminCompany' }
+        422:
+          description: Validation error
 
   /admin/partners:
     get:

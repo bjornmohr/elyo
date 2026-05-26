@@ -12,11 +12,12 @@ class Company extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name', 'slug', 'status', 'anonymity_threshold', 'created_by_elyo_admin_id',
+        'name', 'slug', 'status', 'anonymity_threshold', 'team_layer_enabled', 'created_by_elyo_admin_id',
     ];
 
     protected $casts = [
         'anonymity_threshold' => 'integer',
+        'team_layer_enabled' => 'boolean',
     ];
 
     public function users(): HasMany
