@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\Role;
 use App\Models\Company;
 use App\Models\InviteToken;
+use App\Models\Team;
 use App\Models\User;
 use App\Models\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -218,6 +219,174 @@ class AuthTest extends TestCase
         $this->assertDatabaseHas('invite_tokens', ['email' => 'employee@test.com', 'role' => 'EMPLOYEE']);
     }
 
+    public function test_company_admin_can_create_employee_invite_with_valid_same_company_team(): void
+    {
+        [$company, $admin] = $this->createCompanyWithAdmin();
+        $team = Team::factory()->create(['company_id' => $company->id, 'manager_id' => null]);
+
+        $response = $this->actingAs($admin, 'sanctum')->postJson('/api/company/invitations', [
+            'email' => 'teamed-employee@test.com',
+            'role' => Role::EMPLOYEE->value,
+            'teamId' => $team->id,
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.teamId', $team->id);
+
+        $this->assertDatabaseHas('invite_tokens', [
+            'email' => 'teamed-employee@test.com',
+            'role' => Role::EMPLOYEE->value,
+            'team_id' => $team->id,
+        ]);
+    }
+
+    public function test_company_owner_invite_creation_is_rejected_by_validation(): void
+    {
+        [$company, $admin] = $this->createCompanyWithAdmin();
+        $team = Team::factory()->create(['company_id' => $company->id, 'manager_id' => null]);
+
+        $response = $this->actingAs($admin, 'sanctum')->postJson('/api/company/invitations', [
+            'email' => 'owner-invite@test.com',
+            'role' => Role::COMPANY_OWNER->value,
+            'teamId' => $team->id,
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors('role');
+        $this->assertDatabaseMissing('invite_tokens', [
+            'email' => 'owner-invite@test.com',
+        ]);
+    }
+
+    public function test_company_invitations_list_includes_team_id_for_team_scoped_invites(): void
+    {
+        [$company, $admin] = $this->createCompanyWithAdmin();
+        $team = Team::factory()->create(['company_id' => $company->id, 'manager_id' => null]);
+
+        $createResponse = $this->actingAs($admin, 'sanctum')->postJson('/api/company/invitations', [
+            'email' => 'listed-team-invite@test.com',
+            'role' => Role::EMPLOYEE->value,
+            'teamId' => $team->id,
+        ]);
+
+        $createResponse->assertStatus(201);
+
+        $response = $this->actingAs($admin, 'sanctum')->getJson('/api/company/invitations');
+
+        $response->assertStatus(200)
+            ->assertJsonFragment([
+                'email' => 'listed-team-invite@test.com',
+                'teamId' => $team->id,
+            ]);
+    }
+
+    public function test_invite_creation_rejects_foreign_company_team(): void
+    {
+        [$company, $admin] = $this->createCompanyWithAdmin();
+        $foreignCompany = Company::factory()->create();
+        $foreignTeam = Team::factory()->create(['company_id' => $foreignCompany->id, 'manager_id' => null]);
+
+        $response = $this->actingAs($admin, 'sanctum')->postJson('/api/company/invitations', [
+            'email' => 'foreign-team@test.com',
+            'role' => Role::EMPLOYEE->value,
+            'teamId' => $foreignTeam->id,
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertDatabaseMissing('invite_tokens', ['email' => 'foreign-team@test.com']);
+    }
+
+    public function test_manager_can_invite_employee_only_into_managed_team(): void
+    {
+        [$company] = $this->createCompanyWithAdmin();
+        $manager = $this->createUserWithRole(Role::COMPANY_MANAGER, $company->id);
+        $managedTeam = Team::factory()->create(['company_id' => $company->id, 'manager_id' => $manager->id]);
+
+        $response = $this->actingAs($manager, 'sanctum')->postJson('/api/company/invitations', [
+            'email' => 'managed-invite@test.com',
+            'role' => Role::EMPLOYEE->value,
+            'teamId' => $managedTeam->id,
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('invite_tokens', [
+            'email' => 'managed-invite@test.com',
+            'role' => Role::EMPLOYEE->value,
+            'team_id' => $managedTeam->id,
+        ]);
+    }
+
+    public function test_manager_cannot_invite_into_unmanaged_team(): void
+    {
+        [$company] = $this->createCompanyWithAdmin();
+        $manager = $this->createUserWithRole(Role::COMPANY_MANAGER, $company->id);
+        $unmanagedTeam = Team::factory()->create(['company_id' => $company->id, 'manager_id' => null]);
+
+        $response = $this->actingAs($manager, 'sanctum')->postJson('/api/company/invitations', [
+            'email' => 'unmanaged-invite@test.com',
+            'role' => Role::EMPLOYEE->value,
+            'teamId' => $unmanagedTeam->id,
+        ]);
+
+        $response->assertStatus(403)
+            ->assertJsonPath('error.code', 'FORBIDDEN');
+        $this->assertDatabaseMissing('invite_tokens', ['email' => 'unmanaged-invite@test.com']);
+    }
+
+    public function test_company_admin_can_create_and_accept_manager_invite_with_team_affiliation(): void
+    {
+        [$company, $admin] = $this->createCompanyWithAdmin();
+        $team = Team::factory()->create(['company_id' => $company->id, 'manager_id' => null]);
+
+        $response = $this->actingAs($admin, 'sanctum')->postJson('/api/company/invitations', [
+            'email' => 'manager-with-team@test.com',
+            'role' => Role::COMPANY_MANAGER->value,
+            'teamId' => $team->id,
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.teamId', $team->id);
+        $this->assertDatabaseHas('invite_tokens', [
+            'email' => 'manager-with-team@test.com',
+            'role' => Role::COMPANY_MANAGER->value,
+            'team_id' => $team->id,
+        ]);
+
+        $acceptResponse = $this->postJson('/api/auth/invite/accept', [
+            'token' => $response->json('data.invite_token'),
+            'name' => 'Manager With Team',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $acceptResponse->assertStatus(200)
+            ->assertJsonPath('user.teamId', $team->id);
+        $this->assertDatabaseHas('users', [
+            'email' => 'manager-with-team@test.com',
+            'company_id' => $company->id,
+            'team_id' => $team->id,
+        ]);
+        $manager = User::where('email', 'manager-with-team@test.com')->firstOrFail();
+        $this->assertTrue($manager->hasRole(Role::COMPANY_MANAGER));
+    }
+
+    public function test_manager_cannot_invite_non_employee_roles(): void
+    {
+        [$company] = $this->createCompanyWithAdmin();
+        $manager = $this->createUserWithRole(Role::COMPANY_MANAGER, $company->id);
+        $managedTeam = Team::factory()->create(['company_id' => $company->id, 'manager_id' => $manager->id]);
+
+        $response = $this->actingAs($manager, 'sanctum')->postJson('/api/company/invitations', [
+            'email' => 'manager-invites-manager@test.com',
+            'role' => Role::COMPANY_MANAGER->value,
+            'teamId' => $managedTeam->id,
+        ]);
+
+        $response->assertStatus(403)
+            ->assertJsonPath('error.code', 'FORBIDDEN');
+        $this->assertDatabaseMissing('invite_tokens', ['email' => 'manager-invites-manager@test.com']);
+    }
+
     public function test_company_admin_cannot_invite_into_another_company()
     {
         [$company1, $admin1] = $this->createCompanyWithAdmin();
@@ -299,6 +468,138 @@ class AuthTest extends TestCase
         $this->assertDatabaseHas('user_roles', ['role' => 'EMPLOYEE']);
     }
 
+    public function test_invite_acceptance_creates_new_user_with_invite_team_id(): void
+    {
+        $company = Company::factory()->create();
+        $team = Team::factory()->create(['company_id' => $company->id, 'manager_id' => null]);
+        $rawToken = 'team-token-123';
+
+        InviteToken::create([
+            'company_id' => $company->id,
+            'team_id' => $team->id,
+            'email' => 'teamed-invited@test.com',
+            'role' => Role::EMPLOYEE,
+            'token_hash' => hash('sha256', $rawToken),
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        $response = $this->postJson('/api/auth/invite/accept', [
+            'token' => $rawToken,
+            'name' => 'Teamed User',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('user.teamId', $team->id);
+        $this->assertDatabaseHas('users', [
+            'email' => 'teamed-invited@test.com',
+            'company_id' => $company->id,
+            'team_id' => $team->id,
+        ]);
+    }
+
+    public function test_forged_request_team_id_during_invite_accept_is_ignored(): void
+    {
+        $company = Company::factory()->create();
+        $inviteTeam = Team::factory()->create(['company_id' => $company->id, 'manager_id' => null]);
+        $forgedTeam = Team::factory()->create(['company_id' => $company->id, 'manager_id' => null]);
+        $rawToken = 'team-token-forged';
+
+        InviteToken::create([
+            'company_id' => $company->id,
+            'team_id' => $inviteTeam->id,
+            'email' => 'forged-team@test.com',
+            'role' => Role::EMPLOYEE,
+            'token_hash' => hash('sha256', $rawToken),
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        $response = $this->postJson('/api/auth/invite/accept', [
+            'token' => $rawToken,
+            'name' => 'Forged Team',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'team_id' => $forgedTeam->id,
+            'teamId' => $forgedTeam->id,
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('user.teamId', $inviteTeam->id);
+        $this->assertDatabaseHas('users', [
+            'email' => 'forged-team@test.com',
+            'team_id' => $inviteTeam->id,
+        ]);
+    }
+
+    public function test_invite_acceptance_rejects_invite_with_foreign_team_id_without_mutating_users(): void
+    {
+        $company = Company::factory()->create();
+        $foreignCompany = Company::factory()->create();
+        $foreignTeam = Team::factory()->create(['company_id' => $foreignCompany->id, 'manager_id' => null]);
+        $rawToken = 'foreign-team-accept-token';
+
+        InviteToken::create([
+            'company_id' => $company->id,
+            'team_id' => $foreignTeam->id,
+            'email' => 'foreign-team-accept@test.com',
+            'role' => Role::EMPLOYEE,
+            'token_hash' => hash('sha256', $rawToken),
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        $response = $this->postJson('/api/auth/invite/accept', [
+            'token' => $rawToken,
+            'name' => 'Foreign Team',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('error.code', 'INVALID_INVITE_TEAM');
+        $this->assertDatabaseMissing('users', [
+            'email' => 'foreign-team-accept@test.com',
+        ]);
+        $this->assertDatabaseHas('invite_tokens', [
+            'email' => 'foreign-team-accept@test.com',
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_invite_acceptance_rejects_existing_user_invite_with_foreign_team_id_without_updating_user(): void
+    {
+        $company = Company::factory()->create();
+        $foreignCompany = Company::factory()->create();
+        $foreignTeam = Team::factory()->create(['company_id' => $foreignCompany->id, 'manager_id' => null]);
+        $existingUser = $this->createUserWithRole(Role::EMPLOYEE, $company->id);
+        $existingUser->update(['email' => 'existing-foreign-team@test.com', 'team_id' => null]);
+        $rawToken = 'existing-foreign-team-token';
+
+        InviteToken::create([
+            'company_id' => $company->id,
+            'team_id' => $foreignTeam->id,
+            'email' => $existingUser->email,
+            'role' => Role::EMPLOYEE,
+            'token_hash' => hash('sha256', $rawToken),
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        $response = $this->postJson('/api/auth/invite/accept', [
+            'token' => $rawToken,
+            'name' => 'Existing Foreign Team',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('error.code', 'INVALID_INVITE_TEAM');
+        $this->assertNull($existingUser->refresh()->team_id);
+        $this->assertDatabaseHas('invite_tokens', [
+            'email' => $existingUser->email,
+            'status' => 'pending',
+        ]);
+    }
+
     public function test_invite_accept_cannot_override_role()
     {
         $company = Company::factory()->create();
@@ -378,6 +679,41 @@ class AuthTest extends TestCase
 
         $response->assertStatus(422)
             ->assertJsonPath('error.code', 'COMPANY_CONFLICT');
+    }
+
+    public function test_existing_user_with_different_team_accepting_team_invite_is_rejected(): void
+    {
+        $company = Company::factory()->create();
+        $existingTeam = Team::factory()->create(['company_id' => $company->id, 'manager_id' => null]);
+        $inviteTeam = Team::factory()->create(['company_id' => $company->id, 'manager_id' => null]);
+        $existingUser = $this->createUserWithRole(Role::EMPLOYEE, $company->id);
+        $existingUser->update(['email' => 'existing-team@test.com', 'team_id' => $existingTeam->id]);
+        $rawToken = 'team-conflict-token';
+
+        InviteToken::create([
+            'company_id' => $company->id,
+            'team_id' => $inviteTeam->id,
+            'email' => $existingUser->email,
+            'role' => Role::EMPLOYEE,
+            'token_hash' => hash('sha256', $rawToken),
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        $response = $this->postJson('/api/auth/invite/accept', [
+            'token' => $rawToken,
+            'name' => 'Existing User',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('error.code', 'TEAM_CONFLICT');
+
+        $this->assertSame($existingTeam->id, $existingUser->refresh()->team_id);
+        $this->assertDatabaseHas('invite_tokens', [
+            'email' => $existingUser->email,
+            'status' => 'pending',
+        ]);
     }
 
     public function test_expired_invite_cannot_be_accepted()

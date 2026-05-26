@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\InviteToken;
+use App\Models\Team;
 use App\Models\User;
 use App\Models\UserRole;
 use Illuminate\Http\Request;
@@ -62,6 +63,14 @@ class InviteController extends Controller
             ], 422);
         }
 
+        if ($invite->team_id !== null && ! Team::where('id', $invite->team_id)
+            ->where('company_id', $invite->company_id)
+            ->exists()) {
+            return response()->json([
+                'error' => ['code' => 'INVALID_INVITE_TEAM', 'message' => 'Die Team-Zuordnung dieser Einladung ist ungültig.'],
+            ], 422);
+        }
+
         // Check if user already exists
         $existingUser = User::where('email', $invite->email)->first();
 
@@ -73,15 +82,29 @@ class InviteController extends Controller
                 ], 422);
             }
 
-            // User exists in same company — add missing role
-            if (! $existingUser->hasRole($invite->role)) {
-                UserRole::create([
-                    'user_id' => $existingUser->id,
-                    'role' => $invite->role,
-                ]);
+            if ($invite->team_id !== null && $existingUser->team_id !== null && (int) $existingUser->team_id !== (int) $invite->team_id) {
+                return response()->json([
+                    'error' => ['code' => 'TEAM_CONFLICT', 'message' => 'Dieses Konto ist bereits einem anderen Team zugeordnet.'],
+                ], 422);
             }
 
-            $invite->update(['status' => 'accepted', 'accepted_at' => now()]);
+            $existingUser = DB::transaction(function () use ($existingUser, $invite) {
+                // User exists in same company — add missing role
+                if (! $existingUser->hasRole($invite->role)) {
+                    UserRole::create([
+                        'user_id' => $existingUser->id,
+                        'role' => $invite->role,
+                    ]);
+                }
+
+                if ($invite->team_id !== null && $existingUser->team_id === null) {
+                    $existingUser->update(['team_id' => $invite->team_id]);
+                }
+
+                $invite->update(['status' => 'accepted', 'accepted_at' => now()]);
+
+                return $existingUser;
+            });
 
             $existingUser->load('roles', 'company');
             $token = $existingUser->createToken('auth_token')->plainTextToken;

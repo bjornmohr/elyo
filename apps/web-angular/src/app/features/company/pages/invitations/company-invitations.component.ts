@@ -2,7 +2,29 @@ import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiClient } from '../../../../core/services/api-client.service';
+import { Role } from '../../../../core/models/auth.models';
+import { AuthStore } from '../../../../core/store/auth.store';
 import { NotificationService } from '../../../../shared/notifications/notification.service';
+
+interface InvitationListItem {
+  id: number;
+  email: string;
+  role: string;
+  teamId?: number | null;
+  status: string;
+  expiresAt: string;
+}
+
+interface CompanyTeamOption {
+  id: number;
+  name: string;
+}
+
+interface CreateInvitationPayload {
+  email: string;
+  role: string;
+  teamId?: number;
+}
 
 @Component({
   selector: 'app-company-invitations',
@@ -39,11 +61,32 @@ import { NotificationService } from '../../../../shared/notifications/notificati
             <select formControlName="role"
               class="w-full px-3 py-2 rounded-lg border bg-stone-50 text-sm text-gray-900 outline-none focus:border-teal-500 border-gray-200">
               <option value="EMPLOYEE">Mitarbeiter</option>
-              <option value="COMPANY_ADMIN">Company Admin</option>
-              <option value="COMPANY_MANAGER">Manager</option>
+              @if (!isManagerOnly()) {
+                <option value="COMPANY_ADMIN">Company Admin</option>
+                <option value="COMPANY_MANAGER">Manager</option>
+              }
             </select>
           </div>
-          <button type="submit" [disabled]="inviteForm.invalid || inviting()"
+          @if (showTeamSelect()) {
+            <div class="w-56 space-y-1">
+              <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Teamzugehörigkeit</label>
+              <select formControlName="teamId"
+                class="w-full px-3 py-2 rounded-lg border bg-stone-50 text-sm text-gray-900 outline-none focus:border-teal-500 border-gray-200">
+                @if (!isManagerOnly()) {
+                  <option [ngValue]="null">Kein Team</option>
+                }
+                @for (team of teams(); track team.id) {
+                  <option [ngValue]="team.id">{{ team.name }}</option>
+                }
+              </select>
+            </div>
+          }
+          @if (managerHasNoTeams()) {
+            <div class="w-full text-sm px-4 py-2 rounded-lg" style="background: #fffbeb; color: #92400e; border: 1px solid #fde68a">
+              Sie verwalten aktuell kein Team. Einladungen sind erst möglich, wenn Ihnen ein Team zugeordnet ist.
+            </div>
+          }
+          <button type="submit" [disabled]="!canSubmit()"
             class="px-4 py-2 rounded-lg text-sm font-semibold text-white"
             style="background: linear-gradient(135deg, #14b8a6, #0d9488)">
             Einladen
@@ -101,21 +144,42 @@ import { NotificationService } from '../../../../shared/notifications/notificati
 export class CompanyInvitationsComponent implements OnInit {
   private api = inject(ApiClient);
   private fb = inject(FormBuilder);
+  private authStore = inject(AuthStore);
   private notifications = inject(NotificationService);
 
-  invitations = signal<any[]>([]);
+  invitations = signal<InvitationListItem[]>([]);
+  teams = signal<CompanyTeamOption[]>([]);
   loading = signal(true);
+  teamsLoading = signal(false);
   inviting = signal(false);
   inviteError = signal<string | null>(null);
   inviteSuccess = signal(false);
   lastToken = signal<string | null>(null);
+  private teamsLoaded = false;
 
   inviteForm = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
     role: ['EMPLOYEE', [Validators.required]],
+    teamId: [null as number | null],
   });
 
   ngOnInit() {
+    if (this.isManagerOnly()) {
+      this.inviteForm.controls.role.setValue(Role.EMPLOYEE);
+      this.inviteForm.controls.role.disable();
+    }
+
+    this.inviteForm.controls.role.valueChanges.subscribe(role => {
+      if (!this.isManagerOnly()) {
+        this.inviteForm.controls.teamId.setValue(null);
+      }
+
+      if (role) {
+        this.loadTeams();
+      }
+    });
+
+    this.loadTeams();
     this.loadInvitations();
   }
 
@@ -127,22 +191,34 @@ export class CompanyInvitationsComponent implements OnInit {
   }
 
   onInvite() {
-    if (this.inviteForm.invalid) return;
+    if (!this.canSubmit()) {
+      this.inviteForm.markAllAsTouched();
+      if (this.isManagerOnly()) {
+        this.inviteError.set(this.managerHasNoTeams()
+          ? 'Sie verwalten aktuell kein Team und können keine Einladungen erstellen.'
+          : 'Bitte wählen Sie ein verwaltetes Team aus.');
+      }
+      return;
+    }
+
     this.inviting.set(true);
     this.inviteError.set(null);
     this.inviteSuccess.set(false);
 
-    this.api.post<{ data: any }>('/company/invitations', this.inviteForm.value).subscribe({
+    this.api.post<{ data: any }>('/company/invitations', this.invitationPayload()).subscribe({
       next: (res) => {
         this.inviteSuccess.set(true);
         this.lastToken.set(res.data.invite_token);
         this.inviting.set(false);
-        this.inviteForm.reset({ role: 'EMPLOYEE' });
+        this.inviteForm.reset({ role: Role.EMPLOYEE, teamId: this.defaultTeamId() });
+        if (this.isManagerOnly()) {
+          this.inviteForm.controls.role.disable();
+        }
         this.notifications.success('Einladung wurde gespeichert.');
         this.loadInvitations();
       },
       error: (err) => {
-        const message = err.error?.error?.message || 'Einladung fehlgeschlagen.';
+        const message = this.validationMessage(err);
         this.inviteError.set(message);
         this.notifications.error(message);
         this.inviting.set(false);
@@ -158,5 +234,76 @@ export class CompanyInvitationsComponent implements OnInit {
       },
       error: () => this.notifications.error('Einladung konnte nicht widerrufen werden.'),
     });
+  }
+
+  showTeamSelect() {
+    if (this.isManagerOnly()) {
+      return this.teamsLoading() || this.teams().length > 1;
+    }
+
+    return this.teamsLoading() || this.teams().length > 0;
+  }
+
+  canSubmit() {
+    if (this.inviteForm.invalid || this.inviting()) return false;
+    if (this.teamsLoading()) return false;
+    return !this.isManagerOnly() || this.inviteForm.controls.teamId.value !== null;
+  }
+
+  managerHasNoTeams() {
+    return this.isManagerOnly() && this.teamsLoaded && this.teams().length === 0;
+  }
+
+  isManagerOnly() {
+    const roles = this.authStore.roles();
+    return roles.includes(Role.COMPANY_MANAGER) && !roles.some(role => [Role.COMPANY_ADMIN, Role.COMPANY_OWNER].includes(role as Role));
+  }
+
+  private loadTeams() {
+    if (this.teamsLoaded || this.teamsLoading()) return;
+
+    this.teamsLoading.set(true);
+    this.api.get<{ data: CompanyTeamOption[] }>('/company/teams').subscribe({
+      next: res => {
+        this.teams.set(res.data ?? []);
+        this.teamsLoaded = true;
+        this.teamsLoading.set(false);
+        this.applyManagerTeamDefault();
+      },
+      error: () => {
+        this.teamsLoading.set(false);
+      },
+    });
+  }
+
+  private applyManagerTeamDefault() {
+    if (this.isManagerOnly() && this.teams().length === 1) {
+      this.inviteForm.controls.teamId.setValue(this.teams()[0].id);
+    }
+  }
+
+  private defaultTeamId() {
+    return this.isManagerOnly() && this.teams().length === 1 ? this.teams()[0].id : null;
+  }
+
+  private invitationPayload(): CreateInvitationPayload {
+    const raw = this.inviteForm.getRawValue();
+    const role = this.isManagerOnly() ? Role.EMPLOYEE : raw.role ?? Role.EMPLOYEE;
+    const payload: CreateInvitationPayload = {
+      email: raw.email ?? '',
+      role,
+    };
+
+    if (raw.teamId != null) {
+      payload.teamId = raw.teamId;
+    }
+
+    return payload;
+  }
+
+  private validationMessage(err: any) {
+    const errors = err.error?.errors;
+    if (errors) return Object.values(errors).flat().join(' ');
+    return err.error?.error?.message || err.error?.message || 'Einladung fehlgeschlagen.';
   }
 }

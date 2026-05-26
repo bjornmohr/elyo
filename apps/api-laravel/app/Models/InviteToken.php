@@ -12,7 +12,7 @@ class InviteToken extends Model
     use HasFactory;
 
     protected $fillable = [
-        'company_id', 'email', 'role', 'token_hash', 'status',
+        'company_id', 'team_id', 'email', 'role', 'token_hash', 'status',
         'invited_by_user_id', 'expires_at', 'accepted_at',
     ];
 
@@ -30,6 +30,11 @@ class InviteToken extends Model
     public function invitedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'invited_by_user_id');
+    }
+
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
     }
 
     public function isPending(): bool

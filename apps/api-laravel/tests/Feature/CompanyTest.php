@@ -633,6 +633,101 @@ class CompanyTest extends TestCase
         $response->assertJsonPath('data.questionsCount', 1);
     }
 
+    public function test_team_members_endpoint_returns_only_matching_team_and_company_users(): void
+    {
+        $otherCompany = Company::factory()->create();
+        $otherTeam = Team::factory()->create(['company_id' => $this->company->id, 'manager_id' => null]);
+        $matchingMember = User::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+            'email' => 'matching-member@test.com',
+        ]);
+        $sameCompanyOtherTeam = User::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $otherTeam->id,
+            'role' => Role::EMPLOYEE,
+            'email' => 'other-team-member@test.com',
+        ]);
+        $foreignCompanySameTeamId = User::factory()->create([
+            'company_id' => $otherCompany->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+            'email' => 'foreign-company-member@test.com',
+        ]);
+
+        $response = $this->actingAs($this->admin)->getJson("/api/company/teams/{$this->team->id}/members");
+
+        $response->assertStatus(200);
+        $emails = collect($response->json('members'))->pluck('email')->all();
+        $this->assertContains($matchingMember->email, $emails);
+        $this->assertNotContains($sameCompanyOtherTeam->email, $emails);
+        $this->assertNotContains($foreignCompanySameTeamId->email, $emails);
+        $response->assertJsonMissingPath('members.0.company_id');
+        $response->assertJsonMissingPath('members.0.team_id');
+    }
+
+    public function test_manager_can_view_only_managed_team_directory_members_without_health_data(): void
+    {
+        $otherCompany = Company::factory()->create();
+        $managedMember = User::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+            'email' => 'managed-team-member@test.com',
+            'last_login_at' => now(),
+        ]);
+        $sameCompanyUnassigned = User::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'role' => Role::EMPLOYEE,
+            'email' => 'unassigned-member@test.com',
+        ]);
+        $foreignCompanyMember = User::factory()->create([
+            'company_id' => $otherCompany->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+            'email' => 'foreign-managed-member@test.com',
+        ]);
+        WellbeingEntry::factory()->create([
+            'user_id' => $managedMember->id,
+            'company_id' => $this->company->id,
+            'mood' => 2,
+            'stress' => 9,
+            'energy' => 3,
+            'score' => 2.3,
+            'note' => 'Private health note',
+        ]);
+
+        $response = $this->actingAs($this->manager)->getJson("/api/company/teams/{$this->team->id}/members");
+
+        $response->assertStatus(200);
+        $members = collect($response->json('members'));
+        $emails = $members->pluck('email')->all();
+        $this->assertContains($managedMember->email, $emails);
+        $this->assertNotContains($sameCompanyUnassigned->email, $emails);
+        $this->assertNotContains($foreignCompanyMember->email, $emails);
+
+        $member = $members->firstWhere('email', $managedMember->email);
+        $this->assertNotNull($member);
+        $this->assertSame(['email', 'id', 'name', 'roles', 'status'], collect($member)->keys()->sort()->values()->all());
+        $response->assertJsonMissingPath('members.0.lastLoginAt');
+        $response->assertJsonMissingPath('members.0.mood');
+        $response->assertJsonMissingPath('members.0.stress');
+        $response->assertJsonMissingPath('members.0.energy');
+        $response->assertJsonMissingPath('members.0.score');
+        $response->assertJsonMissingPath('members.0.note');
+    }
+
+    public function test_manager_cannot_view_unmanaged_team_members(): void
+    {
+        $unmanagedTeam = Team::factory()->create(['company_id' => $this->company->id, 'manager_id' => null]);
+
+        $this->actingAs($this->manager)
+            ->getJson("/api/company/teams/{$unmanagedTeam->id}/members")
+            ->assertStatus(403);
+    }
+
     private function createSurveyAnswer(Survey $survey, SurveyQuestion $question, User $employee, array $answer): SurveyAnswer
     {
         $response = SurveyResponse::factory()->create([

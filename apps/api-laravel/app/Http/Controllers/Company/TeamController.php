@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Company\CreateTeamRequest;
 use App\Http\Resources\Company\TeamResource;
 use App\Models\Team;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class TeamController extends Controller
@@ -107,8 +108,19 @@ class TeamController extends Controller
             abort(403);
         }
 
-        // TODO: team membership needs a proper join table or team_id on users
-        $members = collect([]);
+        $members = User::where('company_id', $user->company_id)
+            ->where('team_id', $team->id)
+            ->select(['id', 'name', 'email', 'status'])
+            ->with('roles')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (User $member) => [
+                'id' => $member->id,
+                'name' => $member->name,
+                'email' => $member->email,
+                'status' => $member->status,
+                'roles' => $member->roleNames(),
+            ]);
 
         return response()->json(['members' => $members]);
     }

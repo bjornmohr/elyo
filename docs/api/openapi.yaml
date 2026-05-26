@@ -149,6 +149,59 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /auth/invite/accept:
+    post:
+      tags: [Auth]
+      summary: Accept an invitation
+      description: Accepts the persisted invitation only. Request company or team identifiers are ignored; team assignment comes from the invite token and must belong to the invite company.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, name, password, password_confirmation]
+              properties:
+                token: { type: string }
+                name: { type: string, maxLength: 255 }
+                password: { type: string, format: password }
+                password_confirmation: { type: string, format: password }
+      responses:
+        200:
+          description: Invite accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token: { type: string }
+                  token_type: { type: string, example: Bearer }
+                  user:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      email: { type: string, format: email }
+                      name: { type: string }
+                      roles:
+                        type: array
+                        items: { type: string }
+                      companyId: { type: integer }
+                      teamId: { type: integer, nullable: true }
+        422:
+          description: Invalid invite, company conflict, team conflict, or invalid persisted invite team
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [INVALID_INVITE, COMPANY_CONFLICT, TEAM_CONFLICT, INVALID_INVITE_TEAM]
+                      message: { type: string }
+
   /employee/dashboard:
     get:
       tags: [Employee]
@@ -504,6 +557,106 @@ paths:
                                 avgMood: { type: number }
                                 avgStress: { type: number }
 
+  /company/invitations:
+    get:
+      tags: [Company]
+      summary: List company invitations
+      description: Company managers only see employee invitations they created.
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: List of invitations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        email: { type: string, format: email }
+                        role: { type: string, enum: [COMPANY_ADMIN, COMPANY_MANAGER, EMPLOYEE] }
+                        teamId:
+                          type: integer
+                          nullable: true
+                          description: Optional same-company team affiliation for the invited user.
+                        status: { type: string }
+                        expiresAt: { type: string, format: date-time }
+                        createdAt: { type: string, format: date-time }
+        403:
+          description: Forbidden for users without company portal access
+    post:
+      tags: [Company]
+      summary: Create a company invitation
+      description: teamId is an optional same-company team affiliation for the invited user. Admins may set it for supported company-internal roles. Managers may only invite employees into teams they manage.
+      security: [{ Sanctum: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { type: string, enum: [COMPANY_ADMIN, COMPANY_MANAGER, EMPLOYEE] }
+                teamId:
+                  type: integer
+                  nullable: true
+                  description: Optional same-company team affiliation for the invited user.
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      email: { type: string, format: email }
+                      role: { type: string, enum: [COMPANY_ADMIN, COMPANY_MANAGER, EMPLOYEE] }
+                      teamId:
+                        type: integer
+                        nullable: true
+                        description: Optional same-company team affiliation for the invited user.
+                      status: { type: string }
+                      expires_at: { type: string, format: date-time }
+                      invite_token: { type: string }
+        403:
+          description: Forbidden for manager role invites or unmanaged team access
+        422:
+          description: Validation error for invalid teamId or company email conflict
+
+  /company/invitations/{id}:
+    delete:
+      tags: [Company]
+      summary: Revoke a pending company invitation
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Invitation revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+        403:
+          description: Forbidden for invitations outside the caller scope
+        422:
+          description: Invitation is no longer pending
+
   /company/teams:
     get:
       tags: [Company]
@@ -614,6 +767,25 @@ paths:
       responses:
         200:
           description: List of members
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  members:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string, nullable: true }
+                        email: { type: string, format: email }
+                        status: { type: string }
+                        roles:
+                          type: array
+                          items: { type: string }
+        403:
+          description: Forbidden for managers accessing unmanaged teams
 
   /company/surveys:
     get:
