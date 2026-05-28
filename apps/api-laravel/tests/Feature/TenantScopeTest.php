@@ -101,8 +101,8 @@ class TenantScopeTest extends TestCase
 
     public function test_company_admin_cannot_use_foreign_team_id_for_measure_or_report(): void
     {
-        $company = Company::factory()->create();
-        $otherCompany = Company::factory()->create();
+        $company = Company::factory()->create(['team_layer_enabled' => true]);
+        $otherCompany = Company::factory()->create(['team_layer_enabled' => true]);
         $admin = User::factory()->create(['company_id' => $company->id, 'role' => Role::COMPANY_ADMIN]);
         $foreignTeam = Team::factory()->create(['company_id' => $otherCompany->id]);
 
@@ -121,7 +121,7 @@ class TenantScopeTest extends TestCase
 
     public function test_company_admin_cannot_access_foreign_company_resources_by_route_id(): void
     {
-        $company = Company::factory()->create();
+        $company = Company::factory()->create(['team_layer_enabled' => true]);
         $otherCompany = Company::factory()->create();
         $admin = User::factory()->create(['company_id' => $company->id, 'role' => Role::COMPANY_ADMIN]);
         $foreignTeam = Team::factory()->create(['company_id' => $otherCompany->id]);
@@ -137,7 +137,7 @@ class TenantScopeTest extends TestCase
 
     public function test_company_manager_cannot_access_non_managed_team_or_create_out_of_scope_resources(): void
     {
-        $company = Company::factory()->create();
+        $company = Company::factory()->create(['team_layer_enabled' => true]);
         $managedTeam = Team::factory()->create(['company_id' => $company->id]);
         $otherTeam = Team::factory()->create(['company_id' => $company->id]);
         $manager = User::factory()->create(['company_id' => $company->id, 'role' => Role::COMPANY_MANAGER]);

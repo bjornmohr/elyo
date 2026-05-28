@@ -25,12 +25,14 @@ class AdminCompanyController extends Controller
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255|unique:companies,slug',
             'anonymity_threshold' => 'nullable|integer|min:1',
+            'team_layer_enabled' => 'nullable|boolean',
         ]);
 
         $company = Company::create([
             'name' => $request->name,
             'slug' => $request->slug ?? Str::slug($request->name),
             'anonymity_threshold' => $request->anonymity_threshold ?? 5,
+            'team_layer_enabled' => $request->boolean('team_layer_enabled', false),
             'created_by_elyo_admin_id' => $request->user()->id,
         ]);
 
@@ -51,9 +53,10 @@ class AdminCompanyController extends Controller
             'slug' => 'sometimes|string|max:255|unique:companies,slug,'.$company->id,
             'status' => 'sometimes|string|in:active,inactive,suspended',
             'anonymity_threshold' => 'sometimes|integer|min:1',
+            'team_layer_enabled' => 'sometimes|boolean',
         ]);
 
-        $company->update($request->only(['name', 'slug', 'status', 'anonymity_threshold']));
+        $company->update($request->only(['name', 'slug', 'status', 'anonymity_threshold', 'team_layer_enabled']));
 
         return response()->json(['data' => $company]);
     }

@@ -63,7 +63,9 @@ interface CreateInvitationPayload {
               <option value="EMPLOYEE">Mitarbeiter</option>
               @if (!isManagerOnly()) {
                 <option value="COMPANY_ADMIN">Company Admin</option>
-                <option value="COMPANY_MANAGER">Manager</option>
+                @if (teamLayerEnabled()) {
+                  <option value="COMPANY_MANAGER">Manager</option>
+                }
               }
             </select>
           </div>
@@ -84,6 +86,11 @@ interface CreateInvitationPayload {
           @if (managerHasNoTeams()) {
             <div class="w-full text-sm px-4 py-2 rounded-lg" style="background: #fffbeb; color: #92400e; border: 1px solid #fde68a">
               Sie verwalten aktuell kein Team. Einladungen sind erst möglich, wenn Ihnen ein Team zugeordnet ist.
+            </div>
+          }
+          @if (managerDisabledByTeamLayer()) {
+            <div class="w-full text-sm px-4 py-2 rounded-lg" style="background: #fffbeb; color: #92400e; border: 1px solid #fde68a">
+              Manager-Einladungen sind nur bei aktivierter Team-Ebene möglich.
             </div>
           }
           <button type="submit" [disabled]="!canSubmit()"
@@ -174,12 +181,14 @@ export class CompanyInvitationsComponent implements OnInit {
         this.inviteForm.controls.teamId.setValue(null);
       }
 
-      if (role) {
+      if (role && this.teamLayerEnabled()) {
         this.loadTeams();
       }
     });
 
-    this.loadTeams();
+    if (this.teamLayerEnabled()) {
+      this.loadTeams();
+    }
     this.loadInvitations();
   }
 
@@ -194,7 +203,9 @@ export class CompanyInvitationsComponent implements OnInit {
     if (!this.canSubmit()) {
       this.inviteForm.markAllAsTouched();
       if (this.isManagerOnly()) {
-        this.inviteError.set(this.managerHasNoTeams()
+        this.inviteError.set(this.managerDisabledByTeamLayer()
+          ? 'Manager-Einladungen sind nur bei aktivierter Team-Ebene möglich.'
+          : this.managerHasNoTeams()
           ? 'Sie verwalten aktuell kein Team und können keine Einladungen erstellen.'
           : 'Bitte wählen Sie ein verwaltetes Team aus.');
       }
@@ -237,6 +248,10 @@ export class CompanyInvitationsComponent implements OnInit {
   }
 
   showTeamSelect() {
+    if (!this.teamLayerEnabled()) {
+      return false;
+    }
+
     if (this.isManagerOnly()) {
       return this.teamsLoading() || this.teams().length > 1;
     }
@@ -246,12 +261,17 @@ export class CompanyInvitationsComponent implements OnInit {
 
   canSubmit() {
     if (this.inviteForm.invalid || this.inviting()) return false;
+    if (!this.teamLayerEnabled() && this.isManagerOnly()) return false;
     if (this.teamsLoading()) return false;
     return !this.isManagerOnly() || this.inviteForm.controls.teamId.value !== null;
   }
 
   managerHasNoTeams() {
-    return this.isManagerOnly() && this.teamsLoaded && this.teams().length === 0;
+    return this.teamLayerEnabled() && this.isManagerOnly() && this.teamsLoaded && this.teams().length === 0;
+  }
+
+  managerDisabledByTeamLayer() {
+    return this.isManagerOnly() && !this.teamLayerEnabled();
   }
 
   isManagerOnly() {
@@ -259,8 +279,12 @@ export class CompanyInvitationsComponent implements OnInit {
     return roles.includes(Role.COMPANY_MANAGER) && !roles.some(role => [Role.COMPANY_ADMIN, Role.COMPANY_OWNER].includes(role as Role));
   }
 
+  teamLayerEnabled() {
+    return this.authStore.teamLayerEnabled();
+  }
+
   private loadTeams() {
-    if (this.teamsLoaded || this.teamsLoading()) return;
+    if (!this.teamLayerEnabled() || this.teamsLoaded || this.teamsLoading()) return;
 
     this.teamsLoading.set(true);
     this.api.get<{ data: CompanyTeamOption[] }>('/company/teams').subscribe({
@@ -294,7 +318,7 @@ export class CompanyInvitationsComponent implements OnInit {
       role,
     };
 
-    if (raw.teamId != null) {
+    if (this.teamLayerEnabled() && raw.teamId != null) {
       payload.teamId = raw.teamId;
     }
 

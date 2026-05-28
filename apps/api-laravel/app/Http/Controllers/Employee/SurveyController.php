@@ -18,11 +18,12 @@ class SurveyController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
+        $teamLayerEnabled = $this->teamLayerEnabled($user);
         $surveys = Survey::where('company_id', $user->company_id)
             ->where('status', SurveyStatus::ACTIVE)
-            ->where(function ($query) use ($user) {
+            ->where(function ($query) use ($user, $teamLayerEnabled) {
                 $query->whereDoesntHave('teams');
-                if ($user->team_id) {
+                if ($teamLayerEnabled && $user->team_id) {
                     $query->orWhereHas('teams', fn ($teamQuery) => $teamQuery->where('teams.id', $user->team_id));
                 }
             })
@@ -162,8 +163,13 @@ class SurveyController extends Controller
     private function accessibleSurveyScope($query, $user): void
     {
         $query->whereDoesntHave('teams');
-        if ($user->team_id) {
+        if ($this->teamLayerEnabled($user) && $user->team_id) {
             $query->orWhereHas('teams', fn ($teamQuery) => $teamQuery->where('teams.id', $user->team_id));
         }
+    }
+
+    private function teamLayerEnabled($user): bool
+    {
+        return (bool) $user->company()->value('team_layer_enabled');
     }
 }

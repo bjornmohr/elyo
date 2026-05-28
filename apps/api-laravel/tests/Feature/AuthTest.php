@@ -27,7 +27,7 @@ class AuthTest extends TestCase
 
     private function createCompanyWithAdmin(): array
     {
-        $company = Company::factory()->create();
+        $company = Company::factory()->create(['team_layer_enabled' => true]);
         $admin = $this->createUserWithRole(Role::COMPANY_ADMIN, $company->id);
 
         return [$company, $admin];
@@ -133,6 +133,36 @@ class AuthTest extends TestCase
             ->assertJsonStructure(['id', 'email', 'name', 'roles', 'allowedPortals']);
     }
 
+    public function test_company_defaults_to_team_layer_disabled(): void
+    {
+        $company = Company::factory()->create();
+
+        $this->assertFalse($company->team_layer_enabled);
+        $this->assertDatabaseHas('companies', [
+            'id' => $company->id,
+            'team_layer_enabled' => false,
+        ]);
+    }
+
+    public function test_auth_responses_include_team_layer_enabled(): void
+    {
+        $company = Company::factory()->create(['team_layer_enabled' => true]);
+        $user = $this->createUserWithRole(Role::COMPANY_ADMIN, $company->id);
+
+        $loginResponse = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $loginResponse->assertStatus(200)
+            ->assertJsonPath('user.teamLayerEnabled', true);
+
+        $meResponse = $this->actingAs($user, 'sanctum')->getJson('/api/auth/me');
+
+        $meResponse->assertStatus(200)
+            ->assertJsonPath('teamLayerEnabled', true);
+    }
+
     // --- Admin company management ---
 
     public function test_elyo_admin_can_create_company()
@@ -144,7 +174,44 @@ class AuthTest extends TestCase
         ]);
 
         $response->assertStatus(201);
-        $this->assertDatabaseHas('companies', ['name' => 'Test Company']);
+        $this->assertDatabaseHas('companies', [
+            'name' => 'Test Company',
+            'team_layer_enabled' => false,
+        ]);
+    }
+
+    public function test_elyo_admin_can_create_company_with_team_layer_enabled(): void
+    {
+        $admin = $this->createPlatformAdmin();
+
+        $response = $this->actingAs($admin, 'sanctum')->postJson('/api/admin/companies', [
+            'name' => 'Team Layer Company',
+            'team_layer_enabled' => true,
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.team_layer_enabled', true);
+        $this->assertDatabaseHas('companies', [
+            'name' => 'Team Layer Company',
+            'team_layer_enabled' => true,
+        ]);
+    }
+
+    public function test_elyo_admin_can_update_company_team_layer_setting(): void
+    {
+        $admin = $this->createPlatformAdmin();
+        $company = Company::factory()->create(['team_layer_enabled' => false]);
+
+        $response = $this->actingAs($admin, 'sanctum')->putJson("/api/admin/companies/{$company->id}", [
+            'team_layer_enabled' => true,
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.team_layer_enabled', true);
+        $this->assertDatabaseHas('companies', [
+            'id' => $company->id,
+            'team_layer_enabled' => true,
+        ]);
     }
 
     public function test_non_admin_cannot_create_company()
@@ -217,6 +284,57 @@ class AuthTest extends TestCase
 
         $response->assertStatus(201);
         $this->assertDatabaseHas('invite_tokens', ['email' => 'employee@test.com', 'role' => 'EMPLOYEE']);
+    }
+
+    public function test_company_admin_can_invite_employee_without_team_when_team_layer_disabled(): void
+    {
+        $company = Company::factory()->create(['team_layer_enabled' => false]);
+        $admin = $this->createUserWithRole(Role::COMPANY_ADMIN, $company->id);
+
+        $response = $this->actingAs($admin, 'sanctum')->postJson('/api/company/invitations', [
+            'email' => 'employee-no-team@test.com',
+            'role' => Role::EMPLOYEE->value,
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.teamId', null);
+        $this->assertDatabaseHas('invite_tokens', [
+            'email' => 'employee-no-team@test.com',
+            'role' => Role::EMPLOYEE->value,
+            'team_id' => null,
+        ]);
+    }
+
+    public function test_company_admin_cannot_send_team_id_when_team_layer_disabled(): void
+    {
+        $company = Company::factory()->create(['team_layer_enabled' => false]);
+        $admin = $this->createUserWithRole(Role::COMPANY_ADMIN, $company->id);
+        $team = Team::factory()->create(['company_id' => $company->id, 'manager_id' => null]);
+
+        $response = $this->actingAs($admin, 'sanctum')->postJson('/api/company/invitations', [
+            'email' => 'disabled-team-id@test.com',
+            'role' => Role::EMPLOYEE->value,
+            'teamId' => $team->id,
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+        $this->assertDatabaseMissing('invite_tokens', ['email' => 'disabled-team-id@test.com']);
+    }
+
+    public function test_company_admin_cannot_invite_manager_when_team_layer_disabled(): void
+    {
+        $company = Company::factory()->create(['team_layer_enabled' => false]);
+        $admin = $this->createUserWithRole(Role::COMPANY_ADMIN, $company->id);
+
+        $response = $this->actingAs($admin, 'sanctum')->postJson('/api/company/invitations', [
+            'email' => 'manager-disabled-by-admin@test.com',
+            'role' => Role::COMPANY_MANAGER->value,
+        ]);
+
+        $response->assertStatus(403)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+        $this->assertDatabaseMissing('invite_tokens', ['email' => 'manager-disabled-by-admin@test.com']);
     }
 
     public function test_company_admin_can_create_employee_invite_with_valid_same_company_team(): void
@@ -314,6 +432,23 @@ class AuthTest extends TestCase
             'role' => Role::EMPLOYEE->value,
             'team_id' => $managedTeam->id,
         ]);
+    }
+
+    public function test_manager_cannot_invite_when_team_layer_disabled(): void
+    {
+        $company = Company::factory()->create(['team_layer_enabled' => false]);
+        $manager = $this->createUserWithRole(Role::COMPANY_MANAGER, $company->id);
+        $managedTeam = Team::factory()->create(['company_id' => $company->id, 'manager_id' => $manager->id]);
+
+        $response = $this->actingAs($manager, 'sanctum')->postJson('/api/company/invitations', [
+            'email' => 'manager-disabled@test.com',
+            'role' => Role::EMPLOYEE->value,
+            'teamId' => $managedTeam->id,
+        ]);
+
+        $response->assertStatus(403)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+        $this->assertDatabaseMissing('invite_tokens', ['email' => 'manager-disabled@test.com']);
     }
 
     public function test_manager_cannot_invite_into_unmanaged_team(): void

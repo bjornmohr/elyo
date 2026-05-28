@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ApiClient } from '../../../../core/services/api-client.service';
+import { AuthStore } from '../../../../core/store/auth.store';
 
 @Component({
   selector: 'app-company-dashboard',
@@ -39,11 +40,13 @@ import { ApiClient } from '../../../../core/services/api-client.service';
             <p class="text-xs text-gray-400 mt-2">{{ participantLabel() }}</p>
           </div>
 
-          <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <h3 class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2">Aktive Teams</h3>
-            <p class="text-4xl font-bold text-gray-900">{{ data()?.teams?.length || '0' }}</p>
-            <p class="text-xs text-gray-400 mt-2">Alle Teams erfüllen die Anonymitätsschwelle</p>
-          </div>
+          @if (teamLayerEnabled()) {
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2">Aktive Teams</h3>
+              <p class="text-4xl font-bold text-gray-900">{{ data()?.teams?.length || '0' }}</p>
+              <p class="text-xs text-gray-400 mt-2">Alle Teams erfüllen die Anonymitätsschwelle</p>
+            </div>
+          }
         </div>
 
         <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 animate-fade-up" style="animation-delay: 100ms">
@@ -73,6 +76,7 @@ import { ApiClient } from '../../../../core/services/api-client.service';
 })
 export class CompanyDashboardComponent implements OnInit {
   private api = inject(ApiClient);
+  private authStore = inject(AuthStore);
 
   data = signal<any>(null);
   loading = signal(true);
@@ -121,6 +125,10 @@ export class CompanyDashboardComponent implements OnInit {
     }
 
     return `${company?.responseCount ?? 0} Check-ins in diesem Zeitraum`;
+  }
+
+  teamLayerEnabled() {
+    return this.authStore.teamLayerEnabled();
   }
 
   trendBars() {

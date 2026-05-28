@@ -23,6 +23,22 @@ class CompanyInvitationService
         $role = Role::from($payload['role']);
         $teamId = $payload['teamId'] ?? null;
         $teamId = $teamId === null ? null : (int) $teamId;
+        $teamLayerEnabled = (bool) $user->company()->value('team_layer_enabled');
+
+        if (! $teamLayerEnabled && ($this->teamValidator->isManagerOnly($user) || $role === Role::COMPANY_MANAGER)) {
+            throw new InvitationDomainException(
+                'TEAM_LAYER_DISABLED',
+                'Manager-Einladungen sind nur bei aktivierter Team-Ebene möglich.',
+                403,
+            );
+        }
+
+        if (! $teamLayerEnabled && $teamId !== null) {
+            throw new InvitationDomainException(
+                'TEAM_LAYER_DISABLED',
+                'Teamzuordnung ist für dieses Unternehmen deaktiviert.',
+            );
+        }
 
         $this->teamValidator->assertManagerCanInvite($user, $role, $teamId);
 

@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Test Company',
                 'status' => 'active',
                 'anonymity_threshold' => 5,
+                'team_layer_enabled' => true,
             ],
         );
 

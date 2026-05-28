@@ -2,6 +2,8 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiClient } from '../../../../core/services/api-client.service';
+import { Role } from '../../../../core/models/auth.models';
+import { AuthStore } from '../../../../core/store/auth.store';
 import { NotificationService } from '../../../../shared/notifications/notification.service';
 
 @Component({
@@ -13,56 +15,80 @@ import { NotificationService } from '../../../../shared/notifications/notificati
       <div class="flex items-center justify-between gap-4">
         <div>
           <h1 class="text-2xl font-semibold text-gray-900" style="font-family: 'Fraunces', Georgia, serif">Umfragen</h1>
-          <p class="text-sm text-gray-500 mt-1">Entwürfe bearbeiten, Umfragen aktivieren und aggregierte Ergebnisse auswerten.</p>
+          <p class="text-sm text-gray-500 mt-1">Entwürfe bearbeiten, Umfragen aktivieren und aggregierte Ergebnisse
+            auswerten.</p>
         </div>
-        <button type="button" (click)="startCreate()" class="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700">
-          Umfrage hinzufügen
-        </button>
+        @if (!managerDisabledByTeamLayer()) {
+          <button type="button" (click)="startCreate()"
+                  class="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700">
+            Umfrage hinzufügen
+          </button>
+        }
       </div>
 
-      @if (showForm()) {
-        <form [formGroup]="surveyForm" (ngSubmit)="submit()" class="bg-white rounded-xl border border-gray-200 p-5 space-y-5">
+      @if (managerDisabledByTeamLayer()) {
+        <div class="rounded-xl border border-amber-100 bg-amber-50 p-5 text-amber-800">
+          <div class="font-semibold">Umfragen auf Team-Ebene nicht verfügbar</div>
+          <p class="text-sm mt-1">Manager können Umfragen nur bei aktivierter Team-Ebene erstellen oder bearbeiten.</p>
+        </div>
+      }
+
+      @if (showForm() && !managerDisabledByTeamLayer()) {
+        <form [formGroup]="surveyForm" (ngSubmit)="submit()"
+              class="bg-white rounded-xl border border-gray-200 p-5 space-y-5">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <h2 class="text-lg font-semibold text-gray-900">{{ editingSurveyId() ? 'Umfrage bearbeiten' : 'Neue Umfrage' }}</h2>
+              <h2
+                class="text-lg font-semibold text-gray-900">{{ editingSurveyId() ? 'Umfrage bearbeiten' : 'Neue Umfrage' }}</h2>
               <p class="text-sm text-gray-500">Umfragen koennen nur im Entwurfsstatus bearbeitet werden.</p>
             </div>
-            <button type="button" (click)="closeForm()" class="text-sm text-gray-500 hover:text-gray-700">Schließen</button>
+            <button type="button" (click)="closeForm()" class="text-sm text-gray-500 hover:text-gray-700">Schließen
+            </button>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label class="block">
               <span class="text-sm font-medium text-gray-700">Titel <span class="text-red-500">*</span></span>
-              <input formControlName="title" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500" [class.border-red-300]="invalid('title')" />
-              @if (invalid('title')) { <span class="text-xs text-red-600">Mindestens 3 Zeichen erforderlich.</span> }
+              <input formControlName="title"
+                     class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"
+                     [class.border-red-300]="invalid('title')"/>
+              @if (invalid('title')) {
+                <span class="text-xs text-red-600">Mindestens 3 Zeichen erforderlich.</span>
+              }
             </label>
-            <label class="block">
-              <span class="text-sm font-medium text-gray-700">Teams (Zielgruppe)</span>
-              <select formControlName="teamIds" multiple class="mt-1 h-24 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500">
-                @for (team of teams(); track team.id) {
-                  <option [ngValue]="team.id">{{ team.name }}</option>
-                }
-              </select>
-              <span class="text-xs text-gray-400">Leer bedeutet company-wide. Manager sehen bei company-wide Umfragen nur ihr Team.</span>
-            </label>
+            @if (teamLayerEnabled()) {
+              <label class="block">
+                <span class="text-sm font-medium text-gray-700">Teams (Zielgruppe)</span>
+                <select formControlName="teamIds" multiple
+                        class="mt-1 h-24 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500">
+                  @for (team of teams(); track team.id) {
+                    <option [ngValue]="team.id">{{ team.name }}</option>
+                  }
+                </select>
+                <span class="text-xs text-gray-400">Leer bedeutet company-wide. Manager sehen bei company-wide Umfragen nur ihr Team.</span>
+              </label>
+            }
           </div>
 
           <label class="block">
             <span class="text-sm font-medium text-gray-700">Beschreibung</span>
-            <textarea formControlName="description" rows="3" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"></textarea>
+            <textarea formControlName="description" rows="3"
+                      class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"></textarea>
           </label>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <label class="block">
               <span class="text-sm font-medium text-gray-700">Start</span>
-              <input type="datetime-local" formControlName="startsAt" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500" />
+              <input type="datetime-local" formControlName="startsAt"
+                     class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
             </label>
             <label class="block">
               <span class="text-sm font-medium text-gray-700">Ende</span>
-              <input type="datetime-local" formControlName="endsAt" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500" />
+              <input type="datetime-local" formControlName="endsAt"
+                     class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
             </label>
             <label class="flex items-center gap-2 pt-7 text-sm text-gray-700">
-              <input type="checkbox" formControlName="isAnonymous" class="rounded border-gray-300 text-teal-600" />
+              <input type="checkbox" formControlName="isAnonymous" class="rounded border-gray-300 text-teal-600"/>
               Anonym
             </label>
           </div>
@@ -70,7 +96,10 @@ import { NotificationService } from '../../../../shared/notifications/notificati
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <h2 class="text-sm font-semibold text-gray-900">Fragen <span class="text-red-500">*</span></h2>
-              <button type="button" (click)="addQuestion()" class="px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">Frage hinzufügen</button>
+              <button type="button" (click)="addQuestion()"
+                      class="px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Frage hinzufügen
+              </button>
             </div>
 
             <div formArrayName="questions" class="space-y-3">
@@ -79,13 +108,19 @@ import { NotificationService } from '../../../../shared/notifications/notificati
                   <div class="flex items-start justify-between gap-3">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
                       <label class="block">
-                        <span class="text-sm font-medium text-gray-700">Fragetext <span class="text-red-500">*</span></span>
-                        <input formControlName="text" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500" [class.border-red-300]="questionInvalid(i, 'text')" />
-                        @if (questionInvalid(i, 'text')) { <span class="text-xs text-red-600">Mindestens 3 Zeichen erforderlich.</span> }
+                        <span class="text-sm font-medium text-gray-700">Fragetext <span
+                          class="text-red-500">*</span></span>
+                        <input formControlName="text"
+                               class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"
+                               [class.border-red-300]="questionInvalid(i, 'text')"/>
+                        @if (questionInvalid(i, 'text')) {
+                          <span class="text-xs text-red-600">Mindestens 3 Zeichen erforderlich.</span>
+                        }
                       </label>
                       <label class="block">
                         <span class="text-sm font-medium text-gray-700">Typ <span class="text-red-500">*</span></span>
-                        <select formControlName="type" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500">
+                        <select formControlName="type"
+                                class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500">
                           <option value="SCALE">Skala</option>
                           <option value="MULTIPLE_CHOICE">Mehrfachauswahl</option>
                           <option value="TEXT">Text</option>
@@ -93,31 +128,38 @@ import { NotificationService } from '../../../../shared/notifications/notificati
                         </select>
                       </label>
                     </div>
-                    <button type="button" (click)="removeQuestion(i)" [disabled]="questions.length === 1" class="px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 disabled:text-gray-300 disabled:hover:bg-transparent">Entfernen</button>
+                    <button type="button" (click)="removeQuestion(i)" [disabled]="questions.length === 1"
+                            class="px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 disabled:text-gray-300 disabled:hover:bg-transparent">
+                      Entfernen
+                    </button>
                   </div>
 
                   @if (question.get('type')?.value === 'SCALE') {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <label class="block">
                         <span class="text-sm font-medium text-gray-700">Skala Minimum Label</span>
-                        <input formControlName="scaleMinLabel" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500" />
+                        <input formControlName="scaleMinLabel"
+                               class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
                       </label>
                       <label class="block">
                         <span class="text-sm font-medium text-gray-700">Skala Maximum Label</span>
-                        <input formControlName="scaleMaxLabel" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500" />
+                        <input formControlName="scaleMaxLabel"
+                               class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
                       </label>
                     </div>
                   }
 
                   @if (question.get('type')?.value === 'MULTIPLE_CHOICE') {
                     <label class="block">
-                      <span class="text-sm font-medium text-gray-700">Optionen <span class="text-red-500">*</span></span>
-                      <input formControlName="optionsText" placeholder="Option A, Option B, Option C" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500" />
+                      <span class="text-sm font-medium text-gray-700">Optionen <span
+                        class="text-red-500">*</span></span>
+                      <input formControlName="optionsText" placeholder="Option A, Option B, Option C"
+                             class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
                     </label>
                   }
 
                   <label class="flex items-center gap-2 text-sm text-gray-700">
-                    <input type="checkbox" formControlName="isRequired" class="rounded border-gray-300 text-teal-600" />
+                    <input type="checkbox" formControlName="isRequired" class="rounded border-gray-300 text-teal-600"/>
                     Pflichtfrage
                   </label>
                 </div>
@@ -126,7 +168,8 @@ import { NotificationService } from '../../../../shared/notifications/notificati
           </div>
 
           @if (formError()) {
-            <div class="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">{{ formError() }}</div>
+            <div class="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">{{ formError() }}
+            </div>
           }
 
           <div class="flex justify-between gap-3">
@@ -138,7 +181,8 @@ import { NotificationService } from '../../../../shared/notifications/notificati
             >
               {{ activating() ? 'Aktiviere…' : 'Umfrage aktivieren' }}
             </button>
-            <button type="submit" [disabled]="saving()" class="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 disabled:bg-gray-300">
+            <button type="submit" [disabled]="saving()"
+                    class="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 disabled:bg-gray-300">
               {{ saving() ? 'Speichern…' : 'Entwurf speichern' }}
             </button>
           </div>
@@ -152,7 +196,9 @@ import { NotificationService } from '../../../../shared/notifications/notificati
               <h2 class="text-lg font-semibold text-gray-900">{{ selectedResults()?.survey?.title }}</h2>
               <p class="text-sm text-gray-500">Aggregierte Ergebnisse ohne user-level Daten.</p>
             </div>
-            <button type="button" (click)="selectedResults.set(null)" class="text-sm text-gray-500 hover:text-gray-700">Schließen</button>
+            <button type="button" (click)="selectedResults.set(null)" class="text-sm text-gray-500 hover:text-gray-700">
+              Schließen
+            </button>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -162,11 +208,15 @@ import { NotificationService } from '../../../../shared/notifications/notificati
             </div>
             <div class="rounded-lg bg-stone-50 p-4">
               <div class="text-xs text-gray-400">Antworten</div>
-              <div class="text-2xl font-semibold text-gray-900">{{ selectedResults()?.participation?.responseCount ?? 0 }}</div>
+              <div
+                class="text-2xl font-semibold text-gray-900">{{ selectedResults()?.participation?.responseCount ?? 0 }}
+              </div>
             </div>
             <div class="rounded-lg bg-stone-50 p-4">
               <div class="text-xs text-gray-400">Zielgruppe</div>
-              <div class="text-2xl font-semibold text-gray-900">{{ selectedResults()?.participation?.eligibleCount ?? 0 }}</div>
+              <div
+                class="text-2xl font-semibold text-gray-900">{{ selectedResults()?.participation?.eligibleCount ?? 0 }}
+              </div>
             </div>
           </div>
 
@@ -233,11 +283,13 @@ import { NotificationService } from '../../../../shared/notifications/notificati
                     <div class="mt-4 grid grid-cols-2 gap-3">
                       <div class="rounded-lg bg-green-50 p-3 text-green-800">
                         <div class="text-xs">Ja</div>
-                        <div class="text-xl font-semibold">{{ question.trueCount }} · {{ question.truePercentage }}%</div>
+                        <div class="text-xl font-semibold">{{ question.trueCount }} · {{ question.truePercentage }}%
+                        </div>
                       </div>
                       <div class="rounded-lg bg-red-50 p-3 text-red-800">
                         <div class="text-xs">Nein</div>
-                        <div class="text-xl font-semibold">{{ question.falseCount }} · {{ question.falsePercentage }}%</div>
+                        <div class="text-xl font-semibold">{{ question.falseCount }} · {{ question.falsePercentage }}%
+                        </div>
                       </div>
                     </div>
                   }
@@ -267,9 +319,11 @@ import { NotificationService } from '../../../../shared/notifications/notificati
                   }
                 } @else {
                   @if (question.isSuppressed) {
-                    <p class="mt-4 text-sm text-gray-500">Zu wenige Antworten für eine anonyme Auswertung dieser Frage.</p>
+                    <p class="mt-4 text-sm text-gray-500">Zu wenige Antworten für eine anonyme Auswertung dieser
+                      Frage.</p>
                   } @else {
-                    <p class="mt-4 text-sm text-gray-500">Freitextantworten werden zum Schutz der Anonymität nicht einzeln angezeigt.</p>
+                    <p class="mt-4 text-sm text-gray-500">Freitextantworten werden zum Schutz der Anonymität nicht
+                      einzeln angezeigt.</p>
                   }
                 }
               </article>
@@ -283,44 +337,53 @@ import { NotificationService } from '../../../../shared/notifications/notificati
           <div class="font-semibold">Ergebnisse noch nicht sichtbar</div>
           <p class="text-sm mt-1">{{ resultsError()?.message }}</p>
           @if (resultsError()?.current !== undefined) {
-            <p class="text-sm mt-2">Aktuell: {{ resultsError()?.current }} / erforderlich: {{ resultsError()?.minRequired }}</p>
+            <p class="text-sm mt-2">Aktuell: {{ resultsError()?.current }} /
+              erforderlich: {{ resultsError()?.minRequired }}</p>
           }
         </div>
       }
 
-      @if (loading()) {
-        <div class="flex justify-center py-12"><div class="w-8 h-8 border-4 border-teal-500/30 border-t-teal-500 rounded-full animate-spin"></div></div>
-      } @else if (surveys().length === 0) {
-        <div class="bg-white rounded-xl border border-gray-200 p-12 text-center"><p class="text-gray-500 text-sm">Noch keine Umfragen vorhanden.</p></div>
-      } @else {
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          @for (survey of surveys(); track survey.id) {
-            <button type="button" (click)="openSurvey(survey)" class="text-left bg-white rounded-xl border border-gray-200 p-5 hover:border-teal-200 hover:shadow-sm transition">
-              <div class="flex items-start justify-between gap-4">
-                <div>
-                  <h2 class="font-semibold text-gray-900">{{ survey.title }}</h2>
-                  <p class="text-sm text-gray-500 mt-1">{{ survey.description || 'Keine Beschreibung' }}</p>
+      @if (!managerDisabledByTeamLayer()) {
+        @if (loading()) {
+          <div class="flex justify-center py-12">
+            <div class="w-8 h-8 border-4 border-teal-500/30 border-t-teal-500 rounded-full animate-spin"></div>
+          </div>
+        } @else if (surveys().length === 0) {
+          <div class="bg-white rounded-xl border border-gray-200 p-12 text-center"><p class="text-gray-500 text-sm">Noch
+            keine Umfragen vorhanden.</p></div>
+        } @else {
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            @for (survey of surveys(); track survey.id) {
+              <button type="button" (click)="openSurvey(survey)"
+                      class="text-left bg-white rounded-xl border border-gray-200 p-5 hover:border-teal-200 hover:shadow-sm transition">
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 class="font-semibold text-gray-900">{{ survey.title }}</h2>
+                    <p class="text-sm text-gray-500 mt-1">{{ survey.description || 'Keine Beschreibung' }}</p>
+                  </div>
+                  <span class="px-2 py-0.5 rounded-full text-xs"
+                        [class]="statusClass(survey.status)">{{ survey.status }}</span>
                 </div>
-                <span class="px-2 py-0.5 rounded-full text-xs" [class]="statusClass(survey.status)">{{ survey.status }}</span>
-              </div>
-              <div class="flex gap-3 mt-4 text-xs text-gray-500">
-                <span>{{ survey.questionsCount ?? 0 }} Fragen</span>
-                <span>{{ survey.responsesCount ?? 0 }} Antworten</span>
-                @if (survey.status === 'DRAFT' && survey.canEdit) {
-                  <span class="text-teal-700 font-medium">Bearbeiten</span>
-                } @else if (survey.status === 'ACTIVE') {
-                  <span class="text-teal-700 font-medium">Ergebnisse ansehen</span>
-                }
-              </div>
-            </button>
-          }
-        </div>
+                <div class="flex gap-3 mt-4 text-xs text-gray-500">
+                  <span>{{ survey.questionsCount ?? 0 }} Fragen</span>
+                  <span>{{ survey.responsesCount ?? 0 }} Antworten</span>
+                  @if (survey.status === 'DRAFT' && survey.canEdit) {
+                    <span class="text-teal-700 font-medium">Bearbeiten</span>
+                  } @else if (survey.status === 'ACTIVE') {
+                    <span class="text-teal-700 font-medium">Ergebnisse ansehen</span>
+                  }
+                </div>
+              </button>
+            }
+          </div>
+        }
       }
     </div>
   `
 })
 export class CompanySurveysComponent implements OnInit {
   private api = inject(ApiClient);
+  private authStore = inject(AuthStore);
   private fb = inject(FormBuilder);
   private notifications = inject(NotificationService);
 
@@ -350,13 +413,25 @@ export class CompanySurveysComponent implements OnInit {
   }
 
   ngOnInit() {
+    if (this.managerDisabledByTeamLayer()) {
+      this.loading.set(false);
+      return;
+    }
+
     this.loadSurveys();
-    this.api.get<{ data: any[] }>('/company/teams').subscribe({
-      next: res => this.teams.set(res.data ?? []),
-    });
+    if (this.teamLayerEnabled()) {
+      this.api.get<{ data: any[] }>('/company/teams').subscribe({
+        next: res => this.teams.set(res.data ?? []),
+      });
+    }
   }
 
   startCreate() {
+    if (this.managerDisabledByTeamLayer()) {
+      this.notifications.error('Manager können Umfragen nur bei aktivierter Team-Ebene erstellen.');
+      return;
+    }
+
     this.editingSurveyId.set(null);
     this.resetForm();
     this.selectedResults.set(null);
@@ -376,6 +451,11 @@ export class CompanySurveysComponent implements OnInit {
     this.resultsError.set(null);
 
     if (survey.status === 'DRAFT' && survey.canEdit) {
+      if (this.managerDisabledByTeamLayer()) {
+        this.notifications.error('Manager können Umfragen nur bei aktivierter Team-Ebene bearbeiten.');
+        return;
+      }
+
       this.loadForEdit(survey.id);
       return;
     }
@@ -386,6 +466,10 @@ export class CompanySurveysComponent implements OnInit {
   }
 
   loadForEdit(id: number) {
+    if (this.managerDisabledByTeamLayer()) {
+      return;
+    }
+
     this.api.get<{ data: any }>(`/company/surveys/${id}`).subscribe({
       next: res => {
         const survey = res.data;
@@ -434,6 +518,11 @@ export class CompanySurveysComponent implements OnInit {
 
   submit() {
     this.formError.set(null);
+    if (this.managerDisabledByTeamLayer()) {
+      this.formError.set('Manager können Umfragen nur bei aktivierter Team-Ebene speichern.');
+      return;
+    }
+
     if (this.surveyForm.invalid) {
       this.surveyForm.markAllAsTouched();
       return;
@@ -466,7 +555,7 @@ export class CompanySurveysComponent implements OnInit {
 
   activate() {
     const id = this.editingSurveyId();
-    if (!id) return;
+    if (!id || this.managerDisabledByTeamLayer()) return;
 
     this.activating.set(true);
     this.api.post<{ data: any }>(`/company/surveys/${id}/activate`, {}).subscribe({
@@ -487,6 +576,19 @@ export class CompanySurveysComponent implements OnInit {
     if (status === 'DRAFT') return 'bg-yellow-50 text-yellow-700';
     if (status === 'ACTIVE') return 'bg-green-50 text-green-700';
     return 'bg-gray-100 text-gray-600';
+  }
+
+  teamLayerEnabled() {
+    return this.authStore.teamLayerEnabled();
+  }
+
+  managerDisabledByTeamLayer() {
+    return this.isManagerOnly() && !this.teamLayerEnabled();
+  }
+
+  private isManagerOnly() {
+    const roles = this.authStore.roles();
+    return roles.includes(Role.COMPANY_MANAGER) && !roles.some(role => [Role.COMPANY_ADMIN, Role.COMPANY_OWNER].includes(role as Role));
   }
 
   private payload() {
@@ -516,7 +618,10 @@ export class CompanySurveysComponent implements OnInit {
       return null;
     }
 
-    return { ...this.surveyForm.value, questions };
+    const { teamIds, ...payload } = this.surveyForm.value;
+    return this.teamLayerEnabled()
+      ? { ...payload, teamIds: teamIds ?? [], questions }
+      : { ...payload, questions };
   }
 
   private createQuestion(value: any = {}) {
@@ -544,7 +649,7 @@ export class CompanySurveysComponent implements OnInit {
       startsAt: this.toDateTimeLocal(survey.startsAt),
       endsAt: this.toDateTimeLocal(survey.endsAt),
       isAnonymous: survey.isAnonymous,
-      teamIds: survey.teamIds ?? [],
+      teamIds: this.teamLayerEnabled() ? (survey.teamIds ?? []) : [],
     });
   }
 

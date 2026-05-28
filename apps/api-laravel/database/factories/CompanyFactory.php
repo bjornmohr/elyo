@@ -16,6 +16,7 @@ class CompanyFactory extends Factory
             'slug' => $this->faker->unique()->slug(),
             'status' => 'active',
             'anonymity_threshold' => 5,
+            'team_layer_enabled' => false,
         ];
     }
 }

@@ -30,6 +30,7 @@ class UserFactory extends Factory
                     'name' => 'ELYO Platform',
                     'status' => 'active',
                     'anonymity_threshold' => 5,
+                    'team_layer_enabled' => false,
                 ],
             )->id,
         ]);
