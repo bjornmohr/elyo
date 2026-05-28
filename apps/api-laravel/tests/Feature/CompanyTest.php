@@ -12,6 +12,7 @@ use App\Models\SurveyQuestion;
 use App\Models\SurveyResponse;
 use App\Models\Team;
 use App\Models\User;
+use App\Models\UserRole;
 use App\Models\WellbeingEntry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -838,7 +839,31 @@ class CompanyTest extends TestCase
         $this->actingAs($this->manager)
             ->getJson('/api/company/dashboard')
             ->assertStatus(403)
-            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+            ->assertJsonPath('error.code', 'PORTAL_FORBIDDEN');
+    }
+
+    public function test_manager_only_user_without_team_layer_cannot_access_company_dashboard(): void
+    {
+        $this->company->update(['team_layer_enabled' => false]);
+
+        $this->actingAs($this->manager)
+            ->getJson('/api/company/dashboard')
+            ->assertStatus(403)
+            ->assertJsonPath('error.code', 'PORTAL_FORBIDDEN');
+
+        $this->actingAs($this->admin)
+            ->getJson('/api/company/dashboard')
+            ->assertOk();
+    }
+
+    public function test_manager_employee_user_without_team_layer_can_still_access_employee_dashboard(): void
+    {
+        $this->company->update(['team_layer_enabled' => false]);
+        UserRole::create(['user_id' => $this->manager->id, 'role' => Role::EMPLOYEE]);
+
+        $this->actingAs($this->manager)
+            ->getJson('/api/employee/dashboard')
+            ->assertOk();
     }
 
     public function test_survey_team_targeting_is_rejected_when_team_layer_disabled(): void

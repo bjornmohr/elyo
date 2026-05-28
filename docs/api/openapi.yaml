@@ -59,6 +59,19 @@ components:
                   code: { type: string, enum: [TEAM_LAYER_DISABLED] }
                   message: { type: string }
 
+    PortalForbidden:
+      description: User is not eligible for the requested portal
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  code: { type: string, enum: [PORTAL_FORBIDDEN] }
+                  message: { type: string }
+
   schemas:
     Error:
       type: object
@@ -652,7 +665,7 @@ paths:
     get:
       tags: [Company]
       summary: Get company dashboard data
-      description: Company-level dashboard remains available when the team layer is disabled. Team-level aggregates are omitted in that state, and manager-only team-scoped dashboard workflows return TEAM_LAYER_DISABLED.
+      description: Company-level dashboard remains available to company admins and owners when the team layer is disabled. Team-level aggregates are omitted in that state. Manager-only users are not company-portal eligible while the team layer is disabled and receive PORTAL_FORBIDDEN.
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -715,7 +728,7 @@ paths:
                               nullable: true
                               enum: [ANONYMITY_THRESHOLD_NOT_MET]
         403:
-          $ref: '#/components/responses/TeamLayerDisabled'
+          $ref: '#/components/responses/PortalForbidden'
 
   /company/invitations:
     get:
@@ -789,7 +802,7 @@ paths:
                       expires_at: { type: string, format: date-time }
                       invite_token: { type: string }
         403:
-          description: Forbidden for manager role invites, unmanaged team access, or disabled team-layer manager workflows
+          description: Forbidden for manager role invites, unmanaged team access, or users without company portal access
         422:
           description: Validation error for invalid teamId, disabled team-layer teamId payloads, or company email conflict
 
@@ -1177,7 +1190,7 @@ paths:
     get:
       tags: [Company]
       summary: List company measures
-      description: Company admins receive only company-wide measures when the team layer is disabled. Manager-only team-scoped measure workflows return TEAM_LAYER_DISABLED.
+      description: Company admins receive only company-wide measures when the team layer is disabled. Manager-only users are not company-portal eligible while the team layer is disabled.
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -1187,7 +1200,7 @@ paths:
     post:
       tags: [Company]
       summary: Create/Activate a measure
-      description: Company-wide measures remain available when the team layer is disabled. teamId payloads and manager-only team-scoped workflows return TEAM_LAYER_DISABLED.
+      description: Company-wide measures remain available when the team layer is disabled. teamId payloads return TEAM_LAYER_DISABLED; manager-only users without the team layer receive PORTAL_FORBIDDEN at the company portal guard.
       security: [{ Sanctum: [] }]
       responses:
         201:
@@ -1218,7 +1231,7 @@ paths:
     get:
       tags: [Company]
       summary: Get aggregated report trend
-      description: Company-level trend reports remain available when the team layer is disabled. teamId filters and manager-only team-scoped reporting return TEAM_LAYER_DISABLED.
+      description: Company-level trend reports remain available when the team layer is disabled. teamId filters return TEAM_LAYER_DISABLED; manager-only users without the team layer receive PORTAL_FORBIDDEN at the company portal guard.
       security: [{ Sanctum: [] }]
       parameters:
         - name: limit

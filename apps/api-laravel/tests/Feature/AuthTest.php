@@ -121,6 +121,87 @@ class AuthTest extends TestCase
             ->assertJsonPath('error.code', 'PORTAL_FORBIDDEN');
     }
 
+    public function test_manager_only_user_without_team_layer_does_not_get_company_portal(): void
+    {
+        $company = Company::factory()->create(['team_layer_enabled' => false]);
+        $user = $this->createUserWithRole(Role::COMPANY_MANAGER, $company->id);
+
+        $loginResponse = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $loginResponse->assertOk()
+            ->assertJsonPath('activePortal', null)
+            ->assertJsonPath('allowedPortals', []);
+
+        $meResponse = $this->actingAs($user, 'sanctum')->getJson('/api/auth/me');
+
+        $meResponse->assertOk()
+            ->assertJsonPath('allowedPortals', []);
+    }
+
+    public function test_manager_employee_user_without_team_layer_falls_back_to_employee_portal(): void
+    {
+        $company = Company::factory()->create(['team_layer_enabled' => false]);
+        $user = $this->createUserWithRole(Role::COMPANY_MANAGER, $company->id);
+        UserRole::create(['user_id' => $user->id, 'role' => Role::EMPLOYEE]);
+
+        $response = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('activePortal', 'employee')
+            ->assertJsonPath('allowedPortals', ['employee']);
+    }
+
+    public function test_manager_only_user_with_team_layer_gets_company_portal(): void
+    {
+        $company = Company::factory()->create(['team_layer_enabled' => true]);
+        $user = $this->createUserWithRole(Role::COMPANY_MANAGER, $company->id);
+
+        $response = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('activePortal', 'company')
+            ->assertJsonPath('allowedPortals', ['company']);
+    }
+
+    public function test_company_admin_without_team_layer_keeps_company_portal(): void
+    {
+        $company = Company::factory()->create(['team_layer_enabled' => false]);
+        $user = $this->createUserWithRole(Role::COMPANY_ADMIN, $company->id);
+
+        $response = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('activePortal', 'company')
+            ->assertJsonPath('allowedPortals', ['company']);
+    }
+
+    public function test_manager_only_user_without_team_layer_cannot_request_company_portal(): void
+    {
+        $company = Company::factory()->create(['team_layer_enabled' => false]);
+        $user = $this->createUserWithRole(Role::COMPANY_MANAGER, $company->id);
+
+        $response = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password',
+            'requested_portal' => 'company',
+        ]);
+
+        $response->assertStatus(403)
+            ->assertJsonPath('error.code', 'PORTAL_FORBIDDEN');
+    }
+
     // --- Me ---
 
     public function test_authenticated_user_can_get_me_info()
@@ -447,7 +528,7 @@ class AuthTest extends TestCase
         ]);
 
         $response->assertStatus(403)
-            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+            ->assertJsonPath('error.code', 'PORTAL_FORBIDDEN');
         $this->assertDatabaseMissing('invite_tokens', ['email' => 'manager-disabled@test.com']);
     }
 
