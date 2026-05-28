@@ -11,6 +11,7 @@ use App\Http\Resources\Company\SurveyResource;
 use App\Http\Resources\Company\SurveyResultsResource;
 use App\Models\Survey;
 use App\Services\AnonymityService;
+use App\Services\Company\TeamLayerGuard;
 use App\Services\SurveyResultsAggregationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -18,7 +19,10 @@ use Illuminate\Support\Facades\DB;
 
 class CompanySurveyController extends Controller
 {
-    public function __construct(private readonly SurveyResultsAggregationService $surveyResultsAggregationService)
+    public function __construct(
+        private readonly SurveyResultsAggregationService $surveyResultsAggregationService,
+        private readonly TeamLayerGuard $teamLayerGuard,
+    )
     {
     }
 
@@ -26,8 +30,11 @@ class CompanySurveyController extends Controller
     {
         $user = $request->user();
         // Route middleware already restricts to company roles
+        $teamLayerEnabled = $this->teamLayerGuard->enabledFor($user);
+        $this->teamLayerGuard->abortManagerWorkflowIfDisabled($user);
 
         $surveys = Survey::where('company_id', $user->company_id)
+            ->when(! $teamLayerEnabled, fn (Builder $query) => $query->whereDoesntHave('teams'))
             ->when($this->isManagerOnly($user), function (Builder $query) use ($user) {
                 $managedTeamIds = $this->managedTeamIds($user);
 
@@ -47,6 +54,9 @@ class CompanySurveyController extends Controller
 
     public function store(CreateSurveyRequest $request)
     {
+        $this->abortDisabledTeamTargeting($request->user(), $request->input('teamIds', []));
+        $this->teamLayerGuard->abortManagerWorkflowIfDisabled($request->user());
+
         return DB::transaction(function () use ($request) {
             $survey = Survey::create([
                 'title' => $request->title,
@@ -85,6 +95,7 @@ class CompanySurveyController extends Controller
             ->withCount(['responses', 'questions'])
             ->firstOrFail();
 
+        $this->abortDisabledTeamScopedSurvey($request->user(), $survey);
         abort_unless($this->canAccessSurvey($request->user(), $survey), 403);
 
         return new SurveyResource($survey);
@@ -97,6 +108,8 @@ class CompanySurveyController extends Controller
             ->with(['teams:id', 'questions'])
             ->firstOrFail();
 
+        $this->abortDisabledTeamScopedSurvey($request->user(), $survey);
+        $this->abortDisabledTeamTargeting($request->user(), $request->input('teamIds', []), $request->has('teamIds'));
         abort_unless($this->canEditSurvey($request->user(), $survey), 403);
 
         $survey->update([
@@ -137,6 +150,7 @@ class CompanySurveyController extends Controller
             ->withCount('questions')
             ->firstOrFail();
 
+        $this->abortDisabledTeamScopedSurvey($request->user(), $survey);
         abort_unless($this->canEditSurvey($request->user(), $survey), 403);
 
         if ($survey->questions_count < 1) {
@@ -155,6 +169,7 @@ class CompanySurveyController extends Controller
             ->with('teams:id')
             ->firstOrFail();
 
+        $this->abortDisabledTeamScopedSurvey($request->user(), $survey);
         abort_unless($this->canEditSurvey($request->user(), $survey), 403);
 
         $survey->delete();
@@ -173,6 +188,7 @@ class CompanySurveyController extends Controller
             ->with(['questions' => fn ($q) => $q->orderBy('order', 'asc')])
             ->firstOrFail();
 
+        $this->abortDisabledTeamScopedSurvey($user, $survey);
         abort_unless($this->canAccessSurvey($user, $survey), 403);
 
         if ($survey->status !== SurveyStatus::ACTIVE) {
@@ -273,6 +289,28 @@ class CompanySurveyController extends Controller
         abort_if(empty($scopeTeamIds), 403);
 
         return $scopeTeamIds;
+    }
+
+    private function abortDisabledTeamTargeting($user, mixed $teamIds, bool $fieldPresent = true): void
+    {
+        if (! $fieldPresent || $this->teamLayerGuard->enabledFor($user)) {
+            return;
+        }
+
+        if (! empty($teamIds)) {
+            $this->teamLayerGuard->abortIfDisabled($user, 422);
+        }
+    }
+
+    private function abortDisabledTeamScopedSurvey($user, Survey $survey): void
+    {
+        if ($this->teamLayerGuard->enabledFor($user)) {
+            return;
+        }
+
+        if ($this->isManagerOnly($user) || $survey->teams->isNotEmpty()) {
+            $this->teamLayerGuard->abortIfDisabled($user);
+        }
     }
 
 }

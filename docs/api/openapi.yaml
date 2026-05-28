@@ -45,6 +45,20 @@ components:
       in: header
       name: x-cron-secret
 
+  responses:
+    TeamLayerDisabled:
+      description: Team layer is disabled for this company
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  code: { type: string, enum: [TEAM_LAYER_DISABLED] }
+                  message: { type: string }
+
   schemas:
     Error:
       type: object
@@ -483,6 +497,7 @@ paths:
     get:
       tags: [Employee]
       summary: List available surveys
+      description: When the company team layer is disabled, only company-wide surveys are returned; team-targeted surveys are filtered out.
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -508,6 +523,7 @@ paths:
     get:
       tags: [Employee]
       summary: Get survey details
+      description: Team-targeted surveys are not available to employees when the company team layer is disabled and return 404.
       security: [{ Sanctum: [] }]
       parameters:
         - name: surveyId
@@ -550,6 +566,7 @@ paths:
     post:
       tags: [Employee]
       summary: Submit survey responses
+      description: Team-targeted surveys are not answerable by employees when the company team layer is disabled and return 404.
       security: [{ Sanctum: [] }]
       parameters:
         - name: surveyId
@@ -582,6 +599,8 @@ paths:
                 type: object
                 properties:
                   ok: { type: boolean }
+        404:
+          description: Survey not found, not active, or unavailable because the company team layer is disabled
 
   /partner/login:
     post:
@@ -624,6 +643,7 @@ paths:
     get:
       tags: [Company]
       summary: Get company dashboard data
+      description: Company-level dashboard remains available when the team layer is disabled. Team-level aggregates are omitted in that state, and manager-only team-scoped dashboard workflows return TEAM_LAYER_DISABLED.
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -685,6 +705,8 @@ paths:
                               type: string
                               nullable: true
                               enum: [ANONYMITY_THRESHOLD_NOT_MET]
+        403:
+          $ref: '#/components/responses/TeamLayerDisabled'
 
   /company/invitations:
     get:
@@ -790,6 +812,7 @@ paths:
     get:
       tags: [Company]
       summary: List company teams
+      description: Returns empty Array when the authenticated user's company has team_layer_enabled=false.
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -813,6 +836,7 @@ paths:
     post:
       tags: [Company]
       summary: Create a new team
+      description: Rejected with TEAM_LAYER_DISABLED when the authenticated user's company has team_layer_enabled=false.
       security: [{ Sanctum: [] }]
       requestBody:
         required: true
@@ -834,11 +858,14 @@ paths:
                 type: object
                 properties:
                   data: { type: object, properties: { id: { type: string }, name: { type: string } } }
+        403:
+          $ref: '#/components/responses/TeamLayerDisabled'
 
   /company/teams/{id}:
     get:
       tags: [Company]
       summary: Get team details
+      description: Rejected with TEAM_LAYER_DISABLED when the authenticated user's company has team_layer_enabled=false.
       security: [{ Sanctum: [] }]
       parameters:
         - name: id
@@ -848,9 +875,12 @@ paths:
       responses:
         200:
           description: Team details
+        403:
+          $ref: '#/components/responses/TeamLayerDisabled'
     put:
       tags: [Company]
       summary: Update team
+      description: Rejected with TEAM_LAYER_DISABLED when the authenticated user's company has team_layer_enabled=false.
       security: [{ Sanctum: [] }]
       parameters:
         - name: id
@@ -870,9 +900,12 @@ paths:
       responses:
         200:
           description: Updated
+        403:
+          $ref: '#/components/responses/TeamLayerDisabled'
     delete:
       tags: [Company]
       summary: Delete team
+      description: Rejected with TEAM_LAYER_DISABLED when the authenticated user's company has team_layer_enabled=false.
       security: [{ Sanctum: [] }]
       parameters:
         - name: id
@@ -882,11 +915,14 @@ paths:
       responses:
         200:
           description: OK
+        403:
+          $ref: '#/components/responses/TeamLayerDisabled'
 
   /company/teams/{teamId}/members:
     get:
       tags: [Company]
       summary: List team members
+      description: Rejected with TEAM_LAYER_DISABLED when the authenticated user's company has team_layer_enabled=false.
       security: [{ Sanctum: [] }]
       parameters:
         - name: teamId
@@ -914,7 +950,7 @@ paths:
                           type: array
                           items: { type: string }
         403:
-          description: Forbidden for managers accessing unmanaged teams
+          $ref: '#/components/responses/TeamLayerDisabled'
 
   /company/surveys:
     get:
@@ -927,6 +963,7 @@ paths:
     post:
       tags: [Company]
       summary: Create a new survey
+      description: Company-wide surveys remain available when the team layer is disabled. Non-empty teamIds are rejected with TEAM_LAYER_DISABLED.
       security: [{ Sanctum: [] }]
       requestBody:
         required: true
@@ -938,6 +975,10 @@ paths:
               properties:
                 title: { type: string }
                 description: { type: string }
+                teamIds:
+                  type: array
+                  nullable: true
+                  items: { type: integer }
                 questions:
                   type: array
                   items:
@@ -954,11 +995,14 @@ paths:
       responses:
         201:
           description: Created
+        422:
+          $ref: '#/components/responses/TeamLayerDisabled'
 
   /company/surveys/{id}:
     patch:
       tags: [Company]
       summary: Update survey status or info
+      description: Non-empty teamIds are rejected with TEAM_LAYER_DISABLED when the company team layer is disabled.
       security: [{ Sanctum: [] }]
       parameters:
         - name: id
@@ -968,6 +1012,8 @@ paths:
       responses:
         200:
           description: Updated
+        422:
+          $ref: '#/components/responses/TeamLayerDisabled'
     delete:
       tags: [Company]
       summary: Delete survey
@@ -985,6 +1031,7 @@ paths:
     get:
       tags: [Company]
       summary: Get aggregated survey results
+      description: Team-scoped survey results are rejected with TEAM_LAYER_DISABLED when the company team layer is disabled. Company-wide survey results remain available.
       security: [{ Sanctum: [] }]
       parameters:
         - name: id
@@ -1099,7 +1146,7 @@ paths:
                                   count: { type: integer }
                                   percentage: { type: number }
         403:
-          description: Threshold not met
+          description: Threshold not met, or TEAM_LAYER_DISABLED for team-scoped results when the company team layer is disabled
           content:
             application/json:
               schema:
@@ -1116,22 +1163,31 @@ paths:
     get:
       tags: [Company]
       summary: List company measures
+      description: Company admins receive only company-wide measures when the team layer is disabled. Manager-only team-scoped measure workflows return TEAM_LAYER_DISABLED.
       security: [{ Sanctum: [] }]
       responses:
         200:
           description: List of measures
+        403:
+          $ref: '#/components/responses/TeamLayerDisabled'
     post:
       tags: [Company]
       summary: Create/Activate a measure
+      description: Company-wide measures remain available when the team layer is disabled. teamId payloads and manager-only team-scoped workflows return TEAM_LAYER_DISABLED.
       security: [{ Sanctum: [] }]
       responses:
         201:
           description: Created
+        403:
+          $ref: '#/components/responses/TeamLayerDisabled'
+        422:
+          $ref: '#/components/responses/TeamLayerDisabled'
 
   /company/measures/{id}:
     patch:
       tags: [Company]
       summary: Update measure status
+      description: Team-scoped measures are rejected with TEAM_LAYER_DISABLED when the company team layer is disabled.
       security: [{ Sanctum: [] }]
       parameters:
         - name: id
@@ -1141,11 +1197,14 @@ paths:
       responses:
         200:
           description: Updated
+        403:
+          $ref: '#/components/responses/TeamLayerDisabled'
 
   /company/reports:
     get:
       tags: [Company]
       summary: Get aggregated report trend
+      description: Company-level trend reports remain available when the team layer is disabled. teamId filters and manager-only team-scoped reporting return TEAM_LAYER_DISABLED.
       security: [{ Sanctum: [] }]
       parameters:
         - name: limit
@@ -1172,6 +1231,8 @@ paths:
                         avgMood: { type: number }
                         avgStress: { type: number }
                         avgEnergy: { type: number }
+        403:
+          $ref: '#/components/responses/TeamLayerDisabled'
 
   /admin/companies:
     get:

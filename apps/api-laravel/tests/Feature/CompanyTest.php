@@ -32,7 +32,10 @@ class CompanyTest extends TestCase
     {
         parent::setUp();
 
-        $this->company = Company::factory()->create(['anonymity_threshold' => 3]);
+        $this->company = Company::factory()->create([
+            'anonymity_threshold' => 3,
+            'team_layer_enabled' => true,
+        ]);
         $this->admin = User::factory()->create([
             'company_id' => $this->company->id,
             'role' => Role::COMPANY_ADMIN,
@@ -738,6 +741,234 @@ class CompanyTest extends TestCase
         $response->assertStatus(201);
         $response->assertJsonPath('data.title', 'Quarterly pulse');
         $response->assertJsonPath('data.questionsCount', 1);
+    }
+
+    public function test_team_list_returns_empty_collection_when_team_layer_is_disabled(): void
+    {
+        $this->company->update(['team_layer_enabled' => false]);
+
+        Team::factory()->create([
+            'company_id' => $this->company->id,
+            'name' => 'Hidden Team',
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->getJson('/api/company/teams');
+
+        $response->assertOk()
+            ->assertJsonPath('data', [])
+            ->assertJsonMissing(['name' => 'Hidden Team']);
+    }
+
+    public function test_team_management_endpoints_are_rejected_when_team_layer_is_disabled(): void
+    {
+        $this->company->update(['team_layer_enabled' => false]);
+
+        $this->actingAs($this->admin)
+            ->postJson('/api/company/teams', [
+                'name' => 'Blocked Team',
+                'description' => 'Should not be created.',
+            ])
+            ->assertStatus(403)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+
+        $this->actingAs($this->admin)
+            ->putJson("/api/company/teams/{$this->team->id}", [
+                'name' => 'Blocked Rename',
+                'description' => 'Should not be updated.',
+            ])
+            ->assertStatus(403)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+
+        $this->actingAs($this->admin)
+            ->getJson("/api/company/teams/{$this->team->id}")
+            ->assertStatus(403)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+
+        $this->actingAs($this->admin)
+            ->deleteJson("/api/company/teams/{$this->team->id}")
+            ->assertStatus(403)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+
+        $this->actingAs($this->admin)
+            ->getJson("/api/company/teams/{$this->team->id}/members")
+            ->assertStatus(403)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+    }
+
+    public function test_company_dashboard_still_works_without_team_metadata_when_team_layer_disabled(): void
+    {
+        $this->company->update(['team_layer_enabled' => false]);
+
+        $employees = User::factory()->count(3)->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'role' => Role::EMPLOYEE,
+        ]);
+
+        foreach ($employees as $employee) {
+            WellbeingEntry::factory()->create([
+                'user_id' => $employee->id,
+                'company_id' => $this->company->id,
+                'score' => 7.0,
+            ]);
+        }
+
+        $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('company.isAboveThreshold', true);
+        $response->assertJsonPath('company.responseCount', 3);
+        $response->assertJsonCount(0, 'teams');
+    }
+
+    public function test_team_scoped_reporting_is_rejected_when_team_layer_disabled(): void
+    {
+        $this->company->update(['team_layer_enabled' => false]);
+
+        $this->actingAs($this->admin)
+            ->getJson("/api/company/reports?teamId={$this->team->id}")
+            ->assertStatus(403)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+
+        $this->actingAs($this->admin)
+            ->getJson('/api/company/reports')
+            ->assertStatus(200);
+
+        $this->actingAs($this->manager)
+            ->getJson('/api/company/dashboard')
+            ->assertStatus(403)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+    }
+
+    public function test_survey_team_targeting_is_rejected_when_team_layer_disabled(): void
+    {
+        $this->company->update(['team_layer_enabled' => false]);
+
+        $payload = [
+            'title' => 'Team pulse',
+            'description' => 'Quarterly employee survey.',
+            'teamIds' => [$this->team->id],
+            'questions' => [
+                [
+                    'text' => 'How balanced is your workload?',
+                    'type' => 'SCALE',
+                    'order' => 0,
+                ],
+            ],
+        ];
+
+        $this->actingAs($this->admin)
+            ->postJson('/api/company/surveys', $payload)
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+
+        $survey = Survey::factory()->create([
+            'company_id' => $this->company->id,
+            'created_by' => $this->admin->id,
+            'status' => 'DRAFT',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/surveys/{$survey->id}", ['teamIds' => [$this->team->id]])
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+
+        $this->actingAs($this->admin)
+            ->postJson('/api/company/surveys', array_merge($payload, ['teamIds' => []]))
+            ->assertStatus(201)
+            ->assertJsonPath('data.teamIds', []);
+    }
+
+    public function test_company_wide_survey_results_still_work_when_team_layer_disabled(): void
+    {
+        $this->company->update(['team_layer_enabled' => false]);
+        $survey = Survey::factory()->create([
+            'company_id' => $this->company->id,
+            'created_by' => $this->admin->id,
+            'status' => 'ACTIVE',
+        ]);
+        $question = SurveyQuestion::factory()->create([
+            'survey_id' => $survey->id,
+            'type' => QuestionType::SCALE,
+        ]);
+        $employees = User::factory()->count(3)->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'role' => Role::EMPLOYEE,
+        ]);
+
+        foreach ($employees as $employee) {
+            $this->createSurveyAnswer($survey, $question, $employee, ['scale_value' => 4]);
+        }
+
+        $response = $this->actingAs($this->admin)->getJson("/api/company/surveys/{$survey->id}/results");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.scope.type', 'company');
+        $response->assertJsonPath('data.scope.teamIds', null);
+        $response->assertJsonPath('data.participation.responseCount', 3);
+    }
+
+    public function test_team_scoped_survey_results_are_rejected_when_team_layer_disabled(): void
+    {
+        $this->company->update(['team_layer_enabled' => false]);
+        $survey = Survey::factory()->create([
+            'company_id' => $this->company->id,
+            'created_by' => $this->admin->id,
+            'status' => 'ACTIVE',
+        ]);
+        $survey->teams()->sync([$this->team->id]);
+
+        $this->actingAs($this->admin)
+            ->getJson("/api/company/surveys/{$survey->id}/results")
+            ->assertStatus(403)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+    }
+
+    public function test_measure_team_targeting_is_rejected_when_team_layer_disabled(): void
+    {
+        $this->company->update(['team_layer_enabled' => false]);
+
+        $this->actingAs($this->admin)
+            ->postJson('/api/company/measures', [
+                'title' => 'Team workshop',
+                'category' => 'workshop',
+                'description' => 'A focused workshop for one team.',
+                'teamId' => $this->team->id,
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+
+        $this->actingAs($this->admin)
+            ->postJson('/api/company/measures', [
+                'title' => 'Company workshop',
+                'category' => 'workshop',
+                'description' => 'A company-wide workshop for employees.',
+            ])
+            ->assertStatus(201)
+            ->assertJsonPath('data.team', null);
+
+        $globalMeasure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'title' => 'Global measure',
+            'created_by' => $this->admin->id,
+        ]);
+        Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'title' => 'Team measure',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $response = $this->actingAs($this->admin)->getJson('/api/company/measures');
+
+        $response->assertStatus(200);
+        $this->assertEqualsCanonicalizing(
+            ['Company workshop', $globalMeasure->title],
+            collect($response->json('data'))->pluck('title')->all()
+        );
     }
 
     public function test_team_members_endpoint_returns_only_matching_team_and_company_users(): void

@@ -9,20 +9,34 @@ use App\Http\Requests\Company\PatchMeasureRequest;
 use App\Http\Resources\Company\MeasureResource;
 use App\Models\Measure;
 use App\Models\Team;
+use App\Services\Company\TeamLayerGuard;
 use Illuminate\Http\Request;
 
 class MeasureController extends Controller
 {
+    public function __construct(private readonly TeamLayerGuard $teamLayerGuard)
+    {
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
         $user->loadMissing('roles');
         $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
+        $teamLayerEnabled = $this->teamLayerGuard->enabledFor($user);
+
+        if (! $teamLayerEnabled && $isManager) {
+            $this->teamLayerGuard->abortIfDisabled($user);
+        }
+
         $managedTeamId = $isManager
             ? Team::where('manager_id', $user->id)->where('company_id', $user->company_id)->value('id')
             : null;
 
         $query = Measure::where('company_id', $user->company_id);
+        if (! $teamLayerEnabled) {
+            $query->whereNull('team_id');
+        }
 
         if ($isManager) {
             if (! $managedTeamId) {
@@ -33,10 +47,9 @@ class MeasureController extends Controller
             });
         }
 
-        $measures = $query
-            ->with('team:id,name')
-            ->orderBy('suggested_at', 'desc')
-            ->get();
+        $query->when($teamLayerEnabled, fn ($q) => $q->with('team:id,name'));
+
+        $measures = $query->orderBy('suggested_at', 'desc')->get();
 
         return MeasureResource::collection($measures);
     }
@@ -47,6 +60,11 @@ class MeasureController extends Controller
         $user->loadMissing('roles');
         $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
         $teamId = $request->teamId ?? null;
+        $teamLayerEnabled = $this->teamLayerGuard->enabledFor($user);
+
+        if (! $teamLayerEnabled && ($isManager || $teamId !== null)) {
+            $this->teamLayerGuard->abortIfDisabled($user, $teamId !== null ? 422 : 403);
+        }
 
         if ($isManager) {
             $managedTeamId = Team::where('manager_id', $user->id)->where('company_id', $user->company_id)->value('id');
@@ -77,6 +95,11 @@ class MeasureController extends Controller
         $user = $request->user();
         $user->loadMissing('roles');
         $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
+        $teamLayerEnabled = $this->teamLayerGuard->enabledFor($user);
+        if (! $teamLayerEnabled && $isManager) {
+            $this->teamLayerGuard->abortIfDisabled($user);
+        }
+
         $managedTeamId = $isManager
             ? Team::where('manager_id', $user->id)->where('company_id', $user->company_id)->value('id')
             : null;
@@ -84,6 +107,10 @@ class MeasureController extends Controller
         $measure = Measure::where('id', $id)
             ->where('company_id', $user->company_id)
             ->firstOrFail();
+
+        if (! $teamLayerEnabled && $measure->team_id !== null) {
+            $this->teamLayerGuard->abortIfDisabled($user);
+        }
 
         if ($isManager && (! $managedTeamId || (int) $measure->team_id !== (int) $managedTeamId)) {
             abort(403);

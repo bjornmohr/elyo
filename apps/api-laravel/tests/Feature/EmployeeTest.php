@@ -576,6 +576,72 @@ class EmployeeTest extends TestCase
         ]);
     }
 
+    public function test_employee_team_targeted_surveys_are_not_available_when_team_layer_is_disabled(): void
+    {
+        $this->company->update(['team_layer_enabled' => false]);
+        $team = Team::factory()->create(['company_id' => $this->company->id]);
+        $this->employee->update(['team_id' => $team->id]);
+
+        $companySurvey = Survey::create([
+            'company_id' => $this->company->id,
+            'title' => 'Company Survey',
+            'status' => SurveyStatus::ACTIVE,
+        ]);
+        $companyQuestion = SurveyQuestion::create([
+            'survey_id' => $companySurvey->id,
+            'text' => 'How are you?',
+            'type' => QuestionType::SCALE,
+            'order' => 1,
+        ]);
+
+        $teamSurvey = Survey::create([
+            'company_id' => $this->company->id,
+            'title' => 'Team Survey',
+            'status' => SurveyStatus::ACTIVE,
+        ]);
+        $teamSurvey->teams()->sync([$team->id]);
+        $teamQuestion = SurveyQuestion::create([
+            'survey_id' => $teamSurvey->id,
+            'text' => 'How is the team?',
+            'type' => QuestionType::SCALE,
+            'order' => 1,
+        ]);
+
+        $listResponse = $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/surveys');
+
+        $listResponse->assertStatus(200)
+            ->assertJsonFragment(['title' => 'Company Survey'])
+            ->assertJsonMissing(['title' => 'Team Survey']);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson("/api/employee/surveys/{$teamSurvey->id}")
+            ->assertStatus(404);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/surveys/{$teamSurvey->id}/respond", [
+                'answers' => [
+                    [
+                        'questionId' => $teamQuestion->id,
+                        'scaleValue' => 8,
+                    ],
+                ],
+            ])
+            ->assertStatus(404);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/surveys/{$companySurvey->id}/respond", [
+                'answers' => [
+                    [
+                        'questionId' => $companyQuestion->id,
+                        'scaleValue' => 7,
+                    ],
+                ],
+            ])
+            ->assertStatus(200)
+            ->assertJson(['ok' => true]);
+    }
+
     public function test_employee_can_always_view_own_survey_result()
     {
         $survey = Survey::create([

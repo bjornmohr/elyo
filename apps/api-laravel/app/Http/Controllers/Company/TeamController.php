@@ -8,12 +8,21 @@ use App\Http\Requests\Company\CreateTeamRequest;
 use App\Http\Resources\Company\TeamResource;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Company\TeamLayerGuard;
 use Illuminate\Http\Request;
 
 class TeamController extends Controller
 {
+    public function __construct(private readonly TeamLayerGuard $teamLayerGuard)
+    {
+    }
+
     public function index(Request $request)
     {
+        if (! $this->teamLayerGuard->enabledFor($request->user())) {
+            return TeamResource::collection(collect());
+        }
+
         $user = $request->user();
         $user->loadMissing('roles');
         $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
@@ -34,6 +43,8 @@ class TeamController extends Controller
 
     public function store(CreateTeamRequest $request)
     {
+        $this->teamLayerGuard->abortIfDisabled($request->user());
+
         $validated = $request->validated();
 
         $team = Team::create([
@@ -49,6 +60,8 @@ class TeamController extends Controller
 
     public function show(Request $request, $id)
     {
+        $this->teamLayerGuard->abortIfDisabled($request->user());
+
         $team = Team::where('id', $id)
             ->where('company_id', $request->user()->company_id)
             ->firstOrFail();
@@ -63,6 +76,8 @@ class TeamController extends Controller
 
     public function update(CreateTeamRequest $request, $id)
     {
+        $this->teamLayerGuard->abortIfDisabled($request->user());
+
         $team = Team::where('id', $id)
             ->where('company_id', $request->user()->company_id)
             ->firstOrFail();
@@ -80,6 +95,8 @@ class TeamController extends Controller
 
     public function destroy(Request $request, $id)
     {
+        $this->teamLayerGuard->abortIfDisabled($request->user());
+
         $request->user()->loadMissing('roles');
         if (! $request->user()->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER])) {
             abort(403);
@@ -96,6 +113,8 @@ class TeamController extends Controller
 
     public function members(Request $request, $teamId)
     {
+        $this->teamLayerGuard->abortIfDisabled($request->user());
+
         $user = $request->user();
         $user->loadMissing('roles');
         // Route middleware already restricts to company roles, but double-check

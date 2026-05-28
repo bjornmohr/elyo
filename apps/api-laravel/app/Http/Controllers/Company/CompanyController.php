@@ -9,13 +9,14 @@ use App\Http\Resources\Company\TeamResource;
 use App\Http\Resources\Company\TrendPointResource;
 use App\Models\Team;
 use App\Services\AnonymityService;
+use App\Services\Company\TeamLayerGuard;
 use Illuminate\Http\Request;
 
 class CompanyController extends Controller
 {
     protected $anonymityService;
 
-    public function __construct(AnonymityService $anonymityService)
+    public function __construct(AnonymityService $anonymityService, private readonly TeamLayerGuard $teamLayerGuard)
     {
         $this->anonymityService = $anonymityService;
     }
@@ -26,9 +27,12 @@ class CompanyController extends Controller
         $company = $user->company;
         $companyId = $company->id;
         $threshold = $company->anonymity_threshold ?? AnonymityService::DEFAULT_THRESHOLD;
+        $teamLayerEnabled = $this->teamLayerGuard->enabledFor($user);
 
         $user->loadMissing('roles');
         $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
+        $this->teamLayerGuard->abortManagerWorkflowIfDisabled($user);
+
         $managedTeamId = null;
         if ($isManager) {
             $managedTeam = Team::where('manager_id', $user->id)->where('company_id', $companyId)->first();
@@ -52,11 +56,14 @@ class CompanyController extends Controller
             'limit' => 12,
         ]);
 
-        $teamQuery = Team::where('company_id', $companyId);
-        if ($isManager) {
-            $teamQuery->where('id', $managedTeamId);
+        $teams = collect();
+        if ($teamLayerEnabled) {
+            $teamQuery = Team::where('company_id', $companyId);
+            if ($isManager) {
+                $teamQuery->where('id', $managedTeamId);
+            }
+            $teams = $teamQuery->get();
         }
-        $teams = $teamQuery->get();
 
         foreach ($teams as $team) {
             $teamMetrics = $this->anonymityService->getAggregatedMetrics($companyId, [
