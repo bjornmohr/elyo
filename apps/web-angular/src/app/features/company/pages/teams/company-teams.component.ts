@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiClient } from '../../../../core/services/api-client.service';
+import { AuthStore } from '../../../../core/store/auth.store';
 import { NotificationService } from '../../../../shared/notifications/notification.service';
 
 @Component({
@@ -12,12 +13,19 @@ import { NotificationService } from '../../../../shared/notifications/notificati
     <div class="space-y-6">
       <div class="flex items-center justify-between gap-4">
         <h1 class="text-2xl font-semibold text-gray-900" style="font-family: 'Fraunces', Georgia, serif">Teamübersicht</h1>
-        <button type="button" (click)="toggleForm()" class="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700">
-          {{ showForm() ? 'Schließen' : 'Team hinzufügen' }}
-        </button>
+        @if (teamLayerEnabled()) {
+          <button type="button" (click)="toggleForm()" class="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700">
+            {{ showForm() ? 'Schließen' : 'Team hinzufügen' }}
+          </button>
+        }
       </div>
 
-      @if (showForm()) {
+      @if (!teamLayerEnabled()) {
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 class="text-lg font-semibold text-gray-900">Team-Ebene deaktiviert</h2>
+          <p class="text-sm text-gray-500 mt-2">Teamverwaltung ist für dieses Unternehmen nicht verfügbar.</p>
+        </div>
+      } @else if (showForm()) {
         <form [formGroup]="teamForm" (ngSubmit)="submit()" class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label class="block">
@@ -58,11 +66,11 @@ import { NotificationService } from '../../../../shared/notifications/notificati
         </form>
       }
 
-      @if (loading()) {
+      @if (teamLayerEnabled() && loading()) {
         <div class="flex justify-center py-12"><div class="w-8 h-8 border-4 border-teal-500/30 border-t-teal-500 rounded-full animate-spin"></div></div>
-      } @else if (teams().length === 0) {
+      } @else if (teamLayerEnabled() && teams().length === 0) {
         <div class="bg-white rounded-xl border border-gray-200 p-12 text-center"><p class="text-gray-500 text-sm">Noch keine Teams vorhanden.</p></div>
-      } @else {
+      } @else if (teamLayerEnabled()) {
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           @for (team of teams(); track team.id) {
             <div class="bg-white rounded-xl border border-gray-200 p-5">
@@ -84,6 +92,7 @@ import { NotificationService } from '../../../../shared/notifications/notificati
 })
 export class CompanyTeamsComponent implements OnInit {
   private api = inject(ApiClient);
+  private authStore = inject(AuthStore);
   private fb = inject(FormBuilder);
   private notifications = inject(NotificationService);
 
@@ -102,10 +111,19 @@ export class CompanyTeamsComponent implements OnInit {
   });
 
   ngOnInit() {
+    if (!this.teamLayerEnabled()) {
+      this.loading.set(false);
+      return;
+    }
+
     this.loadTeams();
     this.api.get<{ data: any[] }>('/company/users').subscribe({
       next: res => this.users.set(res.data ?? []),
     });
+  }
+
+  teamLayerEnabled() {
+    return this.authStore.teamLayerEnabled();
   }
 
   managerOptions() {

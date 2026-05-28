@@ -960,6 +960,8 @@ paths:
       responses:
         200:
           description: List of surveys
+        403:
+          $ref: '#/components/responses/TeamLayerDisabled'
     post:
       tags: [Company]
       summary: Create a new survey
