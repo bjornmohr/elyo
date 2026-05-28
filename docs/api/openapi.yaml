@@ -170,6 +170,15 @@ components:
         startedAt: { type: string, format: date-time, nullable: true }
         completedAt: { type: string, format: date-time, nullable: true }
 
+    TeamLayerDisabledError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string, enum: [TEAM_LAYER_DISABLED] }
+            message: { type: string }
+
     Partner:
       type: object
       properties:
@@ -1148,18 +1157,21 @@ paths:
                                   count: { type: integer }
                                   percentage: { type: number }
         403:
-          description: Threshold not met, or TEAM_LAYER_DISABLED for team-scoped results when the company team layer is disabled
+          description: Anonymity threshold not met, or TEAM_LAYER_DISABLED for team-scoped results when the company team layer is disabled
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error: { type: string }
-                  minRequired: { type: integer }
-                  isAboveThreshold: { type: boolean }
-                  suppressionReason:
-                    type: string
-                    enum: [ANONYMITY_THRESHOLD_NOT_MET]
+                oneOf:
+                  - description: Anonymity threshold not met
+                    type: object
+                    properties:
+                      error: { type: string }
+                      minRequired: { type: integer }
+                      isAboveThreshold: { type: boolean }
+                      suppressionReason:
+                        type: string
+                        enum: [ANONYMITY_THRESHOLD_NOT_MET]
+                  - $ref: '#/components/schemas/TeamLayerDisabledError'
 
   /company/measures:
     get:

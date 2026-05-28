@@ -971,6 +971,41 @@ class CompanyTest extends TestCase
         );
     }
 
+    public function test_team_scoped_measure_update_is_rejected_when_team_layer_disabled(): void
+    {
+        $this->company->update(['team_layer_enabled' => false]);
+
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'title' => 'Existing team measure',
+            'created_by' => $this->admin->id,
+            'status' => 'SUGGESTED',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$measure->id}", ['status' => 'ACTIVE'])
+            ->assertStatus(403)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+    }
+
+    public function test_company_survey_show_is_rejected_when_team_layer_disabled_and_survey_is_team_scoped(): void
+    {
+        $this->company->update(['team_layer_enabled' => false]);
+
+        $survey = Survey::factory()->create([
+            'company_id' => $this->company->id,
+            'created_by' => $this->admin->id,
+            'status' => 'DRAFT',
+        ]);
+        $survey->teams()->sync([$this->team->id]);
+
+        $this->actingAs($this->admin)
+            ->getJson("/api/company/surveys/{$survey->id}")
+            ->assertStatus(403)
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+    }
+
     public function test_team_members_endpoint_returns_only_matching_team_and_company_users(): void
     {
         $otherCompany = Company::factory()->create();
