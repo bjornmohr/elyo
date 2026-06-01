@@ -16,6 +16,79 @@ class MeasureParticipationPersistenceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_factory_defaults_create_tenant_consistent_company_wide_participation(): void
+    {
+        $participation = MeasureParticipation::factory()->create();
+
+        $this->assertSame($participation->company_id, $participation->measure->company_id);
+        $this->assertSame($participation->company_id, $participation->user->company_id);
+        $this->assertNull($participation->team_id);
+        $this->assertNull($participation->measure->team_id);
+        $this->assertDatabaseHas('measure_participations', [
+            'id' => $participation->id,
+            'company_id' => $participation->measure->company_id,
+            'team_id' => null,
+        ]);
+    }
+
+    public function test_team_measure_factory_state_creates_tenant_consistent_participation(): void
+    {
+        $participation = MeasureParticipation::factory()->forTeamMeasure()->create();
+
+        $this->assertSame($participation->company_id, $participation->measure->company_id);
+        $this->assertSame($participation->company_id, $participation->user->company_id);
+        $this->assertSame($participation->company_id, $participation->team->company_id);
+        $this->assertSame($participation->team_id, $participation->measure->team_id);
+        $this->assertSame($participation->team_id, $participation->user->team_id);
+    }
+
+    public function test_factory_derives_team_context_from_partial_measure_override(): void
+    {
+        [$company, $team, $user, $measure] = $this->createMeasureContext();
+
+        $participation = MeasureParticipation::factory()->create([
+            'measure_id' => $measure->id,
+        ]);
+
+        $this->assertSame($company->id, $participation->company_id);
+        $this->assertSame($team->id, $participation->team_id);
+        $this->assertSame($team->id, $participation->user->team_id);
+        $this->assertNotSame($user->id, $participation->user_id);
+    }
+
+    public function test_factory_explicit_overrides_do_not_create_unused_tenant_records(): void
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->create([
+            'company_id' => $company->id,
+            'team_id' => null,
+        ]);
+        $measure = Measure::factory()->create([
+            'company_id' => $company->id,
+            'team_id' => null,
+            'created_by' => $user->id,
+        ]);
+
+        $counts = [
+            'companies' => Company::query()->count(),
+            'users' => User::query()->count(),
+            'measures' => Measure::query()->count(),
+            'participations' => MeasureParticipation::query()->count(),
+        ];
+
+        MeasureParticipation::factory()->create([
+            'measure_id' => $measure->id,
+            'user_id' => $user->id,
+            'company_id' => $company->id,
+            'team_id' => null,
+        ]);
+
+        $this->assertSame($counts['companies'], Company::query()->count());
+        $this->assertSame($counts['users'], User::query()->count());
+        $this->assertSame($counts['measures'], Measure::query()->count());
+        $this->assertSame($counts['participations'] + 1, MeasureParticipation::query()->count());
+    }
+
     public function test_measure_participation_can_be_created_with_team_context(): void
     {
         [$company, $team, $user, $measure] = $this->createMeasureContext();
@@ -158,6 +231,9 @@ class MeasureParticipationPersistenceTest extends TestCase
 
     public function test_foreign_key_constraints_reject_unknown_references(): void
     {
+        // Cross-company and team mismatch rejection remains service-level work for
+        // the later employee participation API. The DB only guards references and
+        // duplicate measure/user participation rows.
         $this->expectException(QueryException::class);
 
         DB::table('measure_participations')->insert([
