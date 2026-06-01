@@ -7,6 +7,7 @@ use App\Enums\Role;
 use App\Enums\SurveyStatus;
 use App\Models\Company;
 use App\Models\Measure;
+use App\Models\MeasureParticipation;
 use App\Models\PointTransaction;
 use App\Models\Survey;
 use App\Models\SurveyAnswer;
@@ -748,6 +749,266 @@ class EmployeeTest extends TestCase
             ['Global measure', 'Team measure'],
             collect($response->json('data'))->pluck('title')->all()
         );
+    }
+
+    public function test_employee_measure_list_includes_authenticated_employee_participation_state()
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'title' => 'Global measure',
+            'status' => 'ACTIVE',
+        ]);
+
+        MeasureParticipation::factory()->create([
+            'measure_id' => $measure->id,
+            'user_id' => $this->employee->id,
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'participated_at' => Carbon::parse('2026-06-01 09:00:00'),
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/measures')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.participation.isParticipating', true)
+            ->assertJsonPath('data.0.participation.participatedAt', '2026-06-01T09:00:00+00:00');
+    }
+
+    public function test_employee_measure_list_does_not_expose_other_users_participation_state()
+    {
+        $otherEmployee = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'title' => 'Global measure',
+            'status' => 'ACTIVE',
+        ]);
+
+        MeasureParticipation::factory()->create([
+            'measure_id' => $measure->id,
+            'user_id' => $otherEmployee->id,
+            'company_id' => $this->company->id,
+            'team_id' => null,
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/measures')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.participation.isParticipating', false)
+            ->assertJsonPath('data.0.participation.participatedAt', null);
+    }
+
+    public function test_employee_can_participate_in_active_company_wide_measure()
+    {
+        $this->travelTo(Carbon::parse('2026-06-01 10:00:00'));
+
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measures/{$measure->id}/participate")
+            ->assertStatus(201)
+            ->assertJsonPath('data.id', $measure->id)
+            ->assertJsonPath('data.participation.isParticipating', true)
+            ->assertJsonPath('data.participation.participatedAt', '2026-06-01T10:00:00+00:00');
+
+        $this->assertDatabaseHas('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $this->employee->id,
+            'company_id' => $this->company->id,
+            'team_id' => null,
+        ]);
+        $this->assertDatabaseHas('point_transactions', [
+            'user_id' => $this->employee->id,
+            'reason' => 'measure_participation',
+            'points' => 20,
+        ]);
+        $this->assertDatabaseHas('user_points', [
+            'user_id' => $this->employee->id,
+            'total' => 20,
+        ]);
+    }
+
+    public function test_employee_can_participate_in_active_team_measure_for_own_team()
+    {
+        $team = Team::factory()->create(['company_id' => $this->company->id]);
+        $this->employee->update(['team_id' => $team->id]);
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $team->id,
+            'status' => 'ACTIVE',
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measures/{$measure->id}/participate")
+            ->assertStatus(201)
+            ->assertJsonPath('data.participation.isParticipating', true);
+
+        $this->assertDatabaseHas('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $this->employee->id,
+            'company_id' => $this->company->id,
+            'team_id' => $team->id,
+        ]);
+    }
+
+    public function test_employee_cannot_participate_in_measure_from_another_company()
+    {
+        $otherCompany = Company::factory()->create();
+        $measure = Measure::factory()->create([
+            'company_id' => $otherCompany->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measures/{$measure->id}/participate")
+            ->assertStatus(404);
+
+        $this->assertDatabaseMissing('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $this->employee->id,
+        ]);
+    }
+
+    public function test_employee_cannot_participate_in_measure_for_another_team()
+    {
+        $team = Team::factory()->create(['company_id' => $this->company->id]);
+        $otherTeam = Team::factory()->create(['company_id' => $this->company->id]);
+        $this->employee->update(['team_id' => $team->id]);
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $otherTeam->id,
+            'status' => 'ACTIVE',
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measures/{$measure->id}/participate")
+            ->assertStatus(404);
+
+        $this->assertDatabaseMissing('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $this->employee->id,
+        ]);
+    }
+
+    public function test_employee_cannot_participate_in_inactive_visible_measures()
+    {
+        foreach (['SUGGESTED', 'COMPLETED', 'DISMISSED'] as $status) {
+            $measure = Measure::factory()->create([
+                'company_id' => $this->company->id,
+                'team_id' => null,
+                'status' => $status,
+            ]);
+
+            $this->actingAs($this->employee, 'sanctum')
+                ->postJson("/api/employee/measures/{$measure->id}/participate")
+                ->assertStatus(409)
+                ->assertJsonPath('error.code', 'MEASURE_NOT_ACTIVE');
+        }
+
+        $this->assertSame(0, MeasureParticipation::query()->count());
+        $this->assertSame(0, PointTransaction::where('reason', 'measure_participation')->count());
+    }
+
+    public function test_duplicate_measure_participation_returns_conflict_and_does_not_award_points_twice()
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measures/{$measure->id}/participate")
+            ->assertStatus(201);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measures/{$measure->id}/participate")
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'MEASURE_ALREADY_PARTICIPATED');
+
+        $this->assertSame(1, MeasureParticipation::query()
+            ->where('measure_id', $measure->id)
+            ->where('user_id', $this->employee->id)
+            ->count());
+        $this->assertSame(1, PointTransaction::query()
+            ->where('user_id', $this->employee->id)
+            ->where('reason', 'measure_participation')
+            ->count());
+        $this->assertDatabaseHas('user_points', [
+            'user_id' => $this->employee->id,
+            'total' => 20,
+        ]);
+    }
+
+    public function test_measure_participation_derives_identity_from_authenticated_employee_and_ignores_request_body()
+    {
+        $team = Team::factory()->create(['company_id' => $this->company->id]);
+        $foreignCompany = Company::factory()->create();
+        $foreignTeam = Team::factory()->create(['company_id' => $foreignCompany->id]);
+        $foreignUser = User::factory()->create([
+            'company_id' => $foreignCompany->id,
+            'team_id' => $foreignTeam->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $this->employee->update(['team_id' => $team->id]);
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measures/{$measure->id}/participate", [
+                'user_id' => $foreignUser->id,
+                'company_id' => $foreignCompany->id,
+                'team_id' => $foreignTeam->id,
+                'participated_at' => '2025-01-01T00:00:00Z',
+            ])
+            ->assertStatus(201);
+
+        $this->assertDatabaseHas('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $this->employee->id,
+            'company_id' => $this->company->id,
+            'team_id' => $team->id,
+        ]);
+        $this->assertDatabaseMissing('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $foreignUser->id,
+            'company_id' => $foreignCompany->id,
+            'team_id' => $foreignTeam->id,
+        ]);
+    }
+
+    public function test_company_user_cannot_use_employee_measure_participation_endpoint()
+    {
+        $companyUser = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::COMPANY_ADMIN,
+        ]);
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+        ]);
+
+        $this->actingAs($companyUser, 'sanctum')
+            ->postJson("/api/employee/measures/{$measure->id}/participate")
+            ->assertStatus(403);
+
+        $this->assertDatabaseMissing('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $companyUser->id,
+        ]);
     }
 
     public function test_employee_can_upload_medical_pdf()

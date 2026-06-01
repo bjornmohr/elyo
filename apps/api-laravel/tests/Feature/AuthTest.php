@@ -391,7 +391,8 @@ class AuthTest extends TestCase
 
         $getResponse = $this->actingAs($admin, 'sanctum')->getJson('/api/admin/points-config');
         $getResponse->assertStatus(200)
-            ->assertJsonPath('data.daily_checkin', 10);
+            ->assertJsonPath('data.daily_checkin', 10)
+            ->assertJsonPath('data.measure_participation', 20);
 
         $updateResponse = $this->actingAs($admin, 'sanctum')->putJson('/api/admin/points-config', [
             'daily_checkin' => 15,
@@ -399,11 +400,13 @@ class AuthTest extends TestCase
             'streak_30days' => 250,
             'anamnesis_completed' => 120,
             'medical_document_upload' => 30,
+            'measure_participation' => 25,
         ]);
 
         $updateResponse->assertStatus(200)
             ->assertJsonPath('data.daily_checkin', 15)
-            ->assertJsonPath('data.streak_7days', 60);
+            ->assertJsonPath('data.streak_7days', 60)
+            ->assertJsonPath('data.measure_participation', 25);
     }
 
     // --- Company invitation management ---

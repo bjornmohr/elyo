@@ -193,6 +193,52 @@ components:
         startedAt: { type: string, format: date-time, nullable: true }
         completedAt: { type: string, format: date-time, nullable: true }
 
+    EmployeeMeasure:
+      allOf:
+        - $ref: '#/components/schemas/Measure'
+        - type: object
+          required: [participation]
+          properties:
+            team:
+              type: object
+              nullable: true
+              properties:
+                name: { type: string }
+            participation:
+              type: object
+              required: [isParticipating, participatedAt]
+              properties:
+                isParticipating: { type: boolean }
+                participatedAt: { type: string, format: date-time, nullable: true }
+
+    MeasureAlreadyParticipatedError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [MEASURE_ALREADY_PARTICIPATED]
+            message:
+              type: string
+
+    MeasureNotActiveError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [MEASURE_NOT_ACTIVE]
+            message:
+              type: string
+
     TeamLayerDisabledError:
       type: object
       required: [error]
@@ -574,6 +620,57 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/User' }
+
+  /employee/measures:
+    get:
+      tags: [Employee]
+      summary: List active measures visible to the authenticated employee
+      description: Returns active company-wide measures and active measures targeted to the authenticated employee's current team, including only that employee's participation state.
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Visible employee measures
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EmployeeMeasure'
+
+  /employee/measures/{measure}/participate:
+    post:
+      tags: [Employee]
+      summary: Participate in an active measure
+      description: Creates a participation for the authenticated employee. The request body is ignored; user, company, team, and participation time are derived server-side.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: measure
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        201:
+          description: Participation created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EmployeeMeasure'
+        404:
+          description: Measure not found or not visible to the authenticated employee
+        409:
+          description: Duplicate participation or inactive visible measure
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/MeasureAlreadyParticipatedError'
+                  - $ref: '#/components/schemas/MeasureNotActiveError'
 
   /employee/surveys:
     get:

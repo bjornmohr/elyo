@@ -19,6 +19,7 @@ class UpdatePointSettingsRequest extends FormRequest
             'streak_30days' => ['required', 'integer', 'min:0', 'max:100000'],
             'anamnesis_completed' => ['required', 'integer', 'min:0', 'max:100000'],
             'medical_document_upload' => ['required', 'integer', 'min:0', 'max:100000'],
+            'measure_participation' => ['required', 'integer', 'min:0', 'max:100000'],
         ];
     }
 }

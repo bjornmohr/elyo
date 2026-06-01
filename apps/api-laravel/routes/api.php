@@ -100,6 +100,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/profile', [EmployeeController::class, 'updateProfile']);
         Route::post('/documents', [EmployeeController::class, 'uploadDocument']);
         Route::get('/measures', [EmployeeController::class, 'measures']);
+        Route::post('/measures/{measure}/participate', [EmployeeController::class, 'participateInMeasure']);
 
         Route::get('/surveys', [SurveyController::class, 'index']);
         Route::get('/surveys/{id}', [SurveyController::class, 'show']);

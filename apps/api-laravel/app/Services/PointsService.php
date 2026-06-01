@@ -15,6 +15,7 @@ class PointsService
         'daily_checkin' => 10,
         'anamnesis_completed' => 100,
         'medical_document_upload' => 25,
+        'measure_participation' => 20,
         'streak_7days' => 50,
         'streak_30days' => 200,
     ];
