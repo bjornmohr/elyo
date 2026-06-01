@@ -167,11 +167,11 @@ class User extends Authenticatable
             return false;
         }
 
-        $company = $this->relationLoaded('company')
-            ? $this->company
-            : $this->company()->value('team_layer_enabled');
+        if ($this->relationLoaded('company')) {
+            return (bool) ($this->company?->team_layer_enabled ?? false);
+        }
 
-        return (bool) ($company?->team_layer_enabled ?? false);
+        return (bool) $this->company()->value('team_layer_enabled');
     }
 
     public function isEmployee(): bool

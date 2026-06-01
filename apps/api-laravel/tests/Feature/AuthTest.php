@@ -185,6 +185,18 @@ class AuthTest extends TestCase
             ->assertJsonPath('allowedPortals', ['company', 'employee']);
     }
 
+    public function test_company_portal_eligibility_does_not_require_preloaded_company_relation(): void
+    {
+        $enabledCompany = Company::factory()->create(['team_layer_enabled' => true]);
+        $enabledManager = $this->createUserWithRole(Role::COMPANY_MANAGER, $enabledCompany->id);
+
+        $disabledCompany = Company::factory()->create(['team_layer_enabled' => false]);
+        $disabledManager = $this->createUserWithRole(Role::COMPANY_MANAGER, $disabledCompany->id);
+
+        $this->assertTrue(User::findOrFail($enabledManager->id)->canUsePortal('company'));
+        $this->assertFalse(User::findOrFail($disabledManager->id)->canUsePortal('company'));
+    }
+
     public function test_company_admin_without_team_layer_keeps_company_portal(): void
     {
         $company = Company::factory()->create(['team_layer_enabled' => false]);

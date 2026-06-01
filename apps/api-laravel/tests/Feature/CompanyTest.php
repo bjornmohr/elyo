@@ -852,6 +852,39 @@ class CompanyTest extends TestCase
             ->assertOk();
     }
 
+    public function test_manager_only_user_without_team_layer_cannot_access_company_surveys(): void
+    {
+        $this->company->update(['team_layer_enabled' => false]);
+
+        $this->actingAs($this->manager)
+            ->getJson('/api/company/surveys')
+            ->assertStatus(403)
+            ->assertJsonPath('error.code', 'PORTAL_FORBIDDEN');
+    }
+
+    public function test_manager_only_user_with_team_layer_can_access_company_dashboard(): void
+    {
+        $this->actingAs($this->manager)
+            ->getJson('/api/company/dashboard')
+            ->assertOk();
+    }
+
+    public function test_plain_employee_cannot_access_company_routes(): void
+    {
+        $employee = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+
+        $this->actingAs($employee)
+            ->getJson('/api/company/dashboard')
+            ->assertStatus(403);
+
+        $this->actingAs($employee)
+            ->getJson('/api/company/surveys')
+            ->assertStatus(403);
+    }
+
     public function test_manager_employee_user_without_team_layer_can_still_access_employee_dashboard(): void
     {
         $this->company->update(['team_layer_enabled' => false]);
