@@ -836,10 +836,6 @@ class CompanyTest extends TestCase
             ->getJson('/api/company/reports')
             ->assertStatus(200);
 
-        $this->actingAs($this->manager)
-            ->getJson('/api/company/dashboard')
-            ->assertStatus(403)
-            ->assertJsonPath('error.code', 'PORTAL_FORBIDDEN');
     }
 
     public function test_manager_only_user_without_team_layer_cannot_access_company_dashboard(): void

@@ -51,26 +51,36 @@ components:
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              error:
-                type: object
-                properties:
-                  code: { type: string, enum: [TEAM_LAYER_DISABLED] }
-                  message: { type: string }
+            $ref: '#/components/schemas/TeamLayerDisabledError'
 
     PortalForbidden:
       description: User is not eligible for the requested portal
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              error:
-                type: object
-                properties:
-                  code: { type: string, enum: [PORTAL_FORBIDDEN] }
-                  message: { type: string }
+            $ref: '#/components/schemas/PortalForbiddenError'
+
+    CompanyPortalForbiddenOrTeamLayerDisabled:
+      description: User is not eligible for the company portal, the requested team-layer workflow is disabled, or the caller is outside the allowed scope
+      content:
+        application/json:
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/PortalForbiddenError'
+              - $ref: '#/components/schemas/TeamLayerDisabledError'
+              - $ref: '#/components/schemas/CodedForbiddenError'
+              - $ref: '#/components/schemas/MessageForbiddenError'
+
+    PortalOrScopeForbidden:
+      description: User is not eligible for the requested portal, the requested team-layer workflow is disabled, or the caller is outside the allowed scope
+      content:
+        application/json:
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/PortalForbiddenError'
+              - $ref: '#/components/schemas/TeamLayerDisabledError'
+              - $ref: '#/components/schemas/CodedForbiddenError'
+              - $ref: '#/components/schemas/MessageForbiddenError'
 
   schemas:
     Error:
@@ -185,12 +195,61 @@ components:
 
     TeamLayerDisabledError:
       type: object
+      required: [error]
+      additionalProperties: false
       properties:
         error:
           type: object
+          required: [code, message]
+          additionalProperties: false
           properties:
             code: { type: string, enum: [TEAM_LAYER_DISABLED] }
             message: { type: string }
+
+    PortalForbiddenError:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          additionalProperties: false
+          properties:
+            code: { type: string, enum: [PORTAL_FORBIDDEN] }
+            message: { type: string }
+
+    CodedForbiddenError:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          additionalProperties: false
+          properties:
+            code: { type: string, enum: [FORBIDDEN] }
+            message: { type: string }
+
+    MessageForbiddenError:
+      type: object
+      required: [message]
+      additionalProperties: false
+      properties:
+        message: { type: string }
+
+    AnonymityThresholdError:
+      type: object
+      required: [error, minRequired, isAboveThreshold, suppressionReason]
+      additionalProperties: false
+      properties:
+        error: { type: string }
+        minRequired: { type: integer }
+        isAboveThreshold: { type: boolean }
+        suppressionReason:
+          type: string
+          enum: [ANONYMITY_THRESHOLD_NOT_MET]
 
     Partner:
       type: object
@@ -760,7 +819,7 @@ paths:
                         expiresAt: { type: string, format: date-time }
                         createdAt: { type: string, format: date-time }
         403:
-          description: Forbidden for users without company portal access
+          $ref: '#/components/responses/PortalForbidden'
     post:
       tags: [Company]
       summary: Create a company invitation
@@ -802,7 +861,14 @@ paths:
                       expires_at: { type: string, format: date-time }
                       invite_token: { type: string }
         403:
-          description: Forbidden for manager role invites, unmanaged team access, or users without company portal access
+          description: Forbidden for manager role invites, unmanaged team access, disabled team-layer manager workflows, or users without company portal access
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/PortalForbiddenError'
+                  - $ref: '#/components/schemas/TeamLayerDisabledError'
+                  - $ref: '#/components/schemas/CodedForbiddenError'
         422:
           description: Validation error for invalid teamId, disabled team-layer teamId payloads, or company email conflict
 
@@ -826,7 +892,13 @@ paths:
                 properties:
                   message: { type: string }
         403:
-          description: Forbidden for invitations outside the caller scope
+          description: Forbidden for invitations outside the caller scope, or users without company portal access
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/PortalForbiddenError'
+                  - $ref: '#/components/schemas/CodedForbiddenError'
         422:
           description: Invitation is no longer pending
 
@@ -855,6 +927,8 @@ paths:
                         color: { type: string, nullable: true }
                         memberCount: { type: integer }
                         manager: { type: object, properties: { name: { type: string } } }
+        403:
+          $ref: '#/components/responses/PortalOrScopeForbidden'
     post:
       tags: [Company]
       summary: Create a new team
@@ -881,7 +955,7 @@ paths:
                 properties:
                   data: { type: object, properties: { id: { type: string }, name: { type: string } } }
         403:
-          $ref: '#/components/responses/TeamLayerDisabled'
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
 
   /company/teams/{id}:
     get:
@@ -898,7 +972,7 @@ paths:
         200:
           description: Team details
         403:
-          $ref: '#/components/responses/TeamLayerDisabled'
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
     put:
       tags: [Company]
       summary: Update team
@@ -923,7 +997,7 @@ paths:
         200:
           description: Updated
         403:
-          $ref: '#/components/responses/TeamLayerDisabled'
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
     delete:
       tags: [Company]
       summary: Delete team
@@ -938,7 +1012,7 @@ paths:
         200:
           description: OK
         403:
-          $ref: '#/components/responses/TeamLayerDisabled'
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
 
   /company/teams/{teamId}/members:
     get:
@@ -972,7 +1046,7 @@ paths:
                           type: array
                           items: { type: string }
         403:
-          $ref: '#/components/responses/TeamLayerDisabled'
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
 
   /company/surveys:
     get:
@@ -983,7 +1057,7 @@ paths:
         200:
           description: List of surveys
         403:
-          $ref: '#/components/responses/TeamLayerDisabled'
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
     post:
       tags: [Company]
       summary: Create a new survey
@@ -1019,6 +1093,8 @@ paths:
       responses:
         201:
           description: Created
+        403:
+          $ref: '#/components/responses/PortalOrScopeForbidden'
         422:
           $ref: '#/components/responses/TeamLayerDisabled'
 
@@ -1036,6 +1112,8 @@ paths:
       responses:
         200:
           description: Updated
+        403:
+          $ref: '#/components/responses/PortalOrScopeForbidden'
         422:
           $ref: '#/components/responses/TeamLayerDisabled'
     delete:
@@ -1050,6 +1128,8 @@ paths:
       responses:
         200:
           description: OK
+        403:
+          $ref: '#/components/responses/PortalOrScopeForbidden'
 
   /company/surveys/{id}/results:
     get:
@@ -1170,20 +1250,14 @@ paths:
                                   count: { type: integer }
                                   percentage: { type: number }
         403:
-          description: Anonymity threshold not met, or TEAM_LAYER_DISABLED for team-scoped results when the company team layer is disabled
+          description: User is not eligible for the company portal, anonymity threshold not met, or TEAM_LAYER_DISABLED for team-scoped results when the company team layer is disabled
           content:
             application/json:
               schema:
-                oneOf:
-                  - description: Anonymity threshold not met
-                    type: object
-                    properties:
-                      error: { type: string }
-                      minRequired: { type: integer }
-                      isAboveThreshold: { type: boolean }
-                      suppressionReason:
-                        type: string
-                        enum: [ANONYMITY_THRESHOLD_NOT_MET]
+                anyOf:
+                  - $ref: '#/components/schemas/PortalForbiddenError'
+                  - $ref: '#/components/schemas/MessageForbiddenError'
+                  - $ref: '#/components/schemas/AnonymityThresholdError'
                   - $ref: '#/components/schemas/TeamLayerDisabledError'
 
   /company/measures:
@@ -1196,7 +1270,7 @@ paths:
         200:
           description: List of measures
         403:
-          $ref: '#/components/responses/TeamLayerDisabled'
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
     post:
       tags: [Company]
       summary: Create/Activate a measure
@@ -1206,7 +1280,7 @@ paths:
         201:
           description: Created
         403:
-          $ref: '#/components/responses/TeamLayerDisabled'
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
         422:
           $ref: '#/components/responses/TeamLayerDisabled'
 
@@ -1225,7 +1299,7 @@ paths:
         200:
           description: Updated
         403:
-          $ref: '#/components/responses/TeamLayerDisabled'
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
 
   /company/reports:
     get:
@@ -1259,7 +1333,7 @@ paths:
                         avgStress: { type: number }
                         avgEnergy: { type: number }
         403:
-          $ref: '#/components/responses/TeamLayerDisabled'
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
 
   /admin/companies:
     get:
