@@ -45,6 +45,11 @@ class Company extends Model
         return $this->hasMany(Measure::class);
     }
 
+    public function measureParticipations(): HasMany
+    {
+        return $this->hasMany(MeasureParticipation::class);
+    }
+
     public function createdByAdmin(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_elyo_admin_id');

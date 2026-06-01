@@ -5,23 +5,32 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Measure extends Model
+class MeasureParticipation extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'company_id', 'team_id', 'title', 'category',
-        'description', 'status', 'suggested_at', 'started_at',
-        'completed_at', 'created_by',
+        'measure_id',
+        'user_id',
+        'company_id',
+        'team_id',
+        'participated_at',
     ];
 
     protected $casts = [
-        'suggested_at' => 'datetime',
-        'started_at' => 'datetime',
-        'completed_at' => 'datetime',
+        'participated_at' => 'datetime',
     ];
+
+    public function measure(): BelongsTo
+    {
+        return $this->belongsTo(Measure::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function company(): BelongsTo
     {
@@ -31,10 +40,5 @@ class Measure extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
-    }
-
-    public function participations(): HasMany
-    {
-        return $this->hasMany(MeasureParticipation::class);
     }
 }

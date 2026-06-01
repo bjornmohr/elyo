@@ -40,4 +40,9 @@ class Team extends Model
     {
         return $this->hasMany(Measure::class);
     }
+
+    public function measureParticipations(): HasMany
+    {
+        return $this->hasMany(MeasureParticipation::class);
+    }
 }

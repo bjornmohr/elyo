@@ -80,6 +80,11 @@ class User extends Authenticatable
         return $this->hasMany(PointTransaction::class);
     }
 
+    public function measureParticipations(): HasMany
+    {
+        return $this->hasMany(MeasureParticipation::class);
+    }
+
     public function wearableConnections(): HasMany
     {
         return $this->hasMany(WearableConnection::class);
