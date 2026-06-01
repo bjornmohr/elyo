@@ -21,7 +21,7 @@ class PortalMiddleware
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        $user->loadMissing('roles');
+        $user->loadMissing(['roles', 'company']);
 
         if (! $user->canUsePortal($portal)) {
             return response()->json([

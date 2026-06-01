@@ -200,7 +200,7 @@ class DemoDataSeeder extends Seeder
         $this->upsertUser('small.manager@demo.de', 'Small Manager', $password, $smallCompanyId, null, 'COMPANY_MANAGER', $now);
 
         $smallEmployeeIds = [];
-        for ($i = 1; $i <= 2; $i++) {
+        for ($i = 1; $i <= 3; $i++) {
             $smallEmployeeIds[] = $this->upsertUser(
                 "small.employee{$i}@demo.de",
                 "Small Employee {$i}",

@@ -1,6 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, portalGuard, roleGuard } from './core/guards/auth.guards';
-import { Role } from './core/models/auth.models';
+import { authGuard, portalGuard } from './core/guards/auth.guards';
 
 export const routes: Routes = [
   // Auth (public)
@@ -17,7 +16,7 @@ export const routes: Routes = [
   // Employee portal
   {
     path: 'employee',
-    canActivate: [authGuard, roleGuard([Role.EMPLOYEE])],
+    canActivate: [authGuard, portalGuard('employee')],
     loadComponent: () => import('./shared/shells/employee-shell.component').then(m => m.EmployeeShellComponent),
     children: [
       { path: 'dashboard', loadComponent: () => import('./features/employee/pages/dashboard/dashboard.component').then(m => m.DashboardComponent) },
@@ -33,7 +32,7 @@ export const routes: Routes = [
   // Company portal
   {
     path: 'company',
-    canActivate: [authGuard, roleGuard([Role.COMPANY_OWNER, Role.COMPANY_ADMIN, Role.COMPANY_MANAGER]), portalGuard('company')],
+    canActivate: [authGuard, portalGuard('company')],
     loadComponent: () => import('./shared/shells/company-shell.component').then(m => m.CompanyShellComponent),
     children: [
       { path: 'dashboard', loadComponent: () => import('./features/company/pages/dashboard/dashboard.component').then(m => m.CompanyDashboardComponent) },
@@ -50,7 +49,7 @@ export const routes: Routes = [
   // Admin portal
   {
     path: 'admin',
-    canActivate: [authGuard, roleGuard([Role.ELYO_ADMIN, Role.ELYO_SUPPORT])],
+    canActivate: [authGuard, portalGuard('admin')],
     loadComponent: () => import('./shared/shells/admin-shell.component').then(m => m.AdminShellComponent),
     children: [
       { path: 'companies', loadComponent: () => import('./features/admin/pages/companies/companies.component').then(m => m.AdminCompaniesComponent) },
@@ -64,7 +63,7 @@ export const routes: Routes = [
   // Partner portal
   {
     path: 'partner',
-    canActivate: [authGuard, roleGuard([Role.PARTNER])],
+    canActivate: [authGuard, portalGuard('partner')],
     children: [
       { path: 'dashboard', loadComponent: () => import('./features/partner/pages/dashboard/partner-dashboard.component').then(m => m.PartnerDashboardComponent) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },

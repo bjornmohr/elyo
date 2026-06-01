@@ -20,8 +20,8 @@ export class AuthService {
       tap(res => {
         this.store.setToken(res.access_token);
         this.store.setUser(res.user);
-        this.store.setActivePortal(res.activePortal);
         this.store.setAllowedPortals(res.allowedPortals);
+        this.store.setActivePortal(this.resolvePortal(res.activePortal, res.allowedPortals));
       }),
       finalize(() => this.store.setLoading(false))
     );
@@ -43,11 +43,7 @@ export class AuthService {
       tap(res => {
         this.store.setUser(res);
         this.store.setAllowedPortals(res.allowedPortals);
-        if (!this.store.activePortal() && res.allowedPortals.length > 0) {
-          const detected = this.detectPortalFromHostname();
-          const portal = detected && res.allowedPortals.includes(detected) ? detected : res.allowedPortals[0];
-          this.store.setActivePortal(portal);
-        }
+        this.store.setActivePortal(this.resolvePortal(res.activePortal, res.allowedPortals));
       }),
       map(res => res as User),
       catchError(() => {
@@ -72,6 +68,36 @@ export class AuthService {
     if (hostname.startsWith('partner')) return 'partner';
     // Default for localhost / unknown
     return null;
+  }
+
+  resolvePortal(activePortal: Portal | null, allowedPortals: Portal[]): Portal | null {
+    if (activePortal && allowedPortals.includes(activePortal)) {
+      return activePortal;
+    }
+
+    return allowedPortals[0] ?? null;
+  }
+
+  portalForUrl(url: string | null): Portal | null {
+    if (!url) return null;
+
+    const path = url.split('?')[0].split('#')[0];
+    const firstSegment = path.split('/').filter(Boolean)[0];
+
+    switch (firstSegment) {
+      case 'admin':
+      case 'company':
+      case 'employee':
+      case 'partner':
+        return firstSegment;
+      default:
+        return null;
+    }
+  }
+
+  isAllowedPortalUrl(url: string | null, allowedPortals: Portal[]): boolean {
+    const portal = this.portalForUrl(url);
+    return !!portal && allowedPortals.includes(portal);
   }
 
   getDefaultRoute(portal: Portal | null): string {

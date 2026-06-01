@@ -113,35 +113,49 @@ export class LoginComponent implements OnInit {
   onSubmit() {
     if (this.loginForm.invalid) return;
 
+    this.submitLogin(this.authService.detectPortalFromHostname());
+  }
+
+  private submitLogin(requestedPortal: string | null) {
     this.loading.set(true);
     this.error.set(null);
-
-    const requestedPortal = this.authService.detectPortalFromHostname();
 
     this.authService.login({
       email: this.loginForm.value.email!,
       password: this.loginForm.value.password!,
       requested_portal: requestedPortal ?? undefined,
     }).subscribe({
-      next: (res) => {
-        this.redirectAfterAuth(res.activePortal);
+      next: () => {
+        this.redirectAfterAuth(this.authStore.activePortal());
       },
       error: (err) => {
-        if (err.status === 403 && err.error?.error?.code === 'PORTAL_FORBIDDEN') {
+        if (requestedPortal && err.status === 403 && err.error?.error?.code === 'PORTAL_FORBIDDEN') {
+          this.submitLogin(null);
+        } else if (err.status === 403 && err.error?.error?.code === 'PORTAL_FORBIDDEN') {
           this.error.set('Sie haben keinen Zugang zu diesem Portal.');
+          this.loading.set(false);
         } else {
           this.error.set('E-Mail oder Passwort falsch.');
+          this.loading.set(false);
         }
-        this.loading.set(false);
       }
     });
   }
 
   private redirectAfterAuth(portal = this.authStore.activePortal()) {
     const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
-    const target = returnUrl && returnUrl !== '/auth/login'
+    const allowedPortals = this.authStore.allowedPortals();
+    const resolvedPortal = this.authService.resolvePortal(portal, allowedPortals);
+
+    if (!resolvedPortal) {
+      this.error.set('Sie haben keinen Zugang zu einem Portal.');
+      this.loading.set(false);
+      return;
+    }
+
+    const target = returnUrl && returnUrl !== '/auth/login' && this.authService.isAllowedPortalUrl(returnUrl, allowedPortals)
       ? returnUrl
-      : this.authService.getDefaultRoute(portal);
+      : this.authService.getDefaultRoute(resolvedPortal);
 
     this.router.navigateByUrl(target);
   }
