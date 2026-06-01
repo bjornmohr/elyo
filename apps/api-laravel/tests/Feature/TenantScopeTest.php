@@ -167,7 +167,7 @@ class TenantScopeTest extends TestCase
 
     public function test_company_manager_users_are_limited_to_managed_team(): void
     {
-        $company = Company::factory()->create();
+        $company = Company::factory()->create(['team_layer_enabled' => true]);
         $managedTeam = Team::factory()->create(['company_id' => $company->id]);
         $otherTeam = Team::factory()->create(['company_id' => $company->id]);
         $manager = User::factory()->create(['company_id' => $company->id, 'role' => Role::COMPANY_MANAGER]);
@@ -195,7 +195,7 @@ class TenantScopeTest extends TestCase
 
     public function test_company_manager_can_only_see_and_revoke_own_employee_invites(): void
     {
-        $company = Company::factory()->create();
+        $company = Company::factory()->create(['team_layer_enabled' => true]);
         $manager = User::factory()->create(['company_id' => $company->id, 'role' => Role::COMPANY_MANAGER]);
         $admin = User::factory()->create(['company_id' => $company->id, 'role' => Role::COMPANY_ADMIN]);
         $ownInvite = InviteToken::create([

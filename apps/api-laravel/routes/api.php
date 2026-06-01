@@ -61,7 +61,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Company portal routes (COMPANY_OWNER, COMPANY_ADMIN, COMPANY_MANAGER)
-    Route::middleware('role:COMPANY_OWNER,COMPANY_ADMIN,COMPANY_MANAGER')->prefix('company')->group(function () {
+    Route::middleware(['role:COMPANY_OWNER,COMPANY_ADMIN,COMPANY_MANAGER', 'portal:company'])->prefix('company')->group(function () {
         Route::get('/dashboard', [CompanyController::class, 'dashboard']);
         Route::get('/users', [CompanyInvitationController::class, 'users']);
         Route::get('/invitations', [CompanyInvitationController::class, 'invitations']);

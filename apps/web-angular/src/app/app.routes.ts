@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, roleGuard } from './core/guards/auth.guards';
+import { authGuard, portalGuard, roleGuard } from './core/guards/auth.guards';
 import { Role } from './core/models/auth.models';
 
 export const routes: Routes = [
@@ -33,7 +33,7 @@ export const routes: Routes = [
   // Company portal
   {
     path: 'company',
-    canActivate: [authGuard, roleGuard([Role.COMPANY_OWNER, Role.COMPANY_ADMIN, Role.COMPANY_MANAGER])],
+    canActivate: [authGuard, roleGuard([Role.COMPANY_OWNER, Role.COMPANY_ADMIN, Role.COMPANY_MANAGER]), portalGuard('company')],
     loadComponent: () => import('./shared/shells/company-shell.component').then(m => m.CompanyShellComponent),
     children: [
       { path: 'dashboard', loadComponent: () => import('./features/company/pages/dashboard/dashboard.component').then(m => m.CompanyDashboardComponent) },

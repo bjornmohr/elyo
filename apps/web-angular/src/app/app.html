@@ -9,7 +9,7 @@
           @if (authStore.hasRole([Role.EMPLOYEE])) {
             <a routerLink="/employee" routerLinkActive="text-elyo-500 font-bold" class="text-elyo-ink-soft hover:text-elyo-500">Dashboard</a>
           }
-          @if (authStore.hasRole([Role.COMPANY_ADMIN, Role.COMPANY_MANAGER])) {
+          @if (authStore.allowedPortals().includes('company')) {
             <a routerLink="/company" routerLinkActive="text-elyo-500 font-bold" class="text-elyo-ink-soft hover:text-elyo-500">Company</a>
           }
           @if (authStore.hasRole([Role.PARTNER])) {

@@ -157,6 +157,19 @@ class User extends Authenticatable
         return $this->hasAnyRole(Role::companyPortalRoles());
     }
 
+    public function canUseCompanyPortal(): bool
+    {
+        if ($this->hasAnyRole([Role::COMPANY_OWNER, Role::COMPANY_ADMIN])) {
+            return true;
+        }
+
+        if (! $this->hasRole(Role::COMPANY_MANAGER)) {
+            return false;
+        }
+
+        return (bool) $this->company()->value('team_layer_enabled');
+    }
+
     public function isEmployee(): bool
     {
         return $this->hasRole(Role::EMPLOYEE);
@@ -166,7 +179,7 @@ class User extends Authenticatable
     {
         return match ($portal) {
             'admin' => $this->hasAnyRole(Role::adminPortalRoles()),
-            'company' => $this->isCompanyUser(),
+            'company' => $this->canUseCompanyPortal(),
             'employee' => $this->isEmployee(),
             'partner' => $this->hasRole(Role::PARTNER),
             default => false,
@@ -179,7 +192,7 @@ class User extends Authenticatable
         if ($this->hasAnyRole(Role::adminPortalRoles())) {
             $portals[] = 'admin';
         }
-        if ($this->isCompanyUser()) {
+        if ($this->canUseCompanyPortal()) {
             $portals[] = 'company';
         }
         if ($this->isEmployee()) {
