@@ -83,6 +83,7 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         $user = $request->user()->load(['company', 'roles']);
+        $allowedPortals = $user->allowedPortals();
 
         return response()->json([
             'id' => $user->id,
@@ -94,7 +95,8 @@ class AuthController extends Controller
             'teamLayerEnabled' => (bool) ($user->company?->team_layer_enabled ?? false),
             'teamId' => $user->team_id,
             'teamName' => $user->team?->name,
-            'allowedPortals' => $user->allowedPortals(),
+            'activePortal' => $allowedPortals[0] ?? null,
+            'allowedPortals' => $allowedPortals,
         ]);
     }
 }

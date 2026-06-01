@@ -337,6 +337,7 @@ paths:
                     description: Whether this company uses team-level affiliation and team-scoped manager workflows.
                   teamId: { type: integer, nullable: true }
                   teamName: { type: string, nullable: true }
+                  activePortal: { type: string, nullable: true }
                   allowedPortals:
                     type: array
                     items: { type: string }

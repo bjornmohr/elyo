@@ -167,7 +167,11 @@ class User extends Authenticatable
             return false;
         }
 
-        return (bool) $this->company()->value('team_layer_enabled');
+        $company = $this->relationLoaded('company')
+            ? $this->company
+            : $this->company()->value('team_layer_enabled');
+
+        return (bool) ($company?->team_layer_enabled ?? false);
     }
 
     public function isEmployee(): bool
@@ -175,12 +179,38 @@ class User extends Authenticatable
         return $this->hasRole(Role::EMPLOYEE);
     }
 
+    public function isInternalElyoCompany(): bool
+    {
+        $company = $this->relationLoaded('company')
+            ? $this->company
+            : $this->company()->first(['id', 'slug']);
+
+        return $company?->slug === 'elyo-platform';
+    }
+
+    public function canUseEmployeePortal(): bool
+    {
+        if ($this->isEmployee()) {
+            return true;
+        }
+
+        if ($this->isInternalElyoCompany()) {
+            return false;
+        }
+
+        return $this->hasAnyRole([
+            Role::COMPANY_OWNER,
+            Role::COMPANY_ADMIN,
+            Role::COMPANY_MANAGER,
+        ]);
+    }
+
     public function canUsePortal(string $portal): bool
     {
         return match ($portal) {
             'admin' => $this->hasAnyRole(Role::adminPortalRoles()),
             'company' => $this->canUseCompanyPortal(),
-            'employee' => $this->isEmployee(),
+            'employee' => $this->canUseEmployeePortal(),
             'partner' => $this->hasRole(Role::PARTNER),
             default => false,
         };
@@ -195,7 +225,7 @@ class User extends Authenticatable
         if ($this->canUseCompanyPortal()) {
             $portals[] = 'company';
         }
-        if ($this->isEmployee()) {
+        if ($this->canUseEmployeePortal()) {
             $portals[] = 'employee';
         }
         if ($this->hasRole(Role::PARTNER)) {
