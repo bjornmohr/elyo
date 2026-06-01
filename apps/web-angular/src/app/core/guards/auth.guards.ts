@@ -16,13 +16,8 @@ const restoreUser = (store: AuthStore, authService: AuthService): Observable<Use
 };
 
 const defaultAuthenticatedRoute = (store: AuthStore, authService: AuthService): string => {
-  const activePortal = store.activePortal();
-  if (activePortal && store.allowedPortals().includes(activePortal)) {
-    return authService.getDefaultRoute(activePortal);
-  }
-
-  const firstPortal = store.allowedPortals()[0] ?? null;
-  return authService.getDefaultRoute(firstPortal);
+  const portal = authService.resolvePortal(store.activePortal(), store.allowedPortals());
+  return authService.getDefaultRoute(portal);
 };
 
 export const authGuard: CanActivateFn = (route, state) => {
@@ -68,13 +63,17 @@ export const portalGuard = (portal: Portal): CanActivateFn => {
     const authService = inject(AuthService);
 
     if (store.allowedPortals().includes(portal)) {
+      store.setActivePortal(portal);
       return true;
     }
 
     return restoreUser(store, authService).pipe(
       map(user => {
         if (!user) return loginUrl(router, state.url);
-        if (store.allowedPortals().includes(portal)) return true;
+        if (store.allowedPortals().includes(portal)) {
+          store.setActivePortal(portal);
+          return true;
+        }
 
         const route = defaultAuthenticatedRoute(store, authService);
         return router.createUrlTree([route]);

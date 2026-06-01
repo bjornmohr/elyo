@@ -29,6 +29,7 @@ export interface LoginResponse {
 }
 
 export interface MeResponse extends User {
+  activePortal: Portal | null;
   allowedPortals: Portal[];
 }
 
