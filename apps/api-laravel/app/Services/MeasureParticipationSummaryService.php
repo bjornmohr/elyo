@@ -36,8 +36,9 @@ class MeasureParticipationSummaryService
         }
 
         $scopeTeamIds = $this->scopeTeamIds($user, $measure, $isManager);
-        $eligibleCount = $this->eligibleEmployeesQuery($user, $scopeTeamIds)->count();
-        $participantCount = $this->participantCount($measure, $scopeTeamIds);
+        $eligibleEmployeesQuery = $this->eligibleEmployeesQuery($user, $scopeTeamIds);
+        $eligibleCount = (clone $eligibleEmployeesQuery)->count();
+        $participantCount = $this->participantCount($measure, $eligibleEmployeesQuery);
         $isAboveThreshold = $eligibleCount >= $threshold && $participantCount >= $threshold;
 
         if (! $isAboveThreshold) {
@@ -92,17 +93,12 @@ class MeasureParticipationSummaryService
             ->when($scopeTeamIds !== null, fn (Builder $query) => $query->whereIn('team_id', $scopeTeamIds));
     }
 
-    private function participantCount(Measure $measure, ?array $scopeTeamIds): int
+    private function participantCount(Measure $measure, Builder $eligibleEmployeesQuery): int
     {
         return MeasureParticipation::query()
             ->where('measure_id', $measure->id)
             ->where('company_id', $measure->company_id)
-            ->when($scopeTeamIds !== null, fn (Builder $query) => $query->whereIn('team_id', $scopeTeamIds))
-            ->whereHas('user', function (Builder $query) use ($measure) {
-                $query->where('company_id', $measure->company_id)
-                    ->where('status', 'active')
-                    ->whereHas('roles', fn (Builder $roleQuery) => $roleQuery->where('role', Role::EMPLOYEE->value));
-            })
+            ->whereIn('user_id', $eligibleEmployeesQuery->select('users.id'))
             ->distinct('user_id')
             ->count('user_id');
     }

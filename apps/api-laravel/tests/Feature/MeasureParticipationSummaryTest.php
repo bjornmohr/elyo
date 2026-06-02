@@ -197,6 +197,64 @@ class MeasureParticipationSummaryTest extends TestCase
             ->assertJsonPath('data.participationRate', 60);
     }
 
+    public function test_manager_summary_counts_participants_through_current_managed_team_scope(): void
+    {
+        $company = Company::factory()->create([
+            'anonymity_threshold' => 3,
+            'team_layer_enabled' => true,
+        ]);
+        $manager = $this->companyUser($company, Role::COMPANY_MANAGER);
+        $managedTeam = Team::factory()->create([
+            'company_id' => $company->id,
+            'manager_id' => $manager->id,
+        ]);
+        $otherTeam = Team::factory()->create(['company_id' => $company->id]);
+        $measure = Measure::factory()->create([
+            'company_id' => $company->id,
+            'team_id' => null,
+        ]);
+        $currentManagedEmployees = User::factory()->count(3)->create([
+            'company_id' => $company->id,
+            'team_id' => $managedTeam->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $transferredEmployees = User::factory()->count(2)->create([
+            'company_id' => $company->id,
+            'team_id' => $managedTeam->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+
+        $currentManagedEmployees->each(fn (User $employee) => MeasureParticipation::factory()->create([
+            'measure_id' => $measure->id,
+            'user_id' => $employee->id,
+            'company_id' => $company->id,
+            'team_id' => $managedTeam->id,
+        ]));
+        $transferredEmployees->each(function (User $employee) use ($measure, $company, $managedTeam, $otherTeam): void {
+            MeasureParticipation::factory()->create([
+                'measure_id' => $measure->id,
+                'user_id' => $employee->id,
+                'company_id' => $company->id,
+                'team_id' => $managedTeam->id,
+            ]);
+
+            $employee->update(['team_id' => $otherTeam->id]);
+        });
+
+        $response = $this->actingAs($manager)
+            ->getJson("/api/company/measures/{$measure->id}/participation-summary");
+
+        $response->assertOk()
+            ->assertJsonPath('data.isAboveThreshold', true)
+            ->assertJsonPath('data.eligibleCount', 3)
+            ->assertJsonPath('data.participantCount', 3)
+            ->assertJsonPath('data.participationRate', 100)
+            ->assertJsonPath('data.teamBreakdown', null);
+
+        $this->assertLessThanOrEqual(100, $response->json('data.participationRate'));
+        $this->assertNoIndividualParticipationData($response->getContent());
+    }
+
     public function test_manager_cannot_fetch_summary_for_other_team_measure(): void
     {
         $company = Company::factory()->create(['team_layer_enabled' => true]);
@@ -209,6 +267,37 @@ class MeasureParticipationSummaryTest extends TestCase
         $measure = Measure::factory()->create([
             'company_id' => $company->id,
             'team_id' => $otherTeam->id,
+        ]);
+
+        $this->actingAs($manager)
+            ->getJson("/api/company/measures/{$measure->id}/participation-summary")
+            ->assertForbidden();
+    }
+
+    public function test_team_specific_measure_summary_is_blocked_when_team_layer_is_disabled(): void
+    {
+        $company = Company::factory()->create(['team_layer_enabled' => false]);
+        $admin = $this->companyUser($company, Role::COMPANY_ADMIN);
+        $team = Team::factory()->create(['company_id' => $company->id]);
+        $measure = Measure::factory()->create([
+            'company_id' => $company->id,
+            'team_id' => $team->id,
+            'created_by' => $admin->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson("/api/company/measures/{$measure->id}/participation-summary")
+            ->assertForbidden()
+            ->assertJsonPath('error.code', 'TEAM_LAYER_DISABLED');
+    }
+
+    public function test_manager_without_managed_team_cannot_fetch_measure_participation_summary(): void
+    {
+        $company = Company::factory()->create(['team_layer_enabled' => true]);
+        $manager = $this->companyUser($company, Role::COMPANY_MANAGER);
+        $measure = Measure::factory()->create([
+            'company_id' => $company->id,
+            'team_id' => null,
         ]);
 
         $this->actingAs($manager)

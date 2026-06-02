@@ -224,7 +224,19 @@ components:
           nullable: true
           enum: [ANONYMITY_THRESHOLD_NOT_MET]
         teamBreakdown:
+          type: array
           nullable: true
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              teamId: { type: integer }
+              teamName: { type: string }
+              isAboveThreshold: { type: boolean }
+              eligibleCount: { type: integer, nullable: true }
+              participantCount: { type: integer, nullable: true }
+              participationRate: { type: number, nullable: true }
+              suppressionReason: { type: string, nullable: true }
           description: Always null for this measure-level aggregate endpoint.
 
     EmployeeMeasure:
@@ -1438,6 +1450,8 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/MeasureParticipationSummary'
+        401:
+          description: Unauthorized
         403:
           $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
         404:
