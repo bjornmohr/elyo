@@ -6,6 +6,16 @@ import { Role } from '../../../../core/models/auth.models';
 import { AuthStore } from '../../../../core/store/auth.store';
 import { NotificationService } from '../../../../shared/notifications/notification.service';
 
+interface MeasureParticipationSummary {
+  measureId: number;
+  isAboveThreshold: boolean;
+  eligibleCount: number | null;
+  participantCount: number | null;
+  participationRate: number | null;
+  suppressionReason: string | null;
+  teamBreakdown: null;
+}
+
 @Component({
   selector: 'app-company-measures',
   standalone: true,
@@ -125,6 +135,7 @@ import { NotificationService } from '../../../../shared/notifications/notificati
                 @if (teamLayerEnabled()) {
                   <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Team</th>
                 }
+                <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Teilnahme</th>
                 <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Status</th>
               </tr>
               </thead>
@@ -136,6 +147,22 @@ import { NotificationService } from '../../../../shared/notifications/notificati
                     @if (teamLayerEnabled()) {
                       <td class="px-4 py-3 text-gray-500">{{ measure.team?.name || 'Alle Teams' }}</td>
                     }
+                    <td class="px-4 py-3 text-gray-500">
+                      @if (summaryFor(measure.id); as summary) {
+                        @if (summary.isAboveThreshold) {
+                          <div class="space-y-0.5">
+                            <div class="font-medium text-gray-900">{{ participationRateLabel(summary) }}</div>
+                            <div class="text-xs text-gray-500">
+                              {{ participationCountLabel(summary) }}
+                            </div>
+                          </div>
+                        } @else {
+                          <span class="text-xs text-gray-500">Mindestgruppengröße nicht erreicht</span>
+                        }
+                      } @else {
+                        <span class="text-xs text-gray-400">Nicht verfügbar</span>
+                      }
+                    </td>
                     <td class="px-4 py-3"><span
                       class="px-2 py-0.5 rounded-full text-xs bg-teal-50 text-teal-700">{{ measure.status }}</span></td>
                   </tr>
@@ -160,6 +187,7 @@ export class CompanyMeasuresComponent implements OnInit {
   saving = signal(false);
   showForm = signal(false);
   formError = signal<string | null>(null);
+  participationSummaries = signal<Record<number, MeasureParticipationSummary | null>>({});
 
   measureForm = this.fb.group({
     title: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(100)]],
@@ -222,6 +250,9 @@ export class CompanyMeasuresComponent implements OnInit {
     this.api.post<{ data: any }>('/company/measures', this.payload()).subscribe({
       next: res => {
         this.measures.update(measures => [res.data, ...measures]);
+        if (res.data?.id) {
+          this.loadParticipationSummary(res.data.id);
+        }
         this.measureForm.reset({ title: '', category: '', description: '', teamId: null, status: 'ACTIVE' });
         this.showForm.set(false);
         this.notifications.success('Maßnahme wurde gespeichert.');
@@ -238,9 +269,52 @@ export class CompanyMeasuresComponent implements OnInit {
 
   private loadMeasures() {
     this.api.get<{ data: any[] }>('/company/measures').subscribe({
-      next: res => { this.measures.set(res.data ?? []); this.loading.set(false); },
+      next: res => {
+        const measures = res.data ?? [];
+        this.measures.set(measures);
+        this.participationSummaries.set({});
+        measures.forEach(measure => this.loadParticipationSummary(measure.id));
+        this.loading.set(false);
+      },
       error: () => this.loading.set(false),
     });
+  }
+
+  private loadParticipationSummary(measureId: number) {
+    this.api.get<{ data: MeasureParticipationSummary }>(`/company/measures/${measureId}/participation-summary`).subscribe({
+      next: res => {
+        this.participationSummaries.update(summaries => ({
+          ...summaries,
+          [measureId]: res.data ?? null,
+        }));
+      },
+      error: () => {
+        this.participationSummaries.update(summaries => ({
+          ...summaries,
+          [measureId]: null,
+        }));
+      },
+    });
+  }
+
+  summaryFor(measureId: number) {
+    return this.participationSummaries()[measureId] ?? null;
+  }
+
+  participationRateLabel(summary: MeasureParticipationSummary) {
+    if (summary.participationRate === null || summary.participationRate === undefined) {
+      return 'Teilnahmequote nicht verfügbar';
+    }
+
+    return `${summary.participationRate}% Teilnahmequote`;
+  }
+
+  participationCountLabel(summary: MeasureParticipationSummary) {
+    if (summary.participantCount === null || summary.participantCount === undefined || summary.eligibleCount === null || summary.eligibleCount === undefined) {
+      return 'Teilnahmen nicht verfügbar';
+    }
+
+    return `${summary.participantCount} von ${summary.eligibleCount} Berechtigten`;
   }
 
   private payload() {

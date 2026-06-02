@@ -53,6 +53,7 @@ export class AdminPointsComponent implements OnInit {
     { key: 'streak_30days', label: '30-Tage-Streak' },
     { key: 'anamnesis_completed', label: 'Anamnese abgeschlossen' },
     { key: 'medical_document_upload', label: 'Medizinisches PDF hochgeladen' },
+    { key: 'measure_participation', label: 'Maßnahmen-Teilnahme' },
   ];
 
   form = this.fb.group({
@@ -61,6 +62,7 @@ export class AdminPointsComponent implements OnInit {
     streak_30days: [0, [Validators.required, Validators.min(0)]],
     anamnesis_completed: [0, [Validators.required, Validators.min(0)]],
     medical_document_upload: [0, [Validators.required, Validators.min(0)]],
+    measure_participation: [0, [Validators.required, Validators.min(0)]],
   });
 
   loading = signal(true);

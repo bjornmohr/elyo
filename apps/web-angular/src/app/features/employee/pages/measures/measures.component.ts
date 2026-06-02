@@ -1,7 +1,8 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { EmployeeService } from '../../services/employee.service';
+import { EmployeeMeasure, EmployeeService } from '../../services/employee.service';
+import { NotificationService } from '../../../../shared/notifications/notification.service';
 
 @Component({
   selector: 'app-employee-measures',
@@ -33,7 +34,29 @@ import { EmployeeService } from '../../services/employee.service';
                 </div>
                 <span class="px-2 py-0.5 rounded-full text-xs bg-teal-50 text-teal-700">{{ measure.category }}</span>
               </div>
-              <p class="text-xs text-slate-400">{{ measure.team?.name || 'Alle Teams' }}</p>
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-xs text-slate-400">{{ measure.team?.name || 'Alle Teams' }}</p>
+
+                @if (hasParticipated(measure)) {
+                  <div class="flex flex-col items-start gap-1 sm:items-end">
+                    <span class="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      Teilgenommen
+                    </span>
+                    @if (measure.participation?.participatedAt) {
+                      <span class="text-xs text-slate-400">
+                        {{ measure.participation?.participatedAt | date:'dd.MM.yyyy' }}
+                      </span>
+                    }
+                  </div>
+                } @else {
+                  <button type="button"
+                          (click)="participate(measure)"
+                          [disabled]="isParticipating(measure.id)"
+                          class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:bg-slate-300">
+                    {{ isParticipating(measure.id) ? 'Wird gespeichert…' : 'Teilnehmen' }}
+                  </button>
+                }
+              </div>
             </div>
           }
         </div>
@@ -43,13 +66,85 @@ import { EmployeeService } from '../../services/employee.service';
 })
 export class EmployeeMeasuresComponent implements OnInit {
   private employeeService = inject(EmployeeService);
-  measures = signal<any[]>([]);
+  private notifications = inject(NotificationService);
+
+  measures = signal<EmployeeMeasure[]>([]);
   loading = signal(true);
+  participatingMeasureIds = signal<Set<number>>(new Set());
 
   ngOnInit() {
     this.employeeService.getMeasures().subscribe({
       next: measures => { this.measures.set(measures); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
+  }
+
+  hasParticipated(measure: EmployeeMeasure) {
+    return measure.participation?.isParticipating === true;
+  }
+
+  isParticipating(measureId: number) {
+    return this.participatingMeasureIds().has(measureId);
+  }
+
+  participate(measure: EmployeeMeasure) {
+    this.setParticipating(measure.id, true);
+
+    this.employeeService.participateInMeasure(measure.id).subscribe({
+      next: res => {
+        this.applyParticipatedMeasure(measure.id, res.data);
+        this.notifications.success('Teilnahme wurde gespeichert.');
+        this.setParticipating(measure.id, false);
+      },
+      error: err => {
+        const code = this.errorCode(err);
+
+        if (code === 'MEASURE_ALREADY_PARTICIPATED') {
+          this.markMeasureParticipated(measure.id);
+          this.notifications.success('Teilnahme ist bereits gespeichert.');
+        } else if (code === 'MEASURE_NOT_ACTIVE') {
+          this.notifications.error('Diese Maßnahme ist aktuell nicht aktiv.');
+        } else {
+          this.notifications.error('Teilnahme konnte nicht gespeichert werden.');
+        }
+
+        this.setParticipating(measure.id, false);
+      },
+    });
+  }
+
+  private applyParticipatedMeasure(measureId: number, updatedMeasure: EmployeeMeasure | null | undefined) {
+    if (updatedMeasure?.id) {
+      this.measures.update(measures => measures.map(measure => measure.id === measureId ? updatedMeasure : measure));
+      return;
+    }
+
+    this.markMeasureParticipated(measureId);
+  }
+
+  private markMeasureParticipated(measureId: number) {
+    this.measures.update(measures => measures.map(measure => measure.id === measureId ? {
+      ...measure,
+      participation: {
+        isParticipating: true,
+        participatedAt: measure.participation?.participatedAt ?? null,
+      },
+    } : measure));
+  }
+
+  private setParticipating(measureId: number, loading: boolean) {
+    this.participatingMeasureIds.update(ids => {
+      const next = new Set(ids);
+      if (loading) {
+        next.add(measureId);
+      } else {
+        next.delete(measureId);
+      }
+      return next;
+    });
+  }
+
+  private errorCode(err: any) {
+    return err.error?.error?.code ?? err.error?.code;
   }
 }
