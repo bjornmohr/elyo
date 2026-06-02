@@ -7,14 +7,20 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Company\CreateMeasureRequest;
 use App\Http\Requests\Company\PatchMeasureRequest;
 use App\Http\Resources\Company\MeasureResource;
+use App\Http\Resources\Company\MeasureParticipationSummaryResource;
 use App\Models\Measure;
 use App\Models\Team;
+use App\Services\AnonymityService;
 use App\Services\Company\TeamLayerGuard;
+use App\Services\MeasureParticipationSummaryService;
 use Illuminate\Http\Request;
 
 class MeasureController extends Controller
 {
-    public function __construct(private readonly TeamLayerGuard $teamLayerGuard)
+    public function __construct(
+        private readonly TeamLayerGuard $teamLayerGuard,
+        private readonly MeasureParticipationSummaryService $measureParticipationSummaryService,
+    )
     {
     }
 
@@ -139,5 +145,15 @@ class MeasureController extends Controller
         $measure->update($updateData);
 
         return new MeasureResource($measure);
+    }
+
+    public function participationSummary(Request $request, $id)
+    {
+        $company = $request->user()->company;
+        $threshold = $company->anonymity_threshold ?? AnonymityService::DEFAULT_THRESHOLD;
+
+        return new MeasureParticipationSummaryResource(
+            $this->measureParticipationSummaryService->summaryFor($request->user(), $id, $threshold)
+        );
     }
 }

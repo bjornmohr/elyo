@@ -85,6 +85,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/measures', [MeasureController::class, 'index']);
         Route::post('/measures', [MeasureController::class, 'store']);
+        Route::get('/measures/{id}/participation-summary', [MeasureController::class, 'participationSummary']);
         Route::patch('/measures/{id}', [MeasureController::class, 'update']);
 
         Route::get('/reports', [ReportController::class, 'index']);

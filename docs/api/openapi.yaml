@@ -193,6 +193,40 @@ components:
         startedAt: { type: string, format: date-time, nullable: true }
         completedAt: { type: string, format: date-time, nullable: true }
 
+    MeasureParticipationSummary:
+      type: object
+      required:
+        - measureId
+        - isAboveThreshold
+        - eligibleCount
+        - participantCount
+        - participationRate
+        - suppressionReason
+        - teamBreakdown
+      additionalProperties: false
+      properties:
+        measureId: { type: integer }
+        isAboveThreshold: { type: boolean }
+        eligibleCount:
+          type: integer
+          nullable: true
+          description: Null when anonymity threshold suppression applies.
+        participantCount:
+          type: integer
+          nullable: true
+          description: Null when anonymity threshold suppression applies.
+        participationRate:
+          type: number
+          nullable: true
+          description: Percentage of scoped eligible employees who participated, null when suppressed.
+        suppressionReason:
+          type: string
+          nullable: true
+          enum: [ANONYMITY_THRESHOLD_NOT_MET]
+        teamBreakdown:
+          nullable: true
+          description: Always null for this measure-level aggregate endpoint.
+
     EmployeeMeasure:
       allOf:
         - $ref: '#/components/schemas/Measure'
@@ -1381,6 +1415,33 @@ paths:
           $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
         422:
           $ref: '#/components/responses/TeamLayerDisabled'
+
+  /company/measures/{id}/participation-summary:
+    get:
+      tags: [Company]
+      summary: Get aggregate measure participation summary
+      description: Returns measure-level aggregate participation metrics only. Individual participant records, user IDs, names, emails, raw participation rows, and per-user participation timestamps are never returned. teamBreakdown is always null in this backend slice. Metrics are null when anonymity threshold suppression applies.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Aggregate measure participation summary
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/MeasureParticipationSummary'
+        403:
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
+        404:
+          description: Measure not found or not visible to the authenticated company user
 
   /company/measures/{id}:
     patch:
