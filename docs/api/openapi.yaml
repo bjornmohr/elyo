@@ -226,6 +226,7 @@ components:
         teamBreakdown:
           type: array
           nullable: true
+          description: Nullable future field. Current backend responses return null; non-null array data is reserved for a future privacy-reviewed team breakdown feature.
           items:
             type: object
             additionalProperties: false
@@ -1432,7 +1433,7 @@ paths:
     get:
       tags: [Company]
       summary: Get aggregate measure participation summary
-      description: Returns measure-level aggregate participation metrics only. Individual participant records, user IDs, names, emails, raw participation rows, and per-user participation timestamps are never returned. teamBreakdown is always null in this backend slice. Metrics are null when anonymity threshold suppression applies.
+      description: Returns measure-level aggregate participation metrics only. Individual participant records, user IDs, names, emails, raw participation rows, and per-user participation timestamps are never returned. teamBreakdown is a nullable future field; current backend responses return it as null, and non-null array data is reserved for a future privacy-reviewed team breakdown feature. Metrics are null when anonymity threshold suppression applies.
       security: [{ Sanctum: [] }]
       parameters:
         - name: id
