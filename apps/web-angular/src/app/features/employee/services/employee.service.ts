@@ -54,6 +54,8 @@ export interface SurveyResult {
 export interface EmployeeMeasureParticipation {
   isParticipating: boolean;
   participatedAt: string | null;
+  verificationType?: 'SELF_REPORTED';
+  verifiedAt?: string | null;
 }
 
 export interface EmployeeMeasure {

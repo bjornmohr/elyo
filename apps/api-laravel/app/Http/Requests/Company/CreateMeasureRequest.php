@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Company;
 
 use App\Enums\Role;
+use App\Models\Measure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -10,7 +11,7 @@ class CreateMeasureRequest extends FormRequest
 {
     public const DELIVERY_TYPES = ['REMOTE', 'ONSITE', 'HYBRID'];
     public const EXECUTION_TYPES = ['INFORMATION_ONLY', 'GUIDED_SESSION', 'SELF_REPORTED_ACTION', 'EVENT_PARTICIPATION', 'CHALLENGE'];
-    public const VERIFICATION_REQUIREMENTS = ['SELF_REPORT'];
+    public const VERIFICATION_REQUIREMENTS = [Measure::VERIFICATION_REQUIREMENT_SELF_REPORT];
 
     public function authorize(): bool
     {

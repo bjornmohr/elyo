@@ -760,7 +760,7 @@ class EmployeeTest extends TestCase
             'status' => 'ACTIVE',
             'delivery_type' => 'HYBRID',
             'execution_type' => 'GUIDED_SESSION',
-            'verification_requirement' => 'SELF_REPORT',
+            'verification_requirement' => Measure::VERIFICATION_REQUIREMENT_SELF_REPORT,
             'starts_at' => Carbon::parse('2026-06-20 09:00:00'),
             'ends_at' => Carbon::parse('2026-06-20 10:00:00'),
             'duration_minutes' => 60,
@@ -776,7 +776,7 @@ class EmployeeTest extends TestCase
             ->assertStatus(200)
             ->assertJsonPath('data.0.deliveryType', 'HYBRID')
             ->assertJsonPath('data.0.executionType', 'GUIDED_SESSION')
-            ->assertJsonPath('data.0.verificationRequirement', 'SELF_REPORT')
+            ->assertJsonPath('data.0.verificationRequirement', Measure::VERIFICATION_REQUIREMENT_SELF_REPORT)
             ->assertJsonPath('data.0.visibilityScope', 'COMPANY')
             ->assertJsonPath('data.0.durationMinutes', 60)
             ->assertJsonPath('data.0.instructions', 'Bring water.')
@@ -808,7 +808,7 @@ class EmployeeTest extends TestCase
             ->assertStatus(200)
             ->assertJsonPath('data.0.participation.isParticipating', true)
             ->assertJsonPath('data.0.participation.participatedAt', '2026-06-01T09:00:00+00:00')
-            ->assertJsonPath('data.0.participation.verificationType', 'SELF_REPORTED')
+            ->assertJsonPath('data.0.participation.verificationType', MeasureParticipation::VERIFICATION_TYPE_SELF_REPORTED)
             ->assertJsonPath('data.0.participation.verifiedAt', '2026-06-01T09:00:00+00:00');
     }
 
@@ -849,7 +849,7 @@ class EmployeeTest extends TestCase
             'company_id' => $this->company->id,
             'team_id' => null,
             'status' => 'ACTIVE',
-            'verification_requirement' => 'SELF_REPORT',
+            'verification_requirement' => Measure::VERIFICATION_REQUIREMENT_SELF_REPORT,
         ]);
 
         $this->actingAs($this->employee, 'sanctum')
@@ -858,7 +858,7 @@ class EmployeeTest extends TestCase
             ->assertJsonPath('data.id', $measure->id)
             ->assertJsonPath('data.participation.isParticipating', true)
             ->assertJsonPath('data.participation.participatedAt', '2026-06-01T10:00:00+00:00')
-            ->assertJsonPath('data.participation.verificationType', 'SELF_REPORTED')
+            ->assertJsonPath('data.participation.verificationType', MeasureParticipation::VERIFICATION_TYPE_SELF_REPORTED)
             ->assertJsonPath('data.participation.verifiedAt', '2026-06-01T10:00:00+00:00');
 
         $this->assertDatabaseHas('measure_participations', [
@@ -866,7 +866,7 @@ class EmployeeTest extends TestCase
             'user_id' => $this->employee->id,
             'company_id' => $this->company->id,
             'team_id' => null,
-            'verification_type' => 'SELF_REPORTED',
+            'verification_type' => MeasureParticipation::VERIFICATION_TYPE_SELF_REPORTED,
             'verified_by_user_id' => null,
         ]);
         $participation = MeasureParticipation::query()
@@ -974,7 +974,7 @@ class EmployeeTest extends TestCase
             'company_id' => $this->company->id,
             'team_id' => null,
             'status' => 'ACTIVE',
-            'verification_requirement' => 'SELF_REPORT',
+            'verification_requirement' => Measure::VERIFICATION_REQUIREMENT_SELF_REPORT,
         ]);
 
         $this->actingAs($this->employee, 'sanctum')
@@ -1034,7 +1034,7 @@ class EmployeeTest extends TestCase
             'user_id' => $this->employee->id,
             'company_id' => $this->company->id,
             'team_id' => $team->id,
-            'verification_type' => 'SELF_REPORTED',
+            'verification_type' => MeasureParticipation::VERIFICATION_TYPE_SELF_REPORTED,
             'verified_by_user_id' => null,
         ]);
         $this->assertDatabaseMissing('measure_participations', [
