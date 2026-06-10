@@ -807,7 +807,9 @@ class EmployeeTest extends TestCase
             ->getJson('/api/employee/measures')
             ->assertStatus(200)
             ->assertJsonPath('data.0.participation.isParticipating', true)
-            ->assertJsonPath('data.0.participation.participatedAt', '2026-06-01T09:00:00+00:00');
+            ->assertJsonPath('data.0.participation.participatedAt', '2026-06-01T09:00:00+00:00')
+            ->assertJsonPath('data.0.participation.verificationType', 'SELF_REPORTED')
+            ->assertJsonPath('data.0.participation.verifiedAt', '2026-06-01T09:00:00+00:00');
     }
 
     public function test_employee_measure_list_does_not_expose_other_users_participation_state()
@@ -834,7 +836,9 @@ class EmployeeTest extends TestCase
             ->getJson('/api/employee/measures')
             ->assertStatus(200)
             ->assertJsonPath('data.0.participation.isParticipating', false)
-            ->assertJsonPath('data.0.participation.participatedAt', null);
+            ->assertJsonPath('data.0.participation.participatedAt', null)
+            ->assertJsonPath('data.0.participation.verificationType', null)
+            ->assertJsonPath('data.0.participation.verifiedAt', null);
     }
 
     public function test_employee_can_participate_in_active_company_wide_measure()
@@ -853,14 +857,24 @@ class EmployeeTest extends TestCase
             ->assertStatus(201)
             ->assertJsonPath('data.id', $measure->id)
             ->assertJsonPath('data.participation.isParticipating', true)
-            ->assertJsonPath('data.participation.participatedAt', '2026-06-01T10:00:00+00:00');
+            ->assertJsonPath('data.participation.participatedAt', '2026-06-01T10:00:00+00:00')
+            ->assertJsonPath('data.participation.verificationType', 'SELF_REPORTED')
+            ->assertJsonPath('data.participation.verifiedAt', '2026-06-01T10:00:00+00:00');
 
         $this->assertDatabaseHas('measure_participations', [
             'measure_id' => $measure->id,
             'user_id' => $this->employee->id,
             'company_id' => $this->company->id,
             'team_id' => null,
+            'verification_type' => 'SELF_REPORTED',
+            'verified_by_user_id' => null,
         ]);
+        $participation = MeasureParticipation::query()
+            ->where('measure_id', $measure->id)
+            ->where('user_id', $this->employee->id)
+            ->firstOrFail();
+        $this->assertNotNull($participation->verified_at);
+        $this->assertTrue($participation->participated_at->equalTo($participation->verified_at));
         $this->assertDatabaseHas('point_transactions', [
             'user_id' => $this->employee->id,
             'reason' => 'measure_participation',
@@ -1009,6 +1023,9 @@ class EmployeeTest extends TestCase
                 'company_id' => $foreignCompany->id,
                 'team_id' => $foreignTeam->id,
                 'participated_at' => '2025-01-01T00:00:00Z',
+                'verification_type' => 'QR_CHECKIN',
+                'verified_at' => '2025-01-01T00:00:00Z',
+                'verified_by_user_id' => $foreignUser->id,
             ])
             ->assertStatus(201);
 
@@ -1017,12 +1034,21 @@ class EmployeeTest extends TestCase
             'user_id' => $this->employee->id,
             'company_id' => $this->company->id,
             'team_id' => $team->id,
+            'verification_type' => 'SELF_REPORTED',
+            'verified_by_user_id' => null,
         ]);
         $this->assertDatabaseMissing('measure_participations', [
             'measure_id' => $measure->id,
             'user_id' => $foreignUser->id,
             'company_id' => $foreignCompany->id,
             'team_id' => $foreignTeam->id,
+        ]);
+        $this->assertDatabaseMissing('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $this->employee->id,
+            'verification_type' => 'QR_CHECKIN',
+            'verified_at' => '2025-01-01 00:00:00',
+            'verified_by_user_id' => $foreignUser->id,
         ]);
     }
 

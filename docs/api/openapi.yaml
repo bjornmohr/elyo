@@ -324,10 +324,15 @@ components:
                 name: { type: string }
             participation:
               type: object
-              required: [isParticipating, participatedAt]
+              required: [isParticipating, participatedAt, verificationType, verifiedAt]
               properties:
                 isParticipating: { type: boolean }
                 participatedAt: { type: string, format: date-time, nullable: true }
+                verificationType:
+                  type: string
+                  nullable: true
+                  enum: [SELF_REPORTED]
+                verifiedAt: { type: string, format: date-time, nullable: true }
 
     MeasureAlreadyParticipatedError:
       type: object

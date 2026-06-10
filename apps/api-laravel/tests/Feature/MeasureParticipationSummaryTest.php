@@ -326,7 +326,21 @@ class MeasureParticipationSummaryTest extends TestCase
 
     private function assertNoIndividualParticipationData(string $content): void
     {
-        foreach (['user_id', 'userId', 'name', 'email', 'participated_at', 'participatedAt', 'participations'] as $field) {
+        foreach ([
+            'user_id',
+            'userId',
+            'name',
+            'email',
+            'participated_at',
+            'participatedAt',
+            'verificationType',
+            'verification_type',
+            'verifiedAt',
+            'verified_at',
+            'verifiedBy',
+            'verified_by_user_id',
+            'participations',
+        ] as $field) {
             $this->assertStringNotContainsString($field, $content);
         }
     }

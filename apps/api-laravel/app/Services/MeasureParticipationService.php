@@ -30,12 +30,17 @@ class MeasureParticipationService
 
         try {
             return DB::transaction(function () use ($user, $measure) {
+                $participatedAt = now();
+
                 $participation = MeasureParticipation::create([
                     'measure_id' => $measure->id,
                     'user_id' => $user->id,
                     'company_id' => $user->company_id,
                     'team_id' => $user->team_id,
-                    'participated_at' => now(),
+                    'participated_at' => $participatedAt,
+                    'verification_type' => MeasureParticipation::VERIFICATION_TYPE_SELF_REPORTED,
+                    'verified_at' => $participatedAt,
+                    'verified_by_user_id' => null,
                 ]);
 
                 $this->pointsService->awardPoints($user, 'measure_participation');
