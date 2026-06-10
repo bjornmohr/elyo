@@ -1188,6 +1188,34 @@ class EmployeeTest extends TestCase
         ]);
     }
 
+    public function test_employee_cannot_redeem_qr_checkin_for_inactive_measure(): void
+    {
+        foreach (['SUGGESTED', 'COMPLETED', 'DISMISSED'] as $status) {
+            $measure = Measure::factory()->create([
+                'company_id' => $this->company->id,
+                'team_id' => null,
+                'status' => $status,
+                'verification_requirement' => 'QR_CODE',
+            ]);
+            $token = bin2hex(random_bytes(32));
+            MeasureCheckinToken::create([
+                'measure_id' => $measure->id,
+                'company_id' => $this->company->id,
+                'token_hash' => MeasureCheckinTokenService::hashToken($token),
+                'created_by_user_id' => User::factory()->create(['company_id' => $this->company->id])->id,
+                'valid_from' => now()->subHour(),
+            ]);
+
+            $this->actingAs($this->employee, 'sanctum')
+                ->postJson("/api/employee/measure-checkins/{$token}")
+                ->assertStatus(409)
+                ->assertJsonPath('error.code', 'MEASURE_NOT_ACTIVE');
+        }
+
+        $this->assertSame(0, MeasureParticipation::query()->count());
+        $this->assertSame(0, PointTransaction::where('reason', 'measure_participation')->count());
+    }
+
     public function test_employee_cannot_redeem_qr_checkin_for_other_company_or_team(): void
     {
         $foreignCompany = Company::factory()->create();

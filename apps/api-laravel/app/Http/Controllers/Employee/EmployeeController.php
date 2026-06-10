@@ -284,7 +284,7 @@ class EmployeeController extends Controller
 
         $checkinToken = $this->measureCheckinTokenService->findTokenByRawToken($token);
 
-        if (! $checkinToken) {
+        if (! $checkinToken || ! $checkinToken->measure) {
             return $notFound();
         }
 
@@ -313,7 +313,9 @@ class EmployeeController extends Controller
                 ])
                 ->firstOrFail();
         } catch (NotFoundHttpException) {
-            return response()->json(['message' => 'Not found'], 404);
+            // Safety net: scope was already verified above; this branch covers unexpected
+            // race conditions (e.g. measure deleted mid-request).
+            return $notFound();
         } catch (ConflictHttpException $exception) {
             $code = $exception->getMessage();
 

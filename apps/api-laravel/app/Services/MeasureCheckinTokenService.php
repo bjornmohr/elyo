@@ -7,7 +7,6 @@ use App\Models\MeasureCheckinToken;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class MeasureCheckinTokenService
 {
@@ -61,19 +60,6 @@ class MeasureCheckinTokenService
         if ($checkinToken->valid_until !== null && $checkinToken->valid_until->isPast()) {
             throw new ConflictHttpException('CHECKIN_TOKEN_EXPIRED');
         }
-    }
-
-    public function resolveActiveToken(string $rawToken): MeasureCheckinToken
-    {
-        $checkinToken = $this->findTokenByRawToken($rawToken);
-
-        if (! $checkinToken) {
-            throw new NotFoundHttpException;
-        }
-
-        $this->validateTokenLifecycle($checkinToken);
-
-        return $checkinToken;
     }
 
     public function markUsed(MeasureCheckinToken $checkinToken): void

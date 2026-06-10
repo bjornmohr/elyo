@@ -391,6 +391,20 @@ components:
             message:
               type: string
 
+    MeasureCheckinTokenNotFoundError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [CHECKIN_TOKEN_NOT_FOUND]
+            message:
+              type: string
+
     MeasureCheckinConflictError:
       type: object
       required: [error]
@@ -886,7 +900,11 @@ paths:
                   data:
                     $ref: '#/components/schemas/EmployeeMeasure'
         404:
-          description: Token not found, measure not found, wrong company, or wrong team scope
+          description: Token not found, measure not found, wrong company, or wrong team scope. All cases return CHECKIN_TOKEN_NOT_FOUND to avoid revealing token state across tenant boundaries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeasureCheckinTokenNotFoundError'
         409:
           description: Lifecycle conflict for an in-scope token only — duplicate participation, inactive measure, self-report-only measure, revoked token, not-yet-valid token, or expired token. Out-of-scope tokens (wrong company or wrong team) are indistinguishable from missing tokens and return 404.
           content:

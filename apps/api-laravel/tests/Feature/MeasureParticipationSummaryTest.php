@@ -316,6 +316,43 @@ class MeasureParticipationSummaryTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_qr_participations_remain_aggregate_only_in_summary(): void
+    {
+        $company = Company::factory()->create(['anonymity_threshold' => 3]);
+        $admin = $this->companyUser($company, Role::COMPANY_ADMIN);
+        $measure = Measure::factory()->create([
+            'company_id' => $company->id,
+            'team_id' => null,
+            'created_by' => $admin->id,
+            'verification_requirement' => 'QR_CODE',
+        ]);
+        $employees = User::factory()->count(5)->create([
+            'company_id' => $company->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+
+        $employees->take(4)->each(fn (User $employee) => MeasureParticipation::factory()->create([
+            'measure_id' => $measure->id,
+            'user_id' => $employee->id,
+            'company_id' => $company->id,
+            'team_id' => null,
+            'verification_type' => MeasureParticipation::VERIFICATION_TYPE_QR_CHECKIN,
+        ]));
+
+        $response = $this->actingAs($admin)
+            ->getJson("/api/company/measures/{$measure->id}/participation-summary");
+
+        $response->assertOk()
+            ->assertJsonPath('data.measureId', $measure->id)
+            ->assertJsonPath('data.isAboveThreshold', true)
+            ->assertJsonPath('data.eligibleCount', 5)
+            ->assertJsonPath('data.participantCount', 4)
+            ->assertJsonPath('data.participationRate', 80)
+            ->assertJsonPath('data.suppressionReason', null);
+
+        $this->assertNoIndividualParticipationData($response->getContent());
+    }
+
     private function companyUser(Company $company, Role $role): User
     {
         return User::factory()->create([
