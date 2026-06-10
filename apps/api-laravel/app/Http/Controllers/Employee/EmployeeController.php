@@ -5,22 +5,26 @@ namespace App\Http\Controllers\Employee;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\CheckinRequest;
 use App\Http\Requests\Employee\UpdateProfileRequest;
-use App\Http\Resources\Company\MeasureResource;
+use App\Http\Resources\Employee\MeasureResource;
 use App\Http\Resources\Employee\WellbeingEntryResource;
 use App\Models\AnamnesisProfile;
 use App\Models\Measure;
 use App\Models\UserDocument;
+use App\Services\MeasureParticipationService;
 use App\Services\PointsService;
 use App\Services\WellbeingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class EmployeeController extends Controller
 {
     public function __construct(
         protected WellbeingService $wellbeingService,
-        protected PointsService $pointsService
+        protected PointsService $pointsService,
+        protected MeasureParticipationService $measureParticipationService
     ) {}
 
     public function dashboard(Request $request): JsonResponse
@@ -223,11 +227,48 @@ class EmployeeController extends Controller
                     $query->orWhere('team_id', $user->team_id);
                 }
             })
-            ->with('team:id,name')
+            ->with([
+                'team:id,name',
+                'participations' => fn ($query) => $query->where('user_id', $user->id),
+            ])
             ->orderBy('started_at', 'desc')
             ->get();
 
         return response()->json(['data' => MeasureResource::collection($measures)]);
+    }
+
+    public function participateInMeasure(Request $request, int|string $measure): JsonResponse
+    {
+        $user = $request->user();
+
+        try {
+            $participation = $this->measureParticipationService->participate($user, $measure);
+            $measureModel = $participation->measure()
+                ->with([
+                    'team:id,name',
+                    'participations' => fn ($query) => $query->where('user_id', $user->id),
+                ])
+                ->firstOrFail();
+        } catch (NotFoundHttpException) {
+            return response()->json(['message' => 'Not found'], 404);
+        } catch (ConflictHttpException $exception) {
+            $code = $exception->getMessage();
+
+            return response()->json([
+                'error' => [
+                    'code' => $code,
+                    'message' => match ($code) {
+                        'MEASURE_ALREADY_PARTICIPATED' => 'Measure already participated.',
+                        'MEASURE_NOT_ACTIVE' => 'Measure is not active.',
+                        default => 'Measure participation conflict.',
+                    },
+                ],
+            ], 409);
+        }
+
+        return response()->json([
+            'data' => new MeasureResource($measureModel),
+        ], 201);
     }
 
     private function calculateAnamnesisCompletion(array $profileData): int

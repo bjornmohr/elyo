@@ -673,6 +673,259 @@ class CompanyTest extends TestCase
         $response->assertStatus(400);
     }
 
+    public function test_measure_creation_accepts_domain_fields_and_derives_visibility_scope(): void
+    {
+        $response = $this->actingAs($this->admin)->postJson('/api/company/measures', [
+            'title' => 'Onsite resilience session',
+            'category' => 'mental',
+            'description' => 'A guided session for the Tech Team.',
+            'teamId' => $this->team->id,
+            'measureOrigin' => 'ELYO_TEMPLATE',
+            'deliveryType' => 'ONSITE',
+            'executionType' => 'GUIDED_SESSION',
+            'verificationRequirement' => 'SELF_REPORT',
+            'startsAt' => '2026-06-20 09:00:00',
+            'endsAt' => '2026-06-20 10:00:00',
+            'durationMinutes' => 60,
+            'instructions' => 'Bring comfortable clothes.',
+            'locationName' => 'Training Room A',
+            'locationAddress' => 'Main Street 1',
+            'capacity' => 12,
+            'pointsOverride' => 5,
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.deliveryType', 'ONSITE')
+            ->assertJsonPath('data.executionType', 'GUIDED_SESSION')
+            ->assertJsonPath('data.measureOrigin', 'COMPANY_CREATED')
+            ->assertJsonPath('data.verificationRequirement', 'SELF_REPORT')
+            ->assertJsonPath('data.visibilityScope', 'TEAM')
+            ->assertJsonPath('data.durationMinutes', 60)
+            ->assertJsonPath('data.locationName', 'Training Room A')
+            ->assertJsonPath('data.capacity', 12)
+            ->assertJsonPath('data.pointsOverride', 5);
+
+        $this->assertDatabaseHas('measures', [
+            'id' => $response->json('data.id'),
+            'team_id' => $this->team->id,
+            'measure_origin' => 'COMPANY_CREATED',
+            'delivery_type' => 'ONSITE',
+            'execution_type' => 'GUIDED_SESSION',
+            'verification_requirement' => 'SELF_REPORT',
+            'visibility_scope' => 'TEAM',
+            'duration_minutes' => 60,
+            'instructions' => 'Bring comfortable clothes.',
+            'location_name' => 'Training Room A',
+            'location_address' => 'Main Street 1',
+            'capacity' => 12,
+            'points_override' => 5,
+        ]);
+    }
+
+    public function test_measure_creation_uses_domain_field_defaults(): void
+    {
+        $response = $this->actingAs($this->admin)->postJson('/api/company/measures', [
+            'title' => 'Default measure',
+            'category' => 'sport',
+            'description' => 'A company-wide default measure.',
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.measureOrigin', 'COMPANY_CREATED')
+            ->assertJsonPath('data.deliveryType', 'ONSITE')
+            ->assertJsonPath('data.executionType', 'EVENT_PARTICIPATION')
+            ->assertJsonPath('data.verificationRequirement', 'SELF_REPORT')
+            ->assertJsonPath('data.visibilityScope', 'COMPANY');
+    }
+
+    public function test_measure_update_accepts_domain_fields_without_bypassing_status_transitions(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $response = $this->actingAs($this->admin)->patchJson("/api/company/measures/{$measure->id}", [
+            'deliveryType' => 'HYBRID',
+            'executionType' => 'CHALLENGE',
+            'verificationRequirement' => 'SELF_REPORT',
+            'startsAt' => '2026-07-01 08:00:00',
+            'endsAt' => '2026-07-01 09:00:00',
+            'durationMinutes' => 45,
+            'instructions' => null,
+            'locationName' => 'Courtyard',
+            'locationAddress' => 'Office Campus',
+            'capacity' => 25,
+            'pointsOverride' => 0,
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.status', 'ACTIVE')
+            ->assertJsonPath('data.deliveryType', 'HYBRID')
+            ->assertJsonPath('data.executionType', 'CHALLENGE')
+            ->assertJsonPath('data.pointsOverride', 0);
+
+        $this->assertDatabaseHas('measures', [
+            'id' => $measure->id,
+            'status' => 'ACTIVE',
+            'delivery_type' => 'HYBRID',
+            'execution_type' => 'CHALLENGE',
+            'verification_requirement' => 'SELF_REPORT',
+            'duration_minutes' => 45,
+            'location_name' => 'Courtyard',
+            'location_address' => 'Office Campus',
+            'capacity' => 25,
+            'points_override' => 0,
+            'visibility_scope' => 'COMPANY',
+        ]);
+
+        $this->actingAs($this->admin)->patchJson("/api/company/measures/{$measure->id}", [
+            'status' => 'ACTIVE',
+        ])->assertStatus(400);
+    }
+
+    public function test_measure_creation_rejects_unsupported_verification_requirements(): void
+    {
+        $response = $this->actingAs($this->admin)->postJson('/api/company/measures', [
+            'title' => 'QR measure',
+            'category' => 'sport',
+            'description' => 'A measure with unsupported verification.',
+            'verificationRequirement' => 'QR_CODE',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['verificationRequirement']);
+    }
+
+    public function test_measure_update_rejects_unsupported_verification_requirements(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $response = $this->actingAs($this->admin)->patchJson("/api/company/measures/{$measure->id}", [
+            'verificationRequirement' => 'ADMIN_CONFIRMATION',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['verificationRequirement']);
+    }
+
+    public function test_measure_update_does_not_allow_client_to_change_origin(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'measure_origin' => 'COMPANY_CREATED',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $response = $this->actingAs($this->admin)->patchJson("/api/company/measures/{$measure->id}", [
+            'measureOrigin' => 'ELYO_TEMPLATE',
+            'deliveryType' => 'REMOTE',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.measureOrigin', 'COMPANY_CREATED')
+            ->assertJsonPath('data.deliveryType', 'REMOTE');
+
+        $this->assertDatabaseHas('measures', [
+            'id' => $measure->id,
+            'measure_origin' => 'COMPANY_CREATED',
+            'delivery_type' => 'REMOTE',
+        ]);
+    }
+
+    public function test_measure_update_rejects_partial_ends_at_before_existing_starts_at(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'starts_at' => '2026-06-20 09:00:00',
+            'ends_at' => '2026-06-20 10:00:00',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$measure->id}", ['endsAt' => '2026-06-20 08:59:00'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['endsAt']);
+    }
+
+    public function test_measure_update_rejects_partial_starts_at_after_existing_ends_at(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'starts_at' => '2026-06-20 09:00:00',
+            'ends_at' => '2026-06-20 10:00:00',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$measure->id}", ['startsAt' => '2026-06-20 10:01:00'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['endsAt']);
+    }
+
+    public function test_measure_update_accepts_valid_partial_date_range(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'starts_at' => '2026-06-20 09:00:00',
+            'ends_at' => '2026-06-20 10:00:00',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$measure->id}", ['endsAt' => '2026-06-20 11:00:00'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.endsAt', '2026-06-20T11:00:00.000000Z');
+
+        $this->assertDatabaseHas('measures', [
+            'id' => $measure->id,
+            'ends_at' => '2026-06-20 11:00:00',
+        ]);
+    }
+
+    public function test_measure_domain_field_validation_rejects_invalid_values(): void
+    {
+        $response = $this->actingAs($this->admin)->postJson('/api/company/measures', [
+            'title' => 'Invalid measure',
+            'category' => 'sport',
+            'description' => 'A measure with invalid domain fields.',
+            'deliveryType' => 'SELF_GUIDED',
+            'executionType' => 'ONE_TIME',
+            'verificationRequirement' => 'UNKNOWN',
+            'startsAt' => '2026-06-20 10:00:00',
+            'endsAt' => '2026-06-20 09:00:00',
+            'durationMinutes' => 0,
+            'capacity' => 0,
+            'pointsOverride' => -1,
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors([
+                'deliveryType',
+                'executionType',
+                'verificationRequirement',
+                'endsAt',
+                'durationMinutes',
+                'capacity',
+                'pointsOverride',
+            ]);
+    }
+
     public function test_manager_can_see_global_and_managed_team_measures()
     {
         $otherTeam = Team::factory()->create(['company_id' => $this->company->id, 'name' => 'Sales']);

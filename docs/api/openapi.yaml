@@ -192,6 +192,170 @@ components:
         suggestedAt: { type: string, format: date-time }
         startedAt: { type: string, format: date-time, nullable: true }
         completedAt: { type: string, format: date-time, nullable: true }
+        measureOrigin:
+          type: string
+          enum: [COMPANY_CREATED, ELYO_TEMPLATE]
+          default: COMPANY_CREATED
+          readOnly: true
+        deliveryType:
+          type: string
+          enum: [REMOTE, ONSITE, HYBRID]
+          default: ONSITE
+        executionType:
+          type: string
+          enum: [INFORMATION_ONLY, GUIDED_SESSION, SELF_REPORTED_ACTION, EVENT_PARTICIPATION, CHALLENGE]
+          default: EVENT_PARTICIPATION
+        verificationRequirement:
+          type: string
+          enum: [SELF_REPORT]
+          default: SELF_REPORT
+        visibilityScope:
+          type: string
+          enum: [COMPANY, TEAM]
+          description: Derived server-side from team scope.
+        startsAt: { type: string, format: date-time, nullable: true }
+        endsAt: { type: string, format: date-time, nullable: true }
+        durationMinutes: { type: integer, nullable: true, minimum: 1 }
+        instructions: { type: string, nullable: true, maxLength: 2000 }
+        locationName: { type: string, nullable: true, maxLength: 255 }
+        locationAddress: { type: string, nullable: true, maxLength: 1000 }
+        capacity: { type: integer, nullable: true, minimum: 1 }
+        pointsOverride:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: Stored for future behavior; current participation points continue to use point settings.
+
+    CompanyMeasurePayload:
+      type: object
+      properties:
+        deliveryType: { type: string, enum: [REMOTE, ONSITE, HYBRID] }
+        executionType: { type: string, enum: [INFORMATION_ONLY, GUIDED_SESSION, SELF_REPORTED_ACTION, EVENT_PARTICIPATION, CHALLENGE] }
+        verificationRequirement: { type: string, enum: [SELF_REPORT] }
+        startsAt: { type: string, format: date-time, nullable: true }
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Must not be before the effective startsAt value.
+        durationMinutes: { type: integer, nullable: true, minimum: 1 }
+        instructions: { type: string, nullable: true, maxLength: 2000 }
+        locationName: { type: string, nullable: true, maxLength: 255 }
+        locationAddress: { type: string, nullable: true, maxLength: 1000 }
+        capacity: { type: integer, nullable: true, minimum: 1 }
+        pointsOverride: { type: integer, nullable: true, minimum: 0 }
+
+    CompanyMeasureCreatePayload:
+      allOf:
+        - $ref: '#/components/schemas/CompanyMeasurePayload'
+        - type: object
+          required: [title, category, description]
+          properties:
+            title: { type: string, minLength: 3, maxLength: 100 }
+            category: { type: string, enum: [workshop, flexibility, sport, mental, nutrition] }
+            description: { type: string, minLength: 10, maxLength: 500 }
+            teamId: { type: integer, nullable: true }
+            status: { type: string, enum: [SUGGESTED, ACTIVE] }
+
+    CompanyMeasureUpdatePayload:
+      allOf:
+        - $ref: '#/components/schemas/CompanyMeasurePayload'
+        - type: object
+          properties:
+            status: { type: string, enum: [ACTIVE, COMPLETED, DISMISSED] }
+
+    MeasureParticipationSummary:
+      type: object
+      required:
+        - measureId
+        - isAboveThreshold
+        - eligibleCount
+        - participantCount
+        - participationRate
+        - suppressionReason
+        - teamBreakdown
+      additionalProperties: false
+      properties:
+        measureId: { type: integer }
+        isAboveThreshold: { type: boolean }
+        eligibleCount:
+          type: integer
+          nullable: true
+          description: Null when anonymity threshold suppression applies.
+        participantCount:
+          type: integer
+          nullable: true
+          description: Null when anonymity threshold suppression applies.
+        participationRate:
+          type: number
+          nullable: true
+          description: Percentage of scoped eligible employees who participated, null when suppressed.
+        suppressionReason:
+          type: string
+          nullable: true
+          enum: [ANONYMITY_THRESHOLD_NOT_MET]
+        teamBreakdown:
+          type: array
+          nullable: true
+          description: Nullable future field. Current backend responses return null; non-null array data is reserved for a future privacy-reviewed team breakdown feature.
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              teamId: { type: integer }
+              teamName: { type: string }
+              isAboveThreshold: { type: boolean }
+              eligibleCount: { type: integer, nullable: true }
+              participantCount: { type: integer, nullable: true }
+              participationRate: { type: number, nullable: true }
+              suppressionReason: { type: string, nullable: true }
+            description: Always null for this measure-level aggregate endpoint.
+
+    EmployeeMeasure:
+      allOf:
+        - $ref: '#/components/schemas/Measure'
+        - type: object
+          required: [participation]
+          properties:
+            team:
+              type: object
+              nullable: true
+              properties:
+                name: { type: string }
+            participation:
+              type: object
+              required: [isParticipating, participatedAt]
+              properties:
+                isParticipating: { type: boolean }
+                participatedAt: { type: string, format: date-time, nullable: true }
+
+    MeasureAlreadyParticipatedError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [MEASURE_ALREADY_PARTICIPATED]
+            message:
+              type: string
+
+    MeasureNotActiveError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [MEASURE_NOT_ACTIVE]
+            message:
+              type: string
 
     TeamLayerDisabledError:
       type: object
@@ -238,6 +402,17 @@ components:
       additionalProperties: false
       properties:
         message: { type: string }
+
+    LaravelValidationError:
+      type: object
+      required: [message, errors]
+      properties:
+        message: { type: string }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
 
     AnonymityThresholdError:
       type: object
@@ -574,6 +749,57 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/User' }
+
+  /employee/measures:
+    get:
+      tags: [Employee]
+      summary: List active measures visible to the authenticated employee
+      description: Returns active company-wide measures and active measures targeted to the authenticated employee's current team, including only that employee's participation state.
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Visible employee measures
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EmployeeMeasure'
+
+  /employee/measures/{measure}/participate:
+    post:
+      tags: [Employee]
+      summary: Participate in an active measure
+      description: Creates a participation for the authenticated employee. The request body is ignored; user, company, team, and participation time are derived server-side.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: measure
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        201:
+          description: Participation created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EmployeeMeasure'
+        404:
+          description: Measure not found or not visible to the authenticated employee
+        409:
+          description: Duplicate participation or inactive visible measure
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/MeasureAlreadyParticipatedError'
+                  - $ref: '#/components/schemas/MeasureNotActiveError'
 
   /employee/surveys:
     get:
@@ -1270,6 +1496,15 @@ paths:
       responses:
         200:
           description: List of measures
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Measure'
         403:
           $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
     post:
@@ -1277,19 +1512,37 @@ paths:
       summary: Create/Activate a measure
       description: Company-wide measures remain available when the team layer is disabled. teamId payloads return TEAM_LAYER_DISABLED; manager-only users without the team layer receive PORTAL_FORBIDDEN at the company portal guard.
       security: [{ Sanctum: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompanyMeasureCreatePayload'
       responses:
         201:
           description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Measure' }
         403:
           $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
         422:
-          $ref: '#/components/responses/TeamLayerDisabled'
+          description: Laravel validation error for invalid or missing request fields, including required fields, string length constraints, invalid enum values, unsupported verificationRequirement values, invalid date formats, invalid date ranges, invalid integer values, invalid team payloads, or TEAM_LAYER_DISABLED for teamId payloads when the company team layer is disabled
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/LaravelValidationError'
+                  - $ref: '#/components/schemas/TeamLayerDisabledError'
 
-  /company/measures/{id}:
-    patch:
+  /company/measures/{id}/participation-summary:
+    get:
       tags: [Company]
-      summary: Update measure status
-      description: Team-scoped measures are rejected with TEAM_LAYER_DISABLED when the company team layer is disabled.
+      summary: Get aggregate measure participation summary
+      description: Returns measure-level aggregate participation metrics only. Individual participant records, user IDs, names, emails, raw participation rows, and per-user participation timestamps are never returned. teamBreakdown is a nullable future field; current backend responses return it as null, and non-null array data is reserved for a future privacy-reviewed team breakdown feature. Metrics are null when anonymity threshold suppression applies.
       security: [{ Sanctum: [] }]
       parameters:
         - name: id
@@ -1298,9 +1551,69 @@ paths:
           schema: { type: string }
       responses:
         200:
-          description: Updated
+          description: Aggregate measure participation summary
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/MeasureParticipationSummary'
+        401:
+          description: Unauthorized
         403:
           $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
+        404:
+          description: Measure not found or not visible to the authenticated company user
+
+  /company/measures/{id}:
+    patch:
+      tags: [Company]
+      summary: Update measure status and domain fields
+      description: Team-scoped measures are rejected with TEAM_LAYER_DISABLED when the company team layer is disabled.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompanyMeasureUpdatePayload'
+      responses:
+        200:
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Measure' }
+        400:
+          description: Invalid measure status transition
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                    enum: [invalid_transition]
+        403:
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
+        404:
+          description: Measure not found for the authenticated company user
+        422:
+          description: Laravel validation error for invalid request fields, including string length constraints, invalid enum values, unsupported verificationRequirement values, invalid date formats, invalid partial date ranges against persisted values, or invalid integer values
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LaravelValidationError'
 
   /company/reports:
     get:

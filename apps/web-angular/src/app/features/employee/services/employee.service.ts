@@ -51,6 +51,31 @@ export interface SurveyResult {
   questions: Array<SurveyQuestion & { answer: any }>;
 }
 
+export interface EmployeeMeasureParticipation {
+  isParticipating: boolean;
+  participatedAt: string | null;
+}
+
+export interface EmployeeMeasure {
+  id: number;
+  title: string;
+  description: string | null;
+  category: string | null;
+  deliveryType?: 'REMOTE' | 'ONSITE' | 'HYBRID' | null;
+  executionType?: string | null;
+  verificationRequirement?: string | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  durationMinutes?: number | null;
+  instructions?: string | null;
+  locationName?: string | null;
+  locationAddress?: string | null;
+  capacity?: number | null;
+  pointsOverride?: number | null;
+  team?: { id: number; name: string } | null;
+  participation?: EmployeeMeasureParticipation | null;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -135,8 +160,12 @@ export class EmployeeService {
     return this.api.get<{ survey: SurveyResult }>(`/employee/surveys/${id}/result`).pipe(map(res => res.survey));
   }
 
-  getMeasures(): Observable<any[]> {
-    return this.api.get<{ data: any[] }>('/employee/measures').pipe(map(res => res.data ?? []));
+  getMeasures(): Observable<EmployeeMeasure[]> {
+    return this.api.get<{ data: EmployeeMeasure[] }>('/employee/measures').pipe(map(res => res.data ?? []));
+  }
+
+  participateInMeasure(measureId: number): Observable<{ data: EmployeeMeasure }> {
+    return this.api.post<{ data: EmployeeMeasure }>(`/employee/measures/${measureId}/participate`, {});
   }
 
   uploadDocument(file: File): Observable<any> {
