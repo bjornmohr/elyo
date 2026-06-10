@@ -91,7 +91,8 @@ class MeasureController extends Controller
             'status' => $status,
             'started_at' => $status === 'ACTIVE' ? now() : null,
             'created_by' => $user->id,
-        ]);
+            'measure_origin' => 'COMPANY_CREATED',
+        ] + $this->measureDomainData($request->validated()));
 
         return new MeasureResource($measure->load('team:id,name'));
     }
@@ -122,29 +123,33 @@ class MeasureController extends Controller
             abort(403);
         }
 
-        $validTransitions = [
-            'SUGGESTED' => ['ACTIVE', 'DISMISSED'],
-            'ACTIVE' => ['COMPLETED', 'DISMISSED'],
-        ];
+        $updateData = $this->measureDomainData($request->validated());
 
-        $newStatus = $request->status;
-        $allowed = $validTransitions[$measure->status] ?? [];
+        if ($request->has('status')) {
+            $validTransitions = [
+                'SUGGESTED' => ['ACTIVE', 'DISMISSED'],
+                'ACTIVE' => ['COMPLETED', 'DISMISSED'],
+            ];
 
-        if (! in_array($newStatus, $allowed)) {
-            return response()->json(['error' => 'invalid_transition'], 400);
-        }
+            $newStatus = $request->status;
+            $allowed = $validTransitions[$measure->status] ?? [];
 
-        $updateData = ['status' => $newStatus];
-        if ($newStatus === 'ACTIVE') {
-            $updateData['started_at'] = now();
-        }
-        if ($newStatus === 'COMPLETED') {
-            $updateData['completed_at'] = now();
+            if (! in_array($newStatus, $allowed)) {
+                return response()->json(['error' => 'invalid_transition'], 400);
+            }
+
+            $updateData['status'] = $newStatus;
+            if ($newStatus === 'ACTIVE') {
+                $updateData['started_at'] = now();
+            }
+            if ($newStatus === 'COMPLETED') {
+                $updateData['completed_at'] = now();
+            }
         }
 
         $measure->update($updateData);
 
-        return new MeasureResource($measure);
+        return new MeasureResource($measure->load('team:id,name'));
     }
 
     public function participationSummary(Request $request, $id)
@@ -155,5 +160,31 @@ class MeasureController extends Controller
         return new MeasureParticipationSummaryResource(
             $this->measureParticipationSummaryService->summaryFor($request->user(), $id, $threshold)
         );
+    }
+
+    private function measureDomainData(array $validated): array
+    {
+        $map = [
+            'deliveryType' => 'delivery_type',
+            'executionType' => 'execution_type',
+            'verificationRequirement' => 'verification_requirement',
+            'startsAt' => 'starts_at',
+            'endsAt' => 'ends_at',
+            'durationMinutes' => 'duration_minutes',
+            'instructions' => 'instructions',
+            'locationName' => 'location_name',
+            'locationAddress' => 'location_address',
+            'capacity' => 'capacity',
+            'pointsOverride' => 'points_override',
+        ];
+
+        $data = [];
+        foreach ($map as $input => $column) {
+            if (array_key_exists($input, $validated)) {
+                $data[$column] = $validated[$input];
+            }
+        }
+
+        return $data;
     }
 }

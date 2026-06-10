@@ -323,3 +323,178 @@ That future task should add actual participation verification fields to `measure
 - `verified_by_user_id`
 
 and should preserve the current self-report participation as the default behavior.
+
+## Implementation Plan
+
+### Constraints for the implementation pass
+
+- Keep this as an additive, backward-compatible vertical slice.
+- Do not modify `../ELYO`.
+- Do not implement QR flows, admin confirmation, partner confirmation, recommendations, templates, Measures Hub restructuring, questionnaire/check-in changes, or participation verification fields.
+- Do not change `measure_participations` behavior or points-award behavior in this task.
+- Do not expose individual employee health data, raw free text health answers, or identifiable participation data to company users.
+- Do not run destructive database commands such as `migrate:fresh`, `db:wipe`, or `docker compose down -v`.
+
+### 1. Backend schema
+
+- Add one new non-destructive Laravel migration for `measures`.
+- Add nullable/defaulted columns:
+  - `measure_origin` string default `COMPANY_CREATED`
+  - `delivery_type` string default `ONSITE`
+  - `execution_type` string default `EVENT_PARTICIPATION`
+  - `verification_requirement` string default `SELF_REPORT`
+  - `visibility_scope` string default `COMPANY`
+  - `starts_at` nullable timestamp
+  - `ends_at` nullable timestamp
+  - `duration_minutes` nullable unsigned integer
+  - `instructions` nullable text
+  - `location_name` nullable string
+  - `location_address` nullable text
+  - `capacity` nullable unsigned integer
+  - `points_override` nullable unsigned integer
+- Backfill `visibility_scope` in the migration based on current `team_id`:
+  - `COMPANY` when `team_id` is null
+  - `TEAM` when `team_id` is set
+- Add useful indexes only if they support existing or newly exposed query/filter patterns; avoid speculative indexes.
+
+### 2. Backend model and constants
+
+- Update `App\Models\Measure` fillable fields with the new measure columns.
+- Add casts:
+  - `starts_at`, `ends_at` as `datetime`
+  - `duration_minutes`, `capacity`, `points_override` as `integer`
+- Check whether the project already uses PHP enums for comparable API fields. If not, use request validation constants or private arrays in the relevant Form Request classes rather than introducing a broad enum layer for this slice.
+- Keep default behavior model-compatible with existing factories and seeders; update `MeasureFactory` only as needed to make test data explicit and stable.
+
+### 3. Backend validation
+
+- Extend `CreateMeasureRequest` to accept the new request fields with strict enum validation.
+- Extend `PatchMeasureRequest` so company users can update the new maintainable measure fields as well as status.
+- Preserve current status-transition validation in the controller/service layer; do not let a general patch payload bypass the existing transition rules.
+- Validate:
+  - `measureOrigin` or `measure_origin` according to the existing API naming style chosen for this endpoint.
+  - `deliveryType`: `REMOTE`, `ONSITE`, `HYBRID`
+  - `executionType`: `INFORMATION_ONLY`, `GUIDED_SESSION`, `SELF_REPORTED_ACTION`, `EVENT_PARTICIPATION`, `CHALLENGE`
+  - `verificationRequirement`: `NONE`, `SELF_REPORT`, `QR_CODE`, `ADMIN_CONFIRMATION`, `PARTNER_CONFIRMATION`
+  - `startsAt`, `endsAt` as nullable dates, with `endsAt` not before `startsAt` when both are present
+  - `durationMinutes` as nullable positive integer
+  - `capacity` as nullable positive integer
+  - `pointsOverride` as nullable integer with minimum `0`
+  - text/string length limits for `instructions`, `locationName`, and `locationAddress`
+- Derive or enforce `visibility_scope` from `team_id`; do not trust a client-provided value that conflicts with the server-derived team scope.
+- Keep company identity, manager team scope, and team-layer restrictions derived from authenticated user context.
+
+### 4. Backend controller/resource behavior
+
+- In company create:
+  - Continue deriving `company_id`, `team_id`, and `created_by` server-side.
+  - Apply defaults for omitted new fields.
+  - Store `visibility_scope` from the final server-side `team_id`, including manager-only team assignment.
+- In company update:
+  - Keep company/team access checks unchanged.
+  - Apply status changes only through the existing allowed transition map.
+  - Update non-status measure fields when present in the validated payload.
+  - Recompute `visibility_scope` if `team_id` can ever be changed in this endpoint; otherwise leave it consistent with the existing `team_id`.
+- Update company and employee `MeasureResource` classes to expose stable camelCase API fields matching OpenAPI:
+  - `measureOrigin`
+  - `deliveryType`
+  - `executionType`
+  - `verificationRequirement`
+  - `visibilityScope`
+  - `startsAt`
+  - `endsAt`
+  - `durationMinutes`
+  - `instructions`
+  - `locationName`
+  - `locationAddress`
+  - `capacity`
+  - `pointsOverride`
+- Ensure participation responses returned after `POST /employee/measures/{measure}/participate` include the same new employee measure fields without changing duplicate-conflict behavior or point awarding.
+- Leave participation summary logic untouched except for test fixture compatibility if needed.
+
+### 5. OpenAPI contract
+
+- Update `docs/api/openapi.yaml` for company measure create/update request bodies.
+- Update company and employee measure response schemas with the new camelCase fields, enum values, nullability, and defaults where appropriate.
+- Keep existing endpoints and error behavior documented as backward-compatible.
+- Do not document unimplemented QR/admin/partner verification endpoints or participation verification fields.
+
+### 6. Frontend types and API usage
+
+- Add or extend local TypeScript interfaces for company and employee measures instead of continuing to rely on broad `any` where the touched UI needs the new fields.
+- Keep API calls in existing Angular services or the existing `ApiClient` usage pattern; do not add direct `fetch` calls.
+- Keep backend-owned scoping and defaults; the frontend should send only editable fields and should not infer company identity.
+
+### 7. Company Measures UI
+
+- Extend the existing create form minimally with:
+  - delivery type
+  - execution type
+  - verification requirement
+  - starts/end date-time fields
+  - duration
+  - instructions
+  - location name
+  - location address
+  - capacity
+  - points override
+- Keep the existing title/category/description/team/status workflow intact.
+- Add client-side validators that mirror backend constraints where practical, but treat backend validation as authoritative.
+- Display selected scheduling/location/type fields in the existing measures list without redesigning the page.
+- Preserve participation summary display and anonymity-threshold suppression behavior exactly.
+
+### 8. Employee Measures UI
+
+- Extend the existing employee measure cards minimally to display relevant new fields:
+  - delivery type badge
+  - execution type label
+  - schedule when present
+  - location for `ONSITE` or `HYBRID`
+  - duration when present
+  - instructions when present
+  - verification requirement only as neutral information, without implying implemented QR/admin confirmation flows
+- Keep the existing `Teilnehmen` flow unchanged.
+- Keep duplicate participation and inactive-measure error handling unchanged.
+
+### 9. Tests
+
+- Add or update backend feature tests for:
+  - creating a company measure with the new fields
+  - default values when new fields are omitted
+  - updating maintainable new fields
+  - invalid enum validation
+  - invalid date range validation
+  - positive integer validation for duration/capacity and non-negative validation for points override
+  - employee measure list response includes the new fields
+  - existing participation success still awards points once
+  - duplicate participation still returns `409`
+  - company/team scoping remains intact, including manager/team-layer behavior where existing tests cover it
+  - participation summary remains aggregate and threshold-protected
+- Update Angular tests only where the new form controls or displayed fields require it.
+
+### 10. Validation for the implementation pass
+
+- Run non-destructive validation only:
+  - relevant Laravel feature tests for company measures, employee measures, participation, and participation summary
+  - Angular tests/build relevant to changed measure UI, or `docker compose exec web npm run build` if that is the established project check for the patch
+  - OpenAPI validation if a project command exists
+  - `git diff --check`
+- Do not run `migrate:fresh` for this task unless the user explicitly changes the constraints.
+
+### 11. Review checklist before handoff
+
+- Confirm OpenAPI matches request and response behavior.
+- Confirm no company response exposes individual participation rows or employee health data.
+- Confirm `visibility_scope` cannot be client-forged against `team_id`.
+- Confirm `points_override` is stored/exposed only and does not change current point-award behavior.
+- Confirm defaults preserve existing measures as company-created onsite event participation with self-report verification.
+- Confirm frontend changes are minimal and do not create a Measures Hub.
+- Mark any uncertain existing repository convention explicitly in the handoff.
+
+## Plan Adjustments Before Implementation
+
+- Do not accept `visibilityScope` / `visibility_scope` from create or patch request payloads. Always derive `visibility_scope` server-side from the final `team_id`: `COMPANY` when `team_id` is null, `TEAM` when `team_id` is set.
+- Use `ONSITE` + `EVENT_PARTICIPATION` + `SELF_REPORT` as compatibility-preserving defaults for the current company-measure slice, unless code inspection clearly shows that existing seed/test measures are remote-like.
+- Do not make `team_id` editable in this task unless it is already editable in the current implementation.
+- Keep optional frontend fields compact. If the existing Company Measures UI becomes noisy, place the new optional fields in an "Erweiterte Angaben" section instead of redesigning the page.
+- Do not prominently display `pointsOverride` in the Employee UI until point-award behavior actually uses it. It may be exposed in the API for future compatibility.

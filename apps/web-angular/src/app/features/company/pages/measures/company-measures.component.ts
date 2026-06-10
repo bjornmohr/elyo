@@ -16,6 +16,26 @@ interface MeasureParticipationSummary {
   teamBreakdown: null;
 }
 
+interface CompanyMeasure {
+  id: number;
+  title: string;
+  category: string;
+  description: string;
+  status: string;
+  deliveryType?: string | null;
+  executionType?: string | null;
+  verificationRequirement?: string | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  durationMinutes?: number | null;
+  instructions?: string | null;
+  locationName?: string | null;
+  locationAddress?: string | null;
+  capacity?: number | null;
+  pointsOverride?: number | null;
+  team?: { name: string } | null;
+}
+
 @Component({
   selector: 'app-company-measures',
   standalone: true,
@@ -103,6 +123,86 @@ interface MeasureParticipationSummary {
             </label>
           </div>
 
+          <div class="space-y-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <label class="block">
+                <span class="text-sm font-medium text-gray-700">Durchführung</span>
+                <select formControlName="deliveryType"
+                        class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500">
+                  <option value="ONSITE">Vor Ort</option>
+                  <option value="REMOTE">Remote</option>
+                  <option value="HYBRID">Hybrid</option>
+                </select>
+              </label>
+              <label class="block">
+                <span class="text-sm font-medium text-gray-700">Ablauf</span>
+                <select formControlName="executionType"
+                        class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500">
+                  <option value="EVENT_PARTICIPATION">Event-Teilnahme</option>
+                  <option value="INFORMATION_ONLY">Information</option>
+                  <option value="GUIDED_SESSION">Geführte Session</option>
+                  <option value="SELF_REPORTED_ACTION">Selbst gemeldet</option>
+                  <option value="CHALLENGE">Challenge</option>
+                </select>
+              </label>
+              <label class="block">
+                <span class="text-sm font-medium text-gray-700">Nachweis</span>
+                <select formControlName="verificationRequirement"
+                        class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500">
+                  <option value="SELF_REPORT">Selbstmeldung</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <label class="block">
+                <span class="text-sm font-medium text-gray-700">Start</span>
+                <input type="datetime-local" formControlName="startsAt"
+                       class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
+              </label>
+              <label class="block">
+                <span class="text-sm font-medium text-gray-700">Ende</span>
+                <input type="datetime-local" formControlName="endsAt"
+                       class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
+              </label>
+              <label class="block">
+                <span class="text-sm font-medium text-gray-700">Dauer (Min.)</span>
+                <input type="number" min="1" formControlName="durationMinutes"
+                       class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
+              </label>
+              <label class="block">
+                <span class="text-sm font-medium text-gray-700">Kapazität</span>
+                <input type="number" min="1" formControlName="capacity"
+                       class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
+              </label>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label class="block">
+                <span class="text-sm font-medium text-gray-700">Ort</span>
+                <input formControlName="locationName"
+                       class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
+              </label>
+              <label class="block">
+                <span class="text-sm font-medium text-gray-700">Punkte-Override</span>
+                <input type="number" min="0" formControlName="pointsOverride"
+                       class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
+              </label>
+            </div>
+
+            <label class="block">
+              <span class="text-sm font-medium text-gray-700">Adresse</span>
+              <input formControlName="locationAddress"
+                     class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
+            </label>
+
+            <label class="block">
+              <span class="text-sm font-medium text-gray-700">Hinweise</span>
+              <textarea formControlName="instructions" rows="2"
+                        class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"></textarea>
+            </label>
+          </div>
+
           @if (formError()) {
             <div class="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">{{ formError() }}
             </div>
@@ -135,6 +235,7 @@ interface MeasureParticipationSummary {
                 @if (teamLayerEnabled()) {
                   <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Team</th>
                 }
+                <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Details</th>
                 <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Teilnahme</th>
                 <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Status</th>
               </tr>
@@ -147,6 +248,17 @@ interface MeasureParticipationSummary {
                     @if (teamLayerEnabled()) {
                       <td class="px-4 py-3 text-gray-500">{{ measure.team?.name || 'Alle Teams' }}</td>
                     }
+                    <td class="px-4 py-3 text-gray-500">
+                      <div class="space-y-1">
+                        <div>{{ label(measure.deliveryType) }} / {{ label(measure.executionType) }}</div>
+                        @if (measure.startsAt || measure.endsAt) {
+                          <div class="text-xs">{{ scheduleLabel(measure) }}</div>
+                        }
+                        @if (measure.locationName) {
+                          <div class="text-xs">{{ measure.locationName }}</div>
+                        }
+                      </div>
+                    </td>
                     <td class="px-4 py-3 text-gray-500">
                       @if (summaryFor(measure.id); as summary) {
                         @if (summary.isAboveThreshold) {
@@ -181,7 +293,7 @@ export class CompanyMeasuresComponent implements OnInit {
   private fb = inject(FormBuilder);
   private notifications = inject(NotificationService);
 
-  measures = signal<any[]>([]);
+  measures = signal<CompanyMeasure[]>([]);
   teams = signal<any[]>([]);
   loading = signal(true);
   saving = signal(false);
@@ -195,6 +307,17 @@ export class CompanyMeasuresComponent implements OnInit {
     description: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(500)]],
     teamId: [null as number | null],
     status: ['ACTIVE', [Validators.required]],
+    deliveryType: ['ONSITE', [Validators.required]],
+    executionType: ['EVENT_PARTICIPATION', [Validators.required]],
+    verificationRequirement: ['SELF_REPORT', [Validators.required]],
+    startsAt: [null as string | null],
+    endsAt: [null as string | null],
+    durationMinutes: [null as number | null, [Validators.min(1)]],
+    instructions: [null as string | null, [Validators.maxLength(2000)]],
+    locationName: [null as string | null, [Validators.maxLength(255)]],
+    locationAddress: [null as string | null, [Validators.maxLength(1000)]],
+    capacity: [null as number | null, [Validators.min(1)]],
+    pointsOverride: [null as number | null, [Validators.min(0)]],
   });
 
   ngOnInit() {
@@ -253,7 +376,7 @@ export class CompanyMeasuresComponent implements OnInit {
         if (res.data?.id) {
           this.loadParticipationSummary(res.data.id);
         }
-        this.measureForm.reset({ title: '', category: '', description: '', teamId: null, status: 'ACTIVE' });
+        this.resetForm();
         this.showForm.set(false);
         this.notifications.success('Maßnahme wurde gespeichert.');
         this.saving.set(false);
@@ -268,7 +391,7 @@ export class CompanyMeasuresComponent implements OnInit {
   }
 
   private loadMeasures() {
-    this.api.get<{ data: any[] }>('/company/measures').subscribe({
+    this.api.get<{ data: CompanyMeasure[] }>('/company/measures').subscribe({
       next: res => {
         const measures = res.data ?? [];
         this.measures.set(measures);
@@ -317,9 +440,46 @@ export class CompanyMeasuresComponent implements OnInit {
     return `${summary.participantCount} von ${summary.eligibleCount} Berechtigten`;
   }
 
+  label(value: string | null | undefined) {
+    return value ? value.toLowerCase().replace(/_/g, ' ') : '-';
+  }
+
+  scheduleLabel(measure: CompanyMeasure) {
+    const startsAt = measure.startsAt ? new Date(measure.startsAt).toLocaleString('de-DE') : null;
+    const endsAt = measure.endsAt ? new Date(measure.endsAt).toLocaleString('de-DE') : null;
+
+    if (startsAt && endsAt) return `${startsAt} - ${endsAt}`;
+    return startsAt ?? endsAt ?? '';
+  }
+
   private payload() {
-    const { teamId, ...payload } = this.measureForm.value;
+    const { teamId, ...rawPayload } = this.measureForm.value;
+    const payload = Object.fromEntries(
+      Object.entries(rawPayload).map(([key, value]) => [key, value === '' ? null : value])
+    );
+
     return this.teamLayerEnabled() ? { ...payload, teamId } : payload;
+  }
+
+  private resetForm() {
+    this.measureForm.reset({
+      title: '',
+      category: '',
+      description: '',
+      teamId: null,
+      status: 'ACTIVE',
+      deliveryType: 'ONSITE',
+      executionType: 'EVENT_PARTICIPATION',
+      verificationRequirement: 'SELF_REPORT',
+      startsAt: null,
+      endsAt: null,
+      durationMinutes: null,
+      instructions: null,
+      locationName: null,
+      locationAddress: null,
+      capacity: null,
+      pointsOverride: null,
+    });
   }
 
   private isManagerOnly() {

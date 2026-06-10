@@ -14,14 +14,34 @@ class Measure extends Model
     protected $fillable = [
         'company_id', 'team_id', 'title', 'category',
         'description', 'status', 'suggested_at', 'started_at',
-        'completed_at', 'created_by',
+        'completed_at', 'created_by', 'measure_origin',
+        'delivery_type', 'execution_type', 'verification_requirement',
+        'visibility_scope', 'starts_at', 'ends_at', 'duration_minutes',
+        'instructions', 'location_name', 'location_address', 'capacity',
+        'points_override',
     ];
 
     protected $casts = [
         'suggested_at' => 'datetime',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
+        'starts_at' => 'datetime',
+        'ends_at' => 'datetime',
+        'duration_minutes' => 'integer',
+        'capacity' => 'integer',
+        'points_override' => 'integer',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (Measure $measure): void {
+            $measure->measure_origin ??= 'COMPANY_CREATED';
+            $measure->delivery_type ??= 'ONSITE';
+            $measure->execution_type ??= 'EVENT_PARTICIPATION';
+            $measure->verification_requirement ??= 'SELF_REPORT';
+            $measure->visibility_scope = $measure->team_id === null ? 'COMPANY' : 'TEAM';
+        });
+    }
 
     public function company(): BelongsTo
     {

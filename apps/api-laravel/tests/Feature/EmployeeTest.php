@@ -751,6 +751,41 @@ class EmployeeTest extends TestCase
         );
     }
 
+    public function test_employee_measure_list_exposes_measure_domain_fields(): void
+    {
+        Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'title' => 'Guided session',
+            'status' => 'ACTIVE',
+            'delivery_type' => 'HYBRID',
+            'execution_type' => 'GUIDED_SESSION',
+            'verification_requirement' => 'SELF_REPORT',
+            'starts_at' => Carbon::parse('2026-06-20 09:00:00'),
+            'ends_at' => Carbon::parse('2026-06-20 10:00:00'),
+            'duration_minutes' => 60,
+            'instructions' => 'Bring water.',
+            'location_name' => 'Training Room A',
+            'location_address' => 'Main Street 1',
+            'capacity' => 15,
+            'points_override' => 5,
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/measures')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.deliveryType', 'HYBRID')
+            ->assertJsonPath('data.0.executionType', 'GUIDED_SESSION')
+            ->assertJsonPath('data.0.verificationRequirement', 'SELF_REPORT')
+            ->assertJsonPath('data.0.visibilityScope', 'COMPANY')
+            ->assertJsonPath('data.0.durationMinutes', 60)
+            ->assertJsonPath('data.0.instructions', 'Bring water.')
+            ->assertJsonPath('data.0.locationName', 'Training Room A')
+            ->assertJsonPath('data.0.locationAddress', 'Main Street 1')
+            ->assertJsonPath('data.0.capacity', 15)
+            ->assertJsonPath('data.0.pointsOverride', 5);
+    }
+
     public function test_employee_measure_list_includes_authenticated_employee_participation_state()
     {
         $measure = Measure::factory()->create([
@@ -810,6 +845,7 @@ class EmployeeTest extends TestCase
             'company_id' => $this->company->id,
             'team_id' => null,
             'status' => 'ACTIVE',
+            'verification_requirement' => 'SELF_REPORT',
         ]);
 
         $this->actingAs($this->employee, 'sanctum')
@@ -924,6 +960,7 @@ class EmployeeTest extends TestCase
             'company_id' => $this->company->id,
             'team_id' => null,
             'status' => 'ACTIVE',
+            'verification_requirement' => 'SELF_REPORT',
         ]);
 
         $this->actingAs($this->employee, 'sanctum')

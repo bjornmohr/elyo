@@ -32,8 +32,33 @@ import { NotificationService } from '../../../../shared/notifications/notificati
                   <h2 class="font-bold text-slate-800">{{ measure.title }}</h2>
                   <p class="text-sm text-slate-500 mt-1">{{ measure.description }}</p>
                 </div>
-                <span class="px-2 py-0.5 rounded-full text-xs bg-teal-50 text-teal-700">{{ measure.category }}</span>
+                <div class="flex flex-col items-end gap-1">
+                  <span class="px-2 py-0.5 rounded-full text-xs bg-teal-50 text-teal-700">{{ measure.category }}</span>
+                  @if (measure.deliveryType) {
+                    <span class="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-600">{{ label(measure.deliveryType) }}</span>
+                  }
+                </div>
               </div>
+              <div class="grid gap-1 text-xs text-slate-500 sm:grid-cols-2">
+                @if (measure.executionType) {
+                  <p>{{ label(measure.executionType) }}</p>
+                }
+                @if (measure.startsAt || measure.endsAt) {
+                  <p>{{ scheduleLabel(measure) }}</p>
+                }
+                @if ((measure.deliveryType === 'ONSITE' || measure.deliveryType === 'HYBRID') && (measure.locationName || measure.locationAddress)) {
+                  <p>{{ measure.locationName || measure.locationAddress }}</p>
+                }
+                @if (measure.durationMinutes) {
+                  <p>{{ measure.durationMinutes }} Minuten</p>
+                }
+                @if (measure.verificationRequirement) {
+                  <p>Nachweis: {{ label(measure.verificationRequirement) }}</p>
+                }
+              </div>
+              @if (measure.instructions) {
+                <p class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{{ measure.instructions }}</p>
+              }
               <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p class="text-xs text-slate-400">{{ measure.team?.name || 'Alle Teams' }}</p>
 
@@ -111,6 +136,18 @@ export class EmployeeMeasuresComponent implements OnInit {
         this.setParticipating(measure.id, false);
       },
     });
+  }
+
+  label(value: string) {
+    return value.toLowerCase().replace(/_/g, ' ');
+  }
+
+  scheduleLabel(measure: EmployeeMeasure) {
+    const startsAt = measure.startsAt ? new Date(measure.startsAt).toLocaleString('de-DE') : null;
+    const endsAt = measure.endsAt ? new Date(measure.endsAt).toLocaleString('de-DE') : null;
+
+    if (startsAt && endsAt) return `${startsAt} - ${endsAt}`;
+    return startsAt ?? endsAt ?? '';
   }
 
   private applyParticipatedMeasure(measureId: number, updatedMeasure: EmployeeMeasure | null | undefined) {
