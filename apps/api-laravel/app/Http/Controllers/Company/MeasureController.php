@@ -12,14 +12,17 @@ use App\Models\Measure;
 use App\Models\Team;
 use App\Services\AnonymityService;
 use App\Services\Company\TeamLayerGuard;
+use App\Services\MeasureCheckinTokenService;
 use App\Services\MeasureParticipationSummaryService;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class MeasureController extends Controller
 {
     public function __construct(
         private readonly TeamLayerGuard $teamLayerGuard,
         private readonly MeasureParticipationSummaryService $measureParticipationSummaryService,
+        private readonly MeasureCheckinTokenService $measureCheckinTokenService,
     )
     {
     }
@@ -162,6 +165,42 @@ class MeasureController extends Controller
         );
     }
 
+    public function rotateCheckinToken(Request $request, int|string $measure)
+    {
+        $user = $request->user();
+        $measureModel = $this->findCompanyManageableMeasure($request, $measure);
+
+        try {
+            [$checkinToken, $rawToken] = $this->measureCheckinTokenService->rotate($measureModel, $user);
+        } catch (ConflictHttpException $exception) {
+            $code = $exception->getMessage();
+
+            return response()->json([
+                'error' => [
+                    'code' => $code,
+                    'message' => match ($code) {
+                        'MEASURE_NOT_ACTIVE' => 'Measure is not active.',
+                        'MEASURE_DOES_NOT_ALLOW_QR_CHECKIN' => 'Measure does not allow QR check-in.',
+                        default => 'Measure check-in token conflict.',
+                    },
+                ],
+            ], 409);
+        }
+
+        $path = "/employee/measure-checkins/{$rawToken}";
+
+        return response()->json([
+            'data' => [
+                'measureId' => $measureModel->id,
+                'token' => $rawToken,
+                'checkinPath' => $path,
+                'validFrom' => $checkinToken->valid_from?->toIso8601String(),
+                'validUntil' => $checkinToken->valid_until?->toIso8601String(),
+                'revokedAt' => $checkinToken->revoked_at?->toIso8601String(),
+            ],
+        ], 201);
+    }
+
     private function measureDomainData(array $validated): array
     {
         $map = [
@@ -186,5 +225,34 @@ class MeasureController extends Controller
         }
 
         return $data;
+    }
+
+    private function findCompanyManageableMeasure(Request $request, int|string $id): Measure
+    {
+        $user = $request->user();
+        $user->loadMissing('roles');
+        $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
+        $teamLayerEnabled = $this->teamLayerGuard->enabledFor($user);
+
+        if (! $teamLayerEnabled && $isManager) {
+            $this->teamLayerGuard->abortIfDisabled($user);
+        }
+
+        $measure = Measure::where('id', $id)
+            ->where('company_id', $user->company_id)
+            ->firstOrFail();
+
+        if (! $teamLayerEnabled && $measure->team_id !== null) {
+            $this->teamLayerGuard->abortIfDisabled($user);
+        }
+
+        if ($isManager) {
+            $managedTeamId = Team::where('manager_id', $user->id)->where('company_id', $user->company_id)->value('id');
+            if (! $managedTeamId || (int) $measure->team_id !== (int) $managedTeamId) {
+                abort(403);
+            }
+        }
+
+        return $measure;
     }
 }

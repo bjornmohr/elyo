@@ -11,6 +11,7 @@ class MeasureParticipation extends Model
     use HasFactory;
 
     public const VERIFICATION_TYPE_SELF_REPORTED = 'SELF_REPORTED';
+    public const VERIFICATION_TYPE_QR_CHECKIN = 'QR_CHECKIN';
 
     protected $fillable = [
         'measure_id',

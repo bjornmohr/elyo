@@ -85,6 +85,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/measures', [MeasureController::class, 'index']);
         Route::post('/measures', [MeasureController::class, 'store']);
+        Route::post('/measures/{measure}/checkin-token', [MeasureController::class, 'rotateCheckinToken']);
         Route::get('/measures/{id}/participation-summary', [MeasureController::class, 'participationSummary']);
         Route::patch('/measures/{id}', [MeasureController::class, 'update']);
 
@@ -102,6 +103,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/documents', [EmployeeController::class, 'uploadDocument']);
         Route::get('/measures', [EmployeeController::class, 'measures']);
         Route::post('/measures/{measure}/participate', [EmployeeController::class, 'participateInMeasure']);
+        Route::post('/measure-checkins/{token}', [EmployeeController::class, 'redeemMeasureCheckin']);
 
         Route::get('/surveys', [SurveyController::class, 'index']);
         Route::get('/surveys/{id}', [SurveyController::class, 'show']);

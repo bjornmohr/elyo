@@ -10,6 +10,7 @@ use App\Http\Resources\Employee\WellbeingEntryResource;
 use App\Models\AnamnesisProfile;
 use App\Models\Measure;
 use App\Models\UserDocument;
+use App\Services\MeasureCheckinTokenService;
 use App\Services\MeasureParticipationService;
 use App\Services\PointsService;
 use App\Services\WellbeingService;
@@ -24,7 +25,8 @@ class EmployeeController extends Controller
     public function __construct(
         protected WellbeingService $wellbeingService,
         protected PointsService $pointsService,
-        protected MeasureParticipationService $measureParticipationService
+        protected MeasureParticipationService $measureParticipationService,
+        protected MeasureCheckinTokenService $measureCheckinTokenService
     ) {}
 
     public function dashboard(Request $request): JsonResponse
@@ -260,7 +262,72 @@ class EmployeeController extends Controller
                     'message' => match ($code) {
                         'MEASURE_ALREADY_PARTICIPATED' => 'Measure already participated.',
                         'MEASURE_NOT_ACTIVE' => 'Measure is not active.',
+                        'MEASURE_REQUIRES_QR_CHECKIN' => 'Measure requires QR check-in.',
                         default => 'Measure participation conflict.',
+                    },
+                ],
+            ], 409);
+        }
+
+        return response()->json([
+            'data' => new MeasureResource($measureModel),
+        ], 201);
+    }
+
+    public function redeemMeasureCheckin(Request $request, string $token): JsonResponse
+    {
+        $user = $request->user();
+
+        $notFound = fn () => response()->json([
+            'error' => ['code' => 'CHECKIN_TOKEN_NOT_FOUND', 'message' => 'Check-in token not found.'],
+        ], 404);
+
+        $checkinToken = $this->measureCheckinTokenService->findTokenByRawToken($token);
+
+        if (! $checkinToken) {
+            return $notFound();
+        }
+
+        $measure = $checkinToken->measure;
+
+        if ((int) $measure->company_id !== (int) $user->company_id) {
+            return $notFound();
+        }
+
+        if ($measure->team_id !== null && (int) $measure->team_id !== (int) $user->team_id) {
+            return $notFound();
+        }
+
+        try {
+            $this->measureCheckinTokenService->validateTokenLifecycle($checkinToken);
+
+            $participation = $this->measureParticipationService->participateByQrCheckin(
+                $user,
+                $measure,
+                fn () => $this->measureCheckinTokenService->markUsed($checkinToken)
+            );
+            $measureModel = $participation->measure()
+                ->with([
+                    'team:id,name',
+                    'participations' => fn ($query) => $query->where('user_id', $user->id),
+                ])
+                ->firstOrFail();
+        } catch (NotFoundHttpException) {
+            return response()->json(['message' => 'Not found'], 404);
+        } catch (ConflictHttpException $exception) {
+            $code = $exception->getMessage();
+
+            return response()->json([
+                'error' => [
+                    'code' => $code,
+                    'message' => match ($code) {
+                        'MEASURE_ALREADY_PARTICIPATED' => 'Measure already participated.',
+                        'MEASURE_NOT_ACTIVE' => 'Measure is not active.',
+                        'CHECKIN_TOKEN_REVOKED' => 'Check-in token has been revoked.',
+                        'CHECKIN_TOKEN_NOT_YET_VALID' => 'Check-in token is not yet valid.',
+                        'CHECKIN_TOKEN_EXPIRED' => 'Check-in token has expired.',
+                        'MEASURE_DOES_NOT_ALLOW_QR_CHECKIN' => 'Measure does not allow QR check-in.',
+                        default => 'Measure check-in conflict.',
                     },
                 ],
             ], 409);
