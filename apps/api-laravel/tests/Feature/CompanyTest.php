@@ -6,6 +6,7 @@ use App\Enums\QuestionType;
 use App\Enums\Role;
 use App\Models\Company;
 use App\Models\Measure;
+use App\Models\MeasureCheckinToken;
 use App\Models\Survey;
 use App\Models\SurveyAnswer;
 use App\Models\SurveyQuestion;
@@ -14,6 +15,8 @@ use App\Models\Team;
 use App\Models\User;
 use App\Models\UserRole;
 use App\Models\WellbeingEntry;
+use App\Services\MeasureCheckinTokenService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -738,6 +741,155 @@ class CompanyTest extends TestCase
             ->assertJsonPath('data.visibilityScope', 'COMPANY');
     }
 
+    public function test_company_admin_can_rotate_measure_checkin_token_without_storing_plaintext(): void
+    {
+        $this->travelTo(Carbon::parse('2026-06-10 09:00:00'));
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'created_by' => $this->admin->id,
+            'verification_requirement' => 'QR_CODE',
+        ]);
+
+        $first = $this->actingAs($this->admin)
+            ->postJson("/api/company/measures/{$measure->id}/checkin-token")
+            ->assertStatus(201)
+            ->assertJsonPath('data.measureId', $measure->id)
+            ->assertJsonPath('data.validFrom', '2026-06-10T09:00:00+00:00')
+            ->assertJsonPath('data.revokedAt', null);
+
+        $firstToken = $first->json('data.token');
+        $this->assertIsString($firstToken);
+        $this->assertStringContainsString("/employee/measure-checkins/{$firstToken}", $first->json('data.checkinPath'));
+        $this->assertArrayNotHasKey('checkinUrl', $first->json('data'));
+        $this->assertArrayNotHasKey('tokenHash', $first->json('data'));
+        $this->assertDatabaseMissing('measure_checkin_tokens', ['token_hash' => $firstToken]);
+        $this->assertDatabaseHas('measure_checkin_tokens', [
+            'measure_id' => $measure->id,
+            'company_id' => $this->company->id,
+            'token_hash' => MeasureCheckinTokenService::hashToken($firstToken),
+            'created_by_user_id' => $this->admin->id,
+            'revoked_at' => null,
+        ]);
+
+        $second = $this->actingAs($this->admin)
+            ->postJson("/api/company/measures/{$measure->id}/checkin-token")
+            ->assertStatus(201);
+
+        $secondToken = $second->json('data.token');
+        $this->assertNotSame($firstToken, $secondToken);
+        $this->assertNotNull(MeasureCheckinToken::where('token_hash', MeasureCheckinTokenService::hashToken($firstToken))->value('revoked_at'));
+        $this->assertNull(MeasureCheckinToken::where('token_hash', MeasureCheckinTokenService::hashToken($secondToken))->value('revoked_at'));
+
+        // Verify uniqueness guarantee
+        $this->assertSame(1, MeasureCheckinToken::where('measure_id', $measure->id)->whereNull('revoked_at')->count());
+    }
+
+    public function test_active_token_uniqueness_guaranteed_by_database_constraint(): void
+    {
+        if (config('database.default') === 'sqlite') {
+            $this->markTestSkipped('SQLite does not support partial unique indexes with WHERE NULL in the same way as PostgreSQL.');
+        }
+
+        $measure = Measure::factory()->create(['verification_requirement' => 'QR_CODE']);
+
+        MeasureCheckinToken::create([
+            'measure_id' => $measure->id,
+            'company_id' => $measure->company_id,
+            'token_hash' => 'hash1',
+            'revoked_at' => null,
+        ]);
+
+        $this->expectException(\Illuminate\Database\QueryException::class);
+
+        MeasureCheckinToken::create([
+            'measure_id' => $measure->id,
+            'company_id' => $measure->company_id,
+            'token_hash' => 'hash2',
+            'revoked_at' => null,
+        ]);
+    }
+
+    public function test_company_cannot_rotate_checkin_token_for_self_report_measure_without_side_effects(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'created_by' => $this->admin->id,
+            'verification_requirement' => 'SELF_REPORT',
+        ]);
+        $existingRawToken = bin2hex(random_bytes(32));
+        $existingToken = MeasureCheckinToken::create([
+            'measure_id' => $measure->id,
+            'company_id' => $this->company->id,
+            'token_hash' => MeasureCheckinTokenService::hashToken($existingRawToken),
+            'created_by_user_id' => $this->admin->id,
+            'valid_from' => now(),
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->postJson("/api/company/measures/{$measure->id}/checkin-token")
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'MEASURE_DOES_NOT_ALLOW_QR_CHECKIN');
+
+        $this->assertNull($response->json('data'));
+        $this->assertSame(1, MeasureCheckinToken::where('measure_id', $measure->id)->count());
+        $this->assertNull($existingToken->fresh()->revoked_at);
+    }
+
+    public function test_company_cannot_rotate_checkin_token_for_inactive_or_foreign_measure(): void
+    {
+        $inactive = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'COMPLETED',
+            'created_by' => $this->admin->id,
+            'verification_requirement' => 'QR_CODE',
+        ]);
+        $foreignMeasure = Measure::factory()->create([
+            'company_id' => Company::factory()->create()->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->postJson("/api/company/measures/{$inactive->id}/checkin-token")
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'MEASURE_NOT_ACTIVE');
+
+        $this->actingAs($this->admin)
+            ->postJson("/api/company/measures/{$foreignMeasure->id}/checkin-token")
+            ->assertStatus(404);
+    }
+
+    public function test_manager_can_only_rotate_checkin_token_for_managed_team_measure(): void
+    {
+        $managedMeasure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'status' => 'ACTIVE',
+            'created_by' => $this->admin->id,
+            'verification_requirement' => 'QR_CODE',
+        ]);
+        $globalMeasure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'created_by' => $this->admin->id,
+            'verification_requirement' => 'QR_CODE',
+        ]);
+
+        $this->actingAs($this->manager)
+            ->postJson("/api/company/measures/{$managedMeasure->id}/checkin-token")
+            ->assertStatus(201);
+
+        $this->actingAs($this->manager)
+            ->postJson("/api/company/measures/{$globalMeasure->id}/checkin-token")
+            ->assertStatus(403);
+    }
+
     public function test_measure_update_accepts_domain_fields_without_bypassing_status_transitions(): void
     {
         $measure = Measure::factory()->create([
@@ -786,16 +938,62 @@ class CompanyTest extends TestCase
         ])->assertStatus(400);
     }
 
-    public function test_measure_creation_rejects_unsupported_verification_requirements(): void
+    public function test_measure_creation_allows_qr_code_verification_requirement(): void
     {
         $response = $this->actingAs($this->admin)->postJson('/api/company/measures', [
             'title' => 'QR measure',
             'category' => 'sport',
-            'description' => 'A measure with unsupported verification.',
+            'description' => 'A measure with QR verification.',
             'verificationRequirement' => 'QR_CODE',
         ]);
 
+        $response->assertStatus(201)
+            ->assertJsonPath('data.verificationRequirement', 'QR_CODE');
+
+        $this->assertDatabaseHas('measures', [
+            'id' => $response->json('data.id'),
+            'verification_requirement' => 'QR_CODE',
+        ]);
+    }
+
+    public function test_measure_creation_rejects_unsupported_verification_requirements(): void
+    {
+        $response = $this->actingAs($this->admin)->postJson('/api/company/measures', [
+            'title' => 'Unsupported measure',
+            'category' => 'sport',
+            'description' => 'A measure with unsupported verification.',
+            'verificationRequirement' => 'NONE',
+        ]);
+
         $response->assertStatus(422)
+            ->assertJsonValidationErrors(['verificationRequirement']);
+    }
+
+    public function test_measure_update_allows_qr_code_verification_requirement(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $response = $this->actingAs($this->admin)->patchJson("/api/company/measures/{$measure->id}", [
+            'verificationRequirement' => 'QR_CODE',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.verificationRequirement', 'QR_CODE');
+
+        $this->assertDatabaseHas('measures', [
+            'id' => $measure->id,
+            'verification_requirement' => 'QR_CODE',
+        ]);
+
+        $this->actingAs($this->admin)->patchJson("/api/company/measures/{$measure->id}", [
+            'verificationRequirement' => 'ADMIN_CONFIRMATION',
+        ])
+            ->assertStatus(422)
             ->assertJsonValidationErrors(['verificationRequirement']);
     }
 
@@ -809,7 +1007,7 @@ class CompanyTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)->patchJson("/api/company/measures/{$measure->id}", [
-            'verificationRequirement' => 'ADMIN_CONFIRMATION',
+            'verificationRequirement' => 'PARTNER_CONFIRMATION',
         ]);
 
         $response->assertStatus(422)

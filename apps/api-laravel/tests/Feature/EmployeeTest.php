@@ -7,6 +7,7 @@ use App\Enums\Role;
 use App\Enums\SurveyStatus;
 use App\Models\Company;
 use App\Models\Measure;
+use App\Models\MeasureCheckinToken;
 use App\Models\MeasureParticipation;
 use App\Models\PointTransaction;
 use App\Models\Survey;
@@ -18,6 +19,7 @@ use App\Models\User;
 use App\Models\UserPoints;
 use App\Models\WellbeingEntry;
 use App\Services\WellbeingService;
+use App\Services\MeasureCheckinTokenService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -894,6 +896,7 @@ class EmployeeTest extends TestCase
             'company_id' => $this->company->id,
             'team_id' => $team->id,
             'status' => 'ACTIVE',
+            'verification_requirement' => 'SELF_REPORT',
         ]);
 
         $this->actingAs($this->employee, 'sanctum')
@@ -907,6 +910,27 @@ class EmployeeTest extends TestCase
             'company_id' => $this->company->id,
             'team_id' => $team->id,
         ]);
+    }
+
+    public function test_employee_cannot_self_report_qr_required_measure(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'verification_requirement' => 'QR_CODE',
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measures/{$measure->id}/participate")
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'MEASURE_REQUIRES_QR_CHECKIN');
+
+        $this->assertDatabaseMissing('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $this->employee->id,
+        ]);
+        $this->assertSame(0, PointTransaction::where('reason', 'measure_participation')->count());
     }
 
     public function test_employee_cannot_participate_in_measure_from_another_company()
@@ -1000,6 +1024,281 @@ class EmployeeTest extends TestCase
         ]);
     }
 
+    public function test_employee_can_redeem_measure_checkin_token_for_qr_participation(): void
+    {
+        $this->travelTo(Carbon::parse('2026-06-10 10:00:00'));
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'verification_requirement' => 'QR_CODE',
+        ]);
+        $token = $this->actingAs(User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::COMPANY_ADMIN,
+        ]), 'sanctum')
+            ->postJson("/api/company/measures/{$measure->id}/checkin-token")
+            ->assertStatus(201)
+            ->json('data.token');
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measure-checkins/{$token}", [
+                'user_id' => User::factory()->create()->id,
+                'company_id' => Company::factory()->create()->id,
+                'team_id' => Team::factory()->create()->id,
+                'participated_at' => '2025-01-01T00:00:00Z',
+                'verification_type' => 'SELF_REPORTED',
+            ])
+            ->assertStatus(201)
+            ->assertJsonPath('data.id', $measure->id)
+            ->assertJsonPath('data.participation.isParticipating', true)
+            ->assertJsonPath('data.participation.participatedAt', '2026-06-10T10:00:00+00:00')
+            ->assertJsonPath('data.participation.verificationType', 'QR_CHECKIN')
+            ->assertJsonPath('data.participation.verifiedAt', '2026-06-10T10:00:00+00:00');
+
+        $this->assertDatabaseHas('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $this->employee->id,
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'verification_type' => 'QR_CHECKIN',
+            'verified_by_user_id' => null,
+        ]);
+        $this->assertDatabaseHas('point_transactions', [
+            'user_id' => $this->employee->id,
+            'reason' => 'measure_participation',
+            'points' => 20,
+        ]);
+        $this->assertNotNull(MeasureCheckinToken::where('token_hash', MeasureCheckinTokenService::hashToken($token))->value('last_used_at'));
+    }
+
+    public function test_employee_cannot_redeem_qr_checkin_for_self_report_measure(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'verification_requirement' => 'SELF_REPORT',
+        ]);
+        $token = bin2hex(random_bytes(32));
+        MeasureCheckinToken::create([
+            'measure_id' => $measure->id,
+            'company_id' => $this->company->id,
+            'token_hash' => MeasureCheckinTokenService::hashToken($token),
+            'created_by_user_id' => User::factory()->create(['company_id' => $this->company->id])->id,
+            'valid_from' => now(),
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measure-checkins/{$token}")
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'MEASURE_DOES_NOT_ALLOW_QR_CHECKIN');
+
+        $this->assertDatabaseMissing('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $this->employee->id,
+        ]);
+        $this->assertSame(0, PointTransaction::where('reason', 'measure_participation')->count());
+        $this->assertNull(MeasureCheckinToken::where('token_hash', MeasureCheckinTokenService::hashToken($token))->value('last_used_at'));
+    }
+
+    public function test_employee_cannot_redeem_revoked_measure_checkin_token(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'verification_requirement' => 'QR_CODE',
+        ]);
+        $token = bin2hex(random_bytes(32));
+        MeasureCheckinToken::create([
+            'measure_id' => $measure->id,
+            'company_id' => $this->company->id,
+            'token_hash' => MeasureCheckinTokenService::hashToken($token),
+            'created_by_user_id' => User::factory()->create(['company_id' => $this->company->id])->id,
+            'valid_from' => now()->subHour(),
+            'revoked_at' => now(),
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measure-checkins/{$token}")
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'CHECKIN_TOKEN_REVOKED');
+
+        $this->assertDatabaseMissing('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $this->employee->id,
+        ]);
+    }
+
+    public function test_employee_cannot_redeem_expired_measure_checkin_token(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'verification_requirement' => 'QR_CODE',
+        ]);
+        $token = bin2hex(random_bytes(32));
+        MeasureCheckinToken::create([
+            'measure_id' => $measure->id,
+            'company_id' => $this->company->id,
+            'token_hash' => MeasureCheckinTokenService::hashToken($token),
+            'created_by_user_id' => User::factory()->create(['company_id' => $this->company->id])->id,
+            'valid_from' => now()->subHours(2),
+            'valid_until' => now()->subHour(),
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measure-checkins/{$token}")
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'CHECKIN_TOKEN_EXPIRED');
+
+        $this->assertDatabaseMissing('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $this->employee->id,
+        ]);
+    }
+
+    public function test_employee_cannot_redeem_not_yet_valid_measure_checkin_token(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'verification_requirement' => 'QR_CODE',
+        ]);
+        $token = bin2hex(random_bytes(32));
+        MeasureCheckinToken::create([
+            'measure_id' => $measure->id,
+            'company_id' => $this->company->id,
+            'token_hash' => MeasureCheckinTokenService::hashToken($token),
+            'created_by_user_id' => User::factory()->create(['company_id' => $this->company->id])->id,
+            'valid_from' => now()->addHour(),
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measure-checkins/{$token}")
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'CHECKIN_TOKEN_NOT_YET_VALID');
+
+        $this->assertDatabaseMissing('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $this->employee->id,
+        ]);
+    }
+
+    public function test_employee_cannot_redeem_qr_checkin_for_inactive_measure(): void
+    {
+        foreach (['SUGGESTED', 'COMPLETED', 'DISMISSED'] as $status) {
+            $measure = Measure::factory()->create([
+                'company_id' => $this->company->id,
+                'team_id' => null,
+                'status' => $status,
+                'verification_requirement' => 'QR_CODE',
+            ]);
+            $token = bin2hex(random_bytes(32));
+            MeasureCheckinToken::create([
+                'measure_id' => $measure->id,
+                'company_id' => $this->company->id,
+                'token_hash' => MeasureCheckinTokenService::hashToken($token),
+                'created_by_user_id' => User::factory()->create(['company_id' => $this->company->id])->id,
+                'valid_from' => now()->subHour(),
+            ]);
+
+            $this->actingAs($this->employee, 'sanctum')
+                ->postJson("/api/employee/measure-checkins/{$token}")
+                ->assertStatus(409)
+                ->assertJsonPath('error.code', 'MEASURE_NOT_ACTIVE');
+        }
+
+        $this->assertSame(0, MeasureParticipation::query()->count());
+        $this->assertSame(0, PointTransaction::where('reason', 'measure_participation')->count());
+    }
+
+    public function test_employee_cannot_redeem_qr_checkin_for_other_company_or_team(): void
+    {
+        $foreignCompany = Company::factory()->create();
+        $foreignMeasure = Measure::factory()->create([
+            'company_id' => $foreignCompany->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'verification_requirement' => 'QR_CODE',
+        ]);
+        $foreignToken = bin2hex(random_bytes(32));
+        MeasureCheckinToken::create([
+            'measure_id' => $foreignMeasure->id,
+            'company_id' => $foreignCompany->id,
+            'token_hash' => MeasureCheckinTokenService::hashToken($foreignToken),
+            'created_by_user_id' => User::factory()->create(['company_id' => $foreignCompany->id])->id,
+            'valid_from' => now(),
+        ]);
+
+        $team = Team::factory()->create(['company_id' => $this->company->id]);
+        $otherTeam = Team::factory()->create(['company_id' => $this->company->id]);
+        $this->employee->update(['team_id' => $team->id]);
+        $teamMeasure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $otherTeam->id,
+            'status' => 'ACTIVE',
+            'verification_requirement' => 'QR_CODE',
+        ]);
+        $teamToken = bin2hex(random_bytes(32));
+        MeasureCheckinToken::create([
+            'measure_id' => $teamMeasure->id,
+            'company_id' => $this->company->id,
+            'token_hash' => MeasureCheckinTokenService::hashToken($teamToken),
+            'created_by_user_id' => User::factory()->create(['company_id' => $this->company->id])->id,
+            'valid_from' => now(),
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measure-checkins/{$foreignToken}")
+            ->assertStatus(404);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measure-checkins/{$teamToken}")
+            ->assertStatus(404);
+
+        $this->assertSame(0, MeasureParticipation::query()->count());
+    }
+
+    public function test_qr_checkin_duplicate_does_not_award_points_twice(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'verification_requirement' => 'QR_CODE',
+        ]);
+        $token = bin2hex(random_bytes(32));
+        MeasureCheckinToken::create([
+            'measure_id' => $measure->id,
+            'company_id' => $this->company->id,
+            'token_hash' => MeasureCheckinTokenService::hashToken($token),
+            'created_by_user_id' => User::factory()->create(['company_id' => $this->company->id])->id,
+            'valid_from' => now(),
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measure-checkins/{$token}")
+            ->assertStatus(201);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson("/api/employee/measure-checkins/{$token}")
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'MEASURE_ALREADY_PARTICIPATED');
+
+        $this->assertSame(1, MeasureParticipation::query()
+            ->where('measure_id', $measure->id)
+            ->where('user_id', $this->employee->id)
+            ->count());
+        $this->assertSame(1, PointTransaction::query()
+            ->where('user_id', $this->employee->id)
+            ->where('reason', 'measure_participation')
+            ->count());
+    }
+
     public function test_measure_participation_derives_identity_from_authenticated_employee_and_ignores_request_body()
     {
         $team = Team::factory()->create(['company_id' => $this->company->id]);
@@ -1015,6 +1314,7 @@ class EmployeeTest extends TestCase
             'company_id' => $this->company->id,
             'team_id' => null,
             'status' => 'ACTIVE',
+            'verification_requirement' => 'SELF_REPORT',
         ]);
 
         $this->actingAs($this->employee, 'sanctum')
@@ -1072,6 +1372,95 @@ class EmployeeTest extends TestCase
             'measure_id' => $measure->id,
             'user_id' => $companyUser->id,
         ]);
+    }
+
+    public function test_unknown_qr_checkin_token_returns_not_found(): void
+    {
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson('/api/employee/measure-checkins/'.bin2hex(random_bytes(32)))
+            ->assertStatus(404)
+            ->assertJsonPath('error.code', 'CHECKIN_TOKEN_NOT_FOUND');
+    }
+
+    public function test_foreign_company_token_masks_lifecycle_state(): void
+    {
+        $foreignCompany = Company::factory()->create();
+        $foreignMeasure = Measure::factory()->create([
+            'company_id' => $foreignCompany->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'verification_requirement' => 'QR_CODE',
+        ]);
+        $creator = User::factory()->create(['company_id' => $foreignCompany->id]);
+
+        $makeToken = function (array $attrs) use ($foreignMeasure, $foreignCompany, $creator): string {
+            $raw = bin2hex(random_bytes(32));
+            MeasureCheckinToken::create(array_merge([
+                'measure_id' => $foreignMeasure->id,
+                'company_id' => $foreignCompany->id,
+                'token_hash' => MeasureCheckinTokenService::hashToken($raw),
+                'created_by_user_id' => $creator->id,
+                'valid_from' => now()->subHour(),
+            ], $attrs));
+
+            return $raw;
+        };
+
+        $activeToken = $makeToken([]);
+        $revokedToken = $makeToken(['revoked_at' => now()]);
+        $expiredToken = $makeToken(['valid_until' => now()->subMinutes(30)]);
+        $notYetValidToken = $makeToken(['valid_from' => now()->addHour()]);
+
+        foreach ([$activeToken, $revokedToken, $expiredToken, $notYetValidToken] as $token) {
+            $this->actingAs($this->employee, 'sanctum')
+                ->postJson("/api/employee/measure-checkins/{$token}")
+                ->assertStatus(404)
+                ->assertJsonPath('error.code', 'CHECKIN_TOKEN_NOT_FOUND');
+        }
+
+        $this->assertSame(0, MeasureParticipation::query()->count());
+    }
+
+    public function test_wrong_team_token_masks_lifecycle_state(): void
+    {
+        $myTeam = Team::factory()->create(['company_id' => $this->company->id]);
+        $otherTeam = Team::factory()->create(['company_id' => $this->company->id]);
+        $this->employee->update(['team_id' => $myTeam->id]);
+
+        $teamMeasure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $otherTeam->id,
+            'status' => 'ACTIVE',
+            'verification_requirement' => 'QR_CODE',
+        ]);
+        $creator = User::factory()->create(['company_id' => $this->company->id]);
+
+        $makeToken = function (array $attrs) use ($teamMeasure, $creator): string {
+            $raw = bin2hex(random_bytes(32));
+            MeasureCheckinToken::create(array_merge([
+                'measure_id' => $teamMeasure->id,
+                'company_id' => $this->company->id,
+                'token_hash' => MeasureCheckinTokenService::hashToken($raw),
+                'created_by_user_id' => $creator->id,
+                'valid_from' => now()->subHour(),
+            ], $attrs));
+
+            return $raw;
+        };
+
+        $activeToken = $makeToken([]);
+        $revokedToken = $makeToken(['revoked_at' => now()]);
+        $expiredToken = $makeToken(['valid_until' => now()->subMinutes(30)]);
+        $notYetValidToken = $makeToken(['valid_from' => now()->addHour()]);
+
+        foreach ([$activeToken, $revokedToken, $expiredToken, $notYetValidToken] as $token) {
+            $this->actingAs($this->employee, 'sanctum')
+                ->postJson("/api/employee/measure-checkins/{$token}")
+                ->assertStatus(404)
+                ->assertJsonPath('error.code', 'CHECKIN_TOKEN_NOT_FOUND');
+        }
+
+        $this->assertSame(0, MeasureParticipation::query()->count());
     }
 
     public function test_employee_can_upload_medical_pdf()

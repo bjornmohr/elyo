@@ -11,6 +11,9 @@ class Measure extends Model
 {
     use HasFactory;
 
+    public const VERIFICATION_REQUIREMENT_SELF_REPORT = 'SELF_REPORT';
+    public const VERIFICATION_REQUIREMENT_QR_CODE = 'QR_CODE';
+
     protected $fillable = [
         'company_id', 'team_id', 'title', 'category',
         'description', 'status', 'suggested_at', 'started_at',
@@ -38,7 +41,7 @@ class Measure extends Model
             $measure->measure_origin ??= 'COMPANY_CREATED';
             $measure->delivery_type ??= 'ONSITE';
             $measure->execution_type ??= 'EVENT_PARTICIPATION';
-            $measure->verification_requirement ??= 'SELF_REPORT';
+            $measure->verification_requirement ??= self::VERIFICATION_REQUIREMENT_SELF_REPORT;
             $measure->visibility_scope = $measure->team_id === null ? 'COMPANY' : 'TEAM';
         });
     }
@@ -56,5 +59,10 @@ class Measure extends Model
     public function participations(): HasMany
     {
         return $this->hasMany(MeasureParticipation::class);
+    }
+
+    public function checkinTokens(): HasMany
+    {
+        return $this->hasMany(MeasureCheckinToken::class);
     }
 }

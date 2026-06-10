@@ -207,7 +207,7 @@ components:
           default: EVENT_PARTICIPATION
         verificationRequirement:
           type: string
-          enum: [SELF_REPORT]
+          enum: [SELF_REPORT, QR_CODE]
           default: SELF_REPORT
         visibilityScope:
           type: string
@@ -231,7 +231,7 @@ components:
       properties:
         deliveryType: { type: string, enum: [REMOTE, ONSITE, HYBRID] }
         executionType: { type: string, enum: [INFORMATION_ONLY, GUIDED_SESSION, SELF_REPORTED_ACTION, EVENT_PARTICIPATION, CHALLENGE] }
-        verificationRequirement: { type: string, enum: [SELF_REPORT] }
+        verificationRequirement: { type: string, enum: [SELF_REPORT, QR_CODE] }
         startsAt: { type: string, format: date-time, nullable: true }
         endsAt:
           type: string
@@ -331,8 +331,23 @@ components:
                 verificationType:
                   type: string
                   nullable: true
-                  enum: [SELF_REPORTED]
+                  enum: [SELF_REPORTED, QR_CHECKIN]
                 verifiedAt: { type: string, format: date-time, nullable: true }
+
+    MeasureCheckinTokenResponse:
+      type: object
+      required: [measureId, token, checkinPath, validFrom, validUntil, revokedAt]
+      properties:
+        measureId: { type: integer }
+        token:
+          type: string
+          description: Raw token for the newly rotated check-in link. The backend stores only token_hash and never returns token hashes.
+        checkinPath:
+          type: string
+          example: /employee/measure-checkins/abcdef
+        validFrom: { type: string, format: date-time, nullable: true }
+        validUntil: { type: string, format: date-time, nullable: true }
+        revokedAt: { type: string, format: date-time, nullable: true }
 
     MeasureAlreadyParticipatedError:
       type: object
@@ -359,6 +374,62 @@ components:
             code:
               type: string
               enum: [MEASURE_NOT_ACTIVE]
+            message:
+              type: string
+
+    MeasureRequiresQrCheckinError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [MEASURE_REQUIRES_QR_CHECKIN]
+            message:
+              type: string
+
+    MeasureCheckinTokenNotFoundError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [CHECKIN_TOKEN_NOT_FOUND]
+            message:
+              type: string
+
+    MeasureCheckinConflictError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [MEASURE_ALREADY_PARTICIPATED, MEASURE_NOT_ACTIVE, MEASURE_DOES_NOT_ALLOW_QR_CHECKIN, CHECKIN_TOKEN_REVOKED, CHECKIN_TOKEN_NOT_YET_VALID, CHECKIN_TOKEN_EXPIRED]
+            message:
+              type: string
+
+    MeasureCheckinTokenGenerationConflictError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [MEASURE_NOT_ACTIVE, MEASURE_DOES_NOT_ALLOW_QR_CHECKIN]
             message:
               type: string
 
@@ -798,13 +869,48 @@ paths:
         404:
           description: Measure not found or not visible to the authenticated employee
         409:
-          description: Duplicate participation or inactive visible measure
+          description: Duplicate participation, inactive visible measure, or measure requiring QR check-in
           content:
             application/json:
               schema:
                 oneOf:
                   - $ref: '#/components/schemas/MeasureAlreadyParticipatedError'
                   - $ref: '#/components/schemas/MeasureNotActiveError'
+                  - $ref: '#/components/schemas/MeasureRequiresQrCheckinError'
+
+  /employee/measure-checkins/{token}:
+    post:
+      tags: [Employee]
+      summary: Redeem an authenticated QR measure check-in token
+      description: Creates a QR_CHECKIN participation for the authenticated employee when the token belongs to a QR_CODE measure. The request body is ignored; user, company, team, participation time, verification type, and points are derived server-side. Employees can only redeem tokens for active measures in their company and team scope.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        201:
+          description: QR check-in participation created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EmployeeMeasure'
+        404:
+          description: Token not found, measure not found, wrong company, or wrong team scope. All cases return CHECKIN_TOKEN_NOT_FOUND to avoid revealing token state across tenant boundaries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeasureCheckinTokenNotFoundError'
+        409:
+          description: Lifecycle conflict for an in-scope token only — duplicate participation, inactive measure, self-report-only measure, revoked token, not-yet-valid token, or expired token. Out-of-scope tokens (wrong company or wrong team) are indistinguishable from missing tokens and return 404.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeasureCheckinConflictError'
 
   /employee/surveys:
     get:
@@ -1542,6 +1648,39 @@ paths:
                 anyOf:
                   - $ref: '#/components/schemas/LaravelValidationError'
                   - $ref: '#/components/schemas/TeamLayerDisabledError'
+
+  /company/measures/{measure}/checkin-token:
+    post:
+      tags: [Company]
+      summary: Rotate QR check-in token for an active QR_CODE measure
+      description: For active measures with verificationRequirement QR_CODE only, revokes existing active check-in tokens for the measure and returns a newly generated raw token plus frontend check-in path once. Token hashes are stored server-side; token_hash is never returned. Company scope and manager team scope are enforced.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: measure
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        201:
+          description: New check-in token created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/MeasureCheckinTokenResponse'
+        403:
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
+        404:
+          description: Measure not found in the authenticated company scope
+        409:
+          description: Measure is not active or does not allow QR check-in token generation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeasureCheckinTokenGenerationConflictError'
 
   /company/measures/{id}/participation-summary:
     get:

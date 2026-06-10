@@ -74,12 +74,21 @@ import { NotificationService } from '../../../../shared/notifications/notificati
                     }
                   </div>
                 } @else {
-                  <button type="button"
-                          (click)="participate(measure)"
-                          [disabled]="isParticipating(measure.id)"
-                          class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:bg-slate-300">
-                    {{ isParticipating(measure.id) ? 'Wird gespeichert…' : 'Teilnehmen' }}
-                  </button>
+                  @if (requiresQrCheckin(measure)) {
+                    <div class="flex flex-col items-start gap-1 sm:items-end">
+                      <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                        QR-Check-in erforderlich
+                      </span>
+                      <span class="text-xs text-slate-400">Teilnahme vor Ort per QR-Code</span>
+                    </div>
+                  } @else {
+                    <button type="button"
+                            (click)="participate(measure)"
+                            [disabled]="isParticipating(measure.id)"
+                            class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:bg-slate-300">
+                      {{ isParticipating(measure.id) ? 'Wird gespeichert…' : 'Teilnehmen' }}
+                    </button>
+                  }
                 }
               </div>
             </div>
@@ -112,7 +121,16 @@ export class EmployeeMeasuresComponent implements OnInit {
     return this.participatingMeasureIds().has(measureId);
   }
 
+  requiresQrCheckin(measure: EmployeeMeasure) {
+    return measure.verificationRequirement === 'QR_CODE';
+  }
+
   participate(measure: EmployeeMeasure) {
+    if (this.requiresQrCheckin(measure)) {
+      this.notifications.error('Diese Maßnahme erfordert einen QR-Check-in vor Ort.');
+      return;
+    }
+
     this.setParticipating(measure.id, true);
 
     this.employeeService.participateInMeasure(measure.id).subscribe({
@@ -129,6 +147,8 @@ export class EmployeeMeasuresComponent implements OnInit {
           this.notifications.success('Teilnahme ist bereits gespeichert.');
         } else if (code === 'MEASURE_NOT_ACTIVE') {
           this.notifications.error('Diese Maßnahme ist aktuell nicht aktiv.');
+        } else if (code === 'MEASURE_REQUIRES_QR_CHECKIN') {
+          this.notifications.error('Diese Maßnahme erfordert einen QR-Check-in vor Ort.');
         } else {
           this.notifications.error('Teilnahme konnte nicht gespeichert werden.');
         }
