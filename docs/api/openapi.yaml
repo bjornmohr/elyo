@@ -309,7 +309,7 @@ components:
               participantCount: { type: integer, nullable: true }
               participationRate: { type: number, nullable: true }
               suppressionReason: { type: string, nullable: true }
-          description: Always null for this measure-level aggregate endpoint.
+            description: Always null for this measure-level aggregate endpoint.
 
     EmployeeMeasure:
       allOf:
@@ -402,6 +402,17 @@ components:
       additionalProperties: false
       properties:
         message: { type: string }
+
+    LaravelValidationError:
+      type: object
+      required: [message, errors]
+      properties:
+        message: { type: string }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
 
     AnonymityThresholdError:
       type: object
@@ -1519,7 +1530,13 @@ paths:
         403:
           $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
         422:
-          $ref: '#/components/responses/TeamLayerDisabled'
+          description: Laravel validation error for invalid or missing request fields, including required fields, string length constraints, invalid enum values, unsupported verificationRequirement values, invalid date formats, invalid date ranges, invalid integer values, invalid team payloads, or TEAM_LAYER_DISABLED for teamId payloads when the company team layer is disabled
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/LaravelValidationError'
+                  - $ref: '#/components/schemas/TeamLayerDisabledError'
 
   /company/measures/{id}/participation-summary:
     get:
@@ -1576,8 +1593,27 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/Measure' }
+        400:
+          description: Invalid measure status transition
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                    enum: [invalid_transition]
         403:
           $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
+        404:
+          description: Measure not found for the authenticated company user
+        422:
+          description: Laravel validation error for invalid request fields, including string length constraints, invalid enum values, unsupported verificationRequirement values, invalid date formats, invalid partial date ranges against persisted values, or invalid integer values
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LaravelValidationError'
 
   /company/reports:
     get:
