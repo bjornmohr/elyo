@@ -60,6 +60,9 @@ class MeasureParticipationFactory extends Factory
             'user_id' => fn (array $attributes): int => $resolveContext($attributes)['user_id'],
             'measure_id' => fn (array $attributes): int => $resolveContext($attributes)['measure_id'],
             'participated_at' => now(),
+            'verification_type' => MeasureParticipation::VERIFICATION_TYPE_SELF_REPORTED,
+            'verified_at' => fn (array $attributes) => $attributes['participated_at'] ?? now(),
+            'verified_by_user_id' => null,
         ];
     }
 

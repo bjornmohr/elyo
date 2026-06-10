@@ -41,6 +41,8 @@ class MeasureResource extends JsonResource
             'participation' => [
                 'isParticipating' => $participation !== null,
                 'participatedAt' => $participation?->participated_at?->toIso8601String(),
+                'verificationType' => $participation?->verification_type,
+                'verifiedAt' => $participation?->verified_at?->toIso8601String(),
             ],
         ];
     }
