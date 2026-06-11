@@ -777,7 +777,7 @@ Plan date: 2026-06-11. Plan only — no implementation files have been modified 
 3. **Schema gap:** `system_measure_templates` (migration `2026_06_10_030000_create_system_measures_tables.php`) has **no `category` and no `is_featured` column**. The task requires both as form fields, list/detail fields, and filters. The existing schema cannot support this, so one small additive migration is justified under the task's migration rule.
 4. The template exercise order column is **`position`**, not `sort_order` (`system_measure_template_exercises.position`, with a **unique constraint on `(system_measure_template_id, position)`**). The API will expose `sortOrder` (camelCase, per task) and map it to `position` server-side.
 5. The `(template, position)` unique constraint is non-deferrable in PostgreSQL, so reorder must avoid transient collisions: inside the transaction, first shift all affected rows by a large offset (single statement), then write final positions.
-6. There is **no unique constraint on `(system_measure_template_id, system_exercise_id)`**, so duplicate prevention must be application-layer validation (task's stated preference applies).
+6. The original schema had **no unique constraint on `(system_measure_template_id, system_exercise_id)`**. This implementation adds a small additive unique-index migration so duplicate template/exercise pairs are rejected at the database layer as well as by API validation.
 7. `SystemMeasureTemplate::booted()` has a `saving` hook that sets `slug ??= Str::slug(title)` (not unique-safe), `difficulty ??= BEGINNER`, `status ??= ACTIVE`. The controller must generate the unique slug explicitly before save (same pattern as `SystemExerciseController::generateUniqueSlug()`), so the hook fallback never produces collisions. Model/schema status default is `ACTIVE`, so per the task ("default `DRAFT` or existing schema/model default") the create default is **`ACTIVE`**, consistent with the exercise catalog.
 8. `system_measure_templates` also has `goal_summary`, `recommended_frequency`, `default_points`, `streak_enabled`, `requires_feedback`. These are **not exposed or accepted** in v1: the task's field lists omit them, and the acceptance criteria forbid point/streak logic. They keep their DB defaults. (Intentional deviation noted in handoff.)
 9. Factories: `SystemMeasureTemplateFactory` exists (with `withExercises()` and `draft()` states). There is **no `SystemMeasureTemplateExerciseFactory`** — add one for tests (test support, not a data-model change).
@@ -790,6 +790,11 @@ New file: `apps/api-laravel/database/migrations/2026_06_11_000000_add_category_a
 
 - `up()`: add `category` (string, default `'MIXED'`) and `is_featured` (boolean, default `false`) to `system_measure_templates`; add index on `category`.
 - `down()`: drop both columns. Fully additive and reversible; no destructive change; user snapshot tables untouched.
+
+New file: `apps/api-laravel/database/migrations/2026_06_11_010000_add_template_exercise_unique_to_system_measure_template_exercises_table.php`
+
+- `up()`: fail clearly if duplicate `(system_measure_template_id, system_exercise_id)` pairs already exist; otherwise add a unique constraint on that pair.
+- `down()`: drop the unique constraint. This is additive and does not delete data.
 
 Update `app/Models/SystemMeasureTemplate.php`:
 
@@ -828,15 +833,15 @@ New controllers:
    - `archive`: set `status = ARCHIVED`, save, return resource. Idempotent by construction (re-setting `ARCHIVED` is a no-op); does not touch template exercises.
    - `generateUniqueSlug()`: `Str::slug($title)`, fallback `'template'`, numeric suffix starting at 2 (`stress-reset`, `stress-reset-2`, …) — same as `SystemExerciseController`.
 2. `app/Http/Controllers/Admin/SystemMeasureTemplateExerciseController.php`
-   - `store`: `CreateSystemMeasureTemplateExerciseRequest`; reject archived exercises with 422 (validation error on `systemExerciseId`, task-preferred); reject duplicates (exercise already in this template) with 422 at application layer (finding A6); if `sortOrder` missing, append at `max(position) + 1`; if provided and already taken, insert by shifting subsequent rows (offset-then-renumber inside a transaction to respect the unique constraint) — simplest compliant alternative: treat provided `sortOrder` colliding with an existing position as 422 and document it; decision in Open Questions, default to **append-or-explicit-free-position with 422 on collision** to keep v1 controlled. Returns created `SystemMeasureTemplateExerciseResource` (with nested exercise) and 201.
-   - `update`: `UpdateSystemMeasureTemplateExerciseRequest`; verify child ownership (404 otherwise); update overrides + `is_required`; `sortOrder` change follows the same collision rule as `store`; never writes to the underlying `system_exercises` row; returns updated resource.
+   - `store`: `CreateSystemMeasureTemplateExerciseRequest`; reject archived exercises with 422 (validation error on `systemExerciseId`, task-preferred); lock the parent template row, reject duplicates with 422 before insert, and rely on the `(template, exercise)` unique constraint as the concurrency backstop; if `sortOrder` missing, append at `max(position) + 1`; if provided and already taken, return 422. Returns created `SystemMeasureTemplateExerciseResource` (with nested exercise) and 201.
+   - `update`: `UpdateSystemMeasureTemplateExerciseRequest`; lock the parent template row, verify child ownership (404 otherwise); update overrides + `is_required`; `sortOrder` change follows the same collision rule as `store`; never writes to the underlying `system_exercises` row; returns updated resource.
    - `destroy`: verify ownership; delete the pivot-style row only; 204. Underlying `SystemExercise` untouched.
    - `reorder`: `ReorderSystemMeasureTemplateExercisesRequest`; **requires the complete set of the template's exercise IDs** and rejects partial payloads before any write. Exact check order:
      1. Validation (form request): `items` shape, distinct `items.*.id`, distinct `items.*.sortOrder` → 422 on duplicate sortOrder values.
-     2. Fetch all existing template exercise IDs for `{systemMeasureTemplate}`; fetch submitted IDs from the payload.
+     2. Inside `DB::transaction()`, lock the parent template row, then lock and fetch all existing template exercise IDs for `{systemMeasureTemplate}`; fetch submitted IDs from the payload.
      3. If any submitted ID does not belong to this template (foreign or unknown) → **404**.
      4. If the submitted ID set does not exactly match the full existing ID set (missing IDs / partial payload) → **422**.
-     5. Only after all checks pass: inside `DB::transaction()`, single statement shifting all the template's rows by a large offset (e.g. `position + 100000`), then per-item final `position` writes (avoids transient unique-constraint violations, finding A5).
+     5. Only after all checks pass: single statement shifting all the template's rows by a large offset, then per-item final `position` writes (avoids transient unique-constraint violations, finding A5).
      No positions are written if any check fails. Returns the full ordered exercise list (`data: [...]`) so the UI can re-render.
 
 New form requests (all `authorize(): true` — route middleware owns authorization, matching existing admin requests):
@@ -845,7 +850,7 @@ New form requests (all `authorize(): true` — route middleware owns authorizati
 - `UpdateSystemMeasureTemplateRequest`: same rules, all `sometimes`; no `slug` field accepted.
 - `CreateSystemMeasureTemplateExerciseRequest`: `systemExerciseId` required integer `exists:system_exercises,id`; `sortOrder` sometimes integer min:1; `customTitle` nullable string max:255; `customInstructions`/`customFeedbackPrompt` nullable string; `customDurationMinutes`/`customSets`/`customRepetitions`/`customHoldSeconds` nullable integer min:1 max:100000; `isRequired` sometimes boolean (default true server-side). Archived-exercise and duplicate checks live in the controller/`withValidator` so they produce 422 with field-level errors.
 - `UpdateSystemMeasureTemplateExerciseRequest`: same as create minus `systemExerciseId`, all optional.
-- `ReorderSystemMeasureTemplateExercisesRequest`: `items` required array min:1; `items.*.id` required integer; `items.*.sortOrder` required integer min:1; `distinct` on both ids and sortOrders (duplicate `sortOrder` → 422 via validation). The complete-set and ownership checks (404 for foreign IDs, 422 for partial payloads) run in the controller before any write — see the `reorder` action above.
+- `ReorderSystemMeasureTemplateExercisesRequest`: `items` required array min:1; `items.*.id` required integer; `items.*.sortOrder` required integer min:1; `distinct` on both ids and sortOrders (duplicate `sortOrder` → 422 via validation). The complete-set and ownership checks (404 for foreign IDs, 422 for partial payloads) run inside the transaction after locking the parent template row and before any write — see the `reorder` action above.
 
 New resources:
 
@@ -934,7 +939,7 @@ Angular — `admin-system-measure-template.service.spec.ts` and `admin-system-me
 
 ### J. File Inventory (planned changes)
 
-Backend (new): migration `2026_06_11_000000_add_category_and_is_featured_to_system_measure_templates_table.php`; `SystemMeasureTemplateController`; `SystemMeasureTemplateExerciseController`; 5 form requests (`CreateSystemMeasureTemplateRequest`, `UpdateSystemMeasureTemplateRequest`, `CreateSystemMeasureTemplateExerciseRequest`, `UpdateSystemMeasureTemplateExerciseRequest`, `ReorderSystemMeasureTemplateExercisesRequest`); 2 resources (`SystemMeasureTemplateResource`, `SystemMeasureTemplateExerciseResource`); `SystemMeasureTemplateExerciseFactory`; `tests/Feature/AdminSystemMeasureTemplateTest.php`.
+Backend (new): migrations `2026_06_11_000000_add_category_and_is_featured_to_system_measure_templates_table.php` and `2026_06_11_010000_add_template_exercise_unique_to_system_measure_template_exercises_table.php`; `SystemMeasureTemplateController`; `SystemMeasureTemplateExerciseController`; 5 form requests (`CreateSystemMeasureTemplateRequest`, `UpdateSystemMeasureTemplateRequest`, `CreateSystemMeasureTemplateExerciseRequest`, `UpdateSystemMeasureTemplateExerciseRequest`, `ReorderSystemMeasureTemplateExercisesRequest`); 2 resources (`SystemMeasureTemplateResource`, `SystemMeasureTemplateExerciseResource`); `SystemMeasureTemplateExerciseFactory`; `tests/Feature/AdminSystemMeasureTemplateTest.php`.
 
 Backend (modified): `routes/api.php` (9 routes in existing admin group); `app/Models/SystemMeasureTemplate.php` (category/is_featured fillable, cast, constants, saving default); `database/factories/SystemMeasureTemplateFactory.php` (new columns + states).
 

@@ -38,49 +38,53 @@ class SystemMeasureTemplateExerciseController extends Controller
             ]);
         }
 
-        if ($systemMeasureTemplate->templateExercises()->where('system_exercise_id', $exercise->id)->exists()) {
-            throw ValidationException::withMessages([
-                'systemExerciseId' => 'This system exercise is already part of the template.',
-            ]);
-        }
+        return DB::transaction(function () use ($systemMeasureTemplate, $exercise, $data) {
+            $lockedTemplate = $this->lockTemplate($systemMeasureTemplate);
 
-        if (array_key_exists('sortOrder', $data)) {
-            $this->ensurePositionIsFree($systemMeasureTemplate, (int) $data['sortOrder']);
-            $position = (int) $data['sortOrder'];
-        } else {
-            $position = (int) $systemMeasureTemplate->templateExercises()->max('position') + 1;
-        }
-
-        $attributes = [
-            'system_exercise_id' => $exercise->id,
-            'position' => $position,
-            'is_required' => $data['isRequired'] ?? true,
-        ];
-        foreach (self::OVERRIDE_COLUMN_MAP as $param => $column) {
-            if ($param !== 'isRequired' && array_key_exists($param, $data)) {
-                $attributes[$column] = $data[$param];
-            }
-        }
-
-        try {
-            $templateExercise = $systemMeasureTemplate->templateExercises()->create($attributes);
-        } catch (UniqueConstraintViolationException $e) {
-            // A concurrent request won the race; map the DB constraint to the
-            // same 422 the application-level checks produce instead of a 500.
-            if (str_contains($e->getMessage(), 'template_exercise_unique')) {
+            if ($lockedTemplate->templateExercises()->where('system_exercise_id', $exercise->id)->exists()) {
                 throw ValidationException::withMessages([
                     'systemExerciseId' => 'This system exercise is already part of the template.',
                 ]);
             }
 
-            throw ValidationException::withMessages([
-                'sortOrder' => 'This sort order is already used in the template. Use the reorder endpoint to move multiple exercises.',
-            ]);
-        }
+            if (array_key_exists('sortOrder', $data)) {
+                $this->ensurePositionIsFree($lockedTemplate, (int) $data['sortOrder']);
+                $position = (int) $data['sortOrder'];
+            } else {
+                $position = (int) $lockedTemplate->templateExercises()->max('position') + 1;
+            }
 
-        $templateExercise->load('exercise.tags');
+            $attributes = [
+                'system_exercise_id' => $exercise->id,
+                'position' => $position,
+                'is_required' => $data['isRequired'] ?? true,
+            ];
+            foreach (self::OVERRIDE_COLUMN_MAP as $param => $column) {
+                if ($param !== 'isRequired' && array_key_exists($param, $data)) {
+                    $attributes[$column] = $data[$param];
+                }
+            }
 
-        return (new SystemMeasureTemplateExerciseResource($templateExercise))->response()->setStatusCode(201);
+            try {
+                $templateExercise = $lockedTemplate->templateExercises()->create($attributes);
+            } catch (UniqueConstraintViolationException $e) {
+                // Map DB constraints to the same 422 responses as the preflight
+                // checks so concurrent races never leak as internal errors.
+                if (str_contains($e->getMessage(), 'template_exercise_unique')) {
+                    throw ValidationException::withMessages([
+                        'systemExerciseId' => 'This system exercise is already part of the template.',
+                    ]);
+                }
+
+                throw ValidationException::withMessages([
+                    'sortOrder' => 'This sort order is already used in the template. Use the reorder endpoint to move multiple exercises.',
+                ]);
+            }
+
+            $templateExercise->load('exercise.tags');
+
+            return (new SystemMeasureTemplateExerciseResource($templateExercise))->response()->setStatusCode(201);
+        });
     }
 
     public function update(
@@ -88,32 +92,45 @@ class SystemMeasureTemplateExerciseController extends Controller
         SystemMeasureTemplate $systemMeasureTemplate,
         SystemMeasureTemplateExercise $templateExercise
     ) {
-        $this->ensureBelongsToTemplate($systemMeasureTemplate, $templateExercise);
+        return DB::transaction(function () use ($request, $systemMeasureTemplate, $templateExercise) {
+            $lockedTemplate = $this->lockTemplate($systemMeasureTemplate);
+            $this->ensureBelongsToTemplate($lockedTemplate, $templateExercise);
 
-        $data = $request->validated();
+            $data = $request->validated();
 
-        if (array_key_exists('sortOrder', $data) && (int) $data['sortOrder'] !== $templateExercise->position) {
-            $this->ensurePositionIsFree($systemMeasureTemplate, (int) $data['sortOrder']);
-            $templateExercise->position = (int) $data['sortOrder'];
-        }
-
-        foreach (self::OVERRIDE_COLUMN_MAP as $param => $column) {
-            if (array_key_exists($param, $data)) {
-                $templateExercise->{$column} = $data[$param];
+            if (array_key_exists('sortOrder', $data) && (int) $data['sortOrder'] !== $templateExercise->position) {
+                $this->ensurePositionIsFree($lockedTemplate, (int) $data['sortOrder']);
+                $templateExercise->position = (int) $data['sortOrder'];
             }
-        }
-        $templateExercise->save();
 
-        $templateExercise->load('exercise.tags');
+            foreach (self::OVERRIDE_COLUMN_MAP as $param => $column) {
+                if (array_key_exists($param, $data)) {
+                    $templateExercise->{$column} = $data[$param];
+                }
+            }
 
-        return new SystemMeasureTemplateExerciseResource($templateExercise);
+            try {
+                $templateExercise->save();
+            } catch (UniqueConstraintViolationException) {
+                throw ValidationException::withMessages([
+                    'sortOrder' => 'This sort order is already used in the template. Use the reorder endpoint to move multiple exercises.',
+                ]);
+            }
+
+            $templateExercise->load('exercise.tags');
+
+            return new SystemMeasureTemplateExerciseResource($templateExercise);
+        });
     }
 
     public function destroy(SystemMeasureTemplate $systemMeasureTemplate, SystemMeasureTemplateExercise $templateExercise)
     {
-        $this->ensureBelongsToTemplate($systemMeasureTemplate, $templateExercise);
+        DB::transaction(function () use ($systemMeasureTemplate, $templateExercise) {
+            $this->lockTemplate($systemMeasureTemplate);
+            $this->ensureBelongsToTemplate($systemMeasureTemplate, $templateExercise);
 
-        $templateExercise->delete();
+            $templateExercise->delete();
+        });
 
         return response()->noContent();
     }
@@ -124,9 +141,10 @@ class SystemMeasureTemplateExerciseController extends Controller
         $submittedIds = collect($items)->pluck('id')->map(fn ($id) => (int) $id);
 
         DB::transaction(function () use ($systemMeasureTemplate, $items, $submittedIds) {
-            // Lock the template's rows so a concurrent add/remove cannot make
-            // the complete-set check stale before the position writes.
-            $lockedRows = $systemMeasureTemplate->templateExercises()->lockForUpdate()->get();
+            // Lock the parent row first so add/remove/reorder operations for the
+            // same template cannot interleave around the complete-set check.
+            $lockedTemplate = $this->lockTemplate($systemMeasureTemplate);
+            $lockedRows = $lockedTemplate->templateExercises()->lockForUpdate()->get();
             $existingIds = $lockedRows->pluck('id');
 
             if ($submittedIds->diff($existingIds)->isNotEmpty()) {
@@ -146,12 +164,12 @@ class SystemMeasureTemplateExerciseController extends Controller
                 (int) collect($items)->max('sortOrder')
             ) + 1;
 
-            $systemMeasureTemplate->templateExercises()->update([
+            $lockedTemplate->templateExercises()->update([
                 'position' => DB::raw('position + '.$offset),
             ]);
 
             foreach ($items as $item) {
-                $systemMeasureTemplate->templateExercises()
+                $lockedTemplate->templateExercises()
                     ->where('id', (int) $item['id'])
                     ->update(['position' => (int) $item['sortOrder']]);
             }
@@ -160,6 +178,11 @@ class SystemMeasureTemplateExerciseController extends Controller
         $exercises = $systemMeasureTemplate->templateExercises()->with('exercise.tags')->get();
 
         return SystemMeasureTemplateExerciseResource::collection($exercises);
+    }
+
+    private function lockTemplate(SystemMeasureTemplate $template): SystemMeasureTemplate
+    {
+        return SystemMeasureTemplate::whereKey($template->getKey())->lockForUpdate()->firstOrFail();
     }
 
     private function ensureBelongsToTemplate(SystemMeasureTemplate $template, SystemMeasureTemplateExercise $templateExercise): void
