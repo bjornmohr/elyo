@@ -26,6 +26,14 @@ Use a consistent error format:
       }
     }
 
+## Form Validation
+
+- Required fields must be validated in both the frontend and backend.
+- Cross-field logical rules must be enforced in the backend and mirrored in the frontend when practical.
+- Backend validation remains the source of truth.
+- Frontend forms must display backend validation errors.
+- Form submissions must not fail silently.
+
 ## API Design
 
 - Use Laravel Resources for response shape.

@@ -17,6 +17,14 @@ export interface MeasureCheckinTokenResponse {
 export class CompanyMeasuresService {
   private api = inject(ApiClient);
 
+  createMeasure(payload: Record<string, unknown>): Observable<{ data: any }> {
+    return this.api.post<{ data: any }>('/company/measures', payload);
+  }
+
+  updateMeasure(measureId: number | string, payload: Record<string, unknown>): Observable<{ data: any }> {
+    return this.api.patch<{ data: any }>(`/company/measures/${measureId}`, payload);
+  }
+
   generateMeasureCheckinToken(measureId: number | string): Observable<{ data: MeasureCheckinTokenResponse }> {
     return this.api.post<{ data: MeasureCheckinTokenResponse }>(`/company/measures/${measureId}/checkin-token`, {});
   }

@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { ApiClient } from '../../../../core/services/api-client.service';
 import { Role } from '../../../../core/models/auth.models';
 import { AuthStore } from '../../../../core/store/auth.store';
@@ -41,6 +41,19 @@ interface MeasureCheckinLink extends MeasureCheckinTokenResponse {
   checkinUrl: string;
 }
 
+const SCHEDULED_EXECUTION_TYPES = ['EVENT_PARTICIPATION', 'GUIDED_SESSION'];
+
+function dateRangeValidator(control: AbstractControl): ValidationErrors | null {
+  const startsAt = control.get('startsAt')?.value;
+  const endsAt = control.get('endsAt')?.value;
+
+  if (!startsAt || !endsAt) return null;
+
+  return new Date(endsAt).getTime() > new Date(startsAt).getTime()
+    ? null
+    : { dateRange: true };
+}
+
 @Component({
   selector: 'app-company-measures',
   standalone: true,
@@ -67,14 +80,25 @@ interface MeasureCheckinLink extends MeasureCheckinTokenResponse {
       @if (showForm() && !managerDisabledByTeamLayer()) {
         <form [formGroup]="measureForm" (ngSubmit)="submit()"
               class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+          <div class="flex items-center justify-between gap-4">
+            <h2 class="text-base font-semibold text-gray-900">
+              {{ editingMeasureId() ? 'Maßnahme bearbeiten' : 'Neue Maßnahme' }}
+            </h2>
+            @if (editingMeasureId()) {
+              <button type="button" (click)="resetForm()"
+                      class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                Bearbeitung beenden
+              </button>
+            }
+          </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label class="block">
               <span class="text-sm font-medium text-gray-700">Titel <span class="text-red-500">*</span></span>
               <input formControlName="title"
                      class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"
                      [class.border-red-300]="invalid('title')"/>
-              @if (invalid('title')) {
-                <span class="text-xs text-red-600">Mindestens 3 Zeichen erforderlich.</span>
+              @if (fieldMessage('title'); as message) {
+                <span class="text-xs text-red-600">{{ message }}</span>
               }
             </label>
             <label class="block">
@@ -89,8 +113,8 @@ interface MeasureCheckinLink extends MeasureCheckinTokenResponse {
                 <option value="mental">Mental</option>
                 <option value="nutrition">Ernährung</option>
               </select>
-              @if (invalid('category')) {
-                <span class="text-xs text-red-600">Kategorie ist erforderlich.</span>
+              @if (fieldMessage('category'); as message) {
+                <span class="text-xs text-red-600">{{ message }}</span>
               }
             </label>
           </div>
@@ -100,8 +124,8 @@ interface MeasureCheckinLink extends MeasureCheckinTokenResponse {
             <textarea formControlName="description" rows="3"
                       class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"
                       [class.border-red-300]="invalid('description')"></textarea>
-            @if (invalid('description')) {
-              <span class="text-xs text-red-600">Mindestens 10 Zeichen erforderlich.</span>
+            @if (fieldMessage('description'); as message) {
+              <span class="text-xs text-red-600">{{ message }}</span>
             }
           </label>
 
@@ -120,11 +144,21 @@ interface MeasureCheckinLink extends MeasureCheckinTokenResponse {
             }
             <label class="block">
               <span class="text-sm font-medium text-gray-700">Status</span>
-              <select formControlName="status"
-                      class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500">
-                <option value="ACTIVE">Aktiv</option>
-                <option value="SUGGESTED">Vorgeschlagen</option>
-              </select>
+              @if (editingMeasureId()) {
+                <div class="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                  {{ statusLabel(measureForm.get('status')?.value) }}
+                </div>
+                <span class="text-xs text-gray-500">Der Status kann beim Bearbeiten nicht geändert werden.</span>
+              } @else {
+                <select formControlName="status"
+                        class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500">
+                  <option value="ACTIVE">Aktiv</option>
+                  <option value="SUGGESTED">Vorgeschlagen</option>
+                </select>
+              }
+              @if (fieldMessage('status'); as message) {
+                <span class="text-xs text-red-600">{{ message }}</span>
+              }
             </label>
           </div>
 
@@ -153,10 +187,14 @@ interface MeasureCheckinLink extends MeasureCheckinTokenResponse {
               <label class="block">
                 <span class="text-sm font-medium text-gray-700">Nachweis</span>
                 <select formControlName="verificationRequirement"
-                        class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500">
+                        class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"
+                        [class.border-red-300]="invalid('verificationRequirement')">
                   <option value="SELF_REPORT">Selbstmeldung</option>
                   <option value="QR_CODE">QR-Check-in</option>
                 </select>
+                @if (fieldMessage('verificationRequirement'); as message) {
+                  <span class="text-xs text-red-600">{{ message }}</span>
+                }
               </label>
             </div>
 
@@ -169,17 +207,38 @@ interface MeasureCheckinLink extends MeasureCheckinTokenResponse {
               <label class="block">
                 <span class="text-sm font-medium text-gray-700">Ende</span>
                 <input type="datetime-local" formControlName="endsAt"
-                       class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
+                       class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"
+                       [class.border-red-300]="invalid('endsAt') || dateRangeInvalid()"/>
+                @if (fieldMessage('endsAt'); as message) {
+                  <span class="text-xs text-red-600">{{ message }}</span>
+                } @else if (dateRangeInvalid()) {
+                  <span class="text-xs text-red-600">Ende muss nach dem Start liegen.</span>
+                }
               </label>
               <label class="block">
                 <span class="text-sm font-medium text-gray-700">Dauer (Min.)</span>
-                <input type="number" min="1" formControlName="durationMinutes"
-                       class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
+                @if (durationPreviewMinutes() !== null) {
+                  <div class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                    {{ durationPreviewMinutes() }} Min.
+                  </div>
+                  <span class="text-xs text-gray-500">Wird aus Start und Ende berechnet.</span>
+                } @else {
+                  <input type="number" min="1" formControlName="durationMinutes"
+                         class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"
+                         [class.border-red-300]="invalid('durationMinutes')"/>
+                  @if (fieldMessage('durationMinutes'); as message) {
+                    <span class="text-xs text-red-600">{{ message }}</span>
+                  }
+                }
               </label>
               <label class="block">
                 <span class="text-sm font-medium text-gray-700">Kapazität</span>
                 <input type="number" min="1" formControlName="capacity"
-                       class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
+                       class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"
+                       [class.border-red-300]="invalid('capacity')"/>
+                @if (fieldMessage('capacity'); as message) {
+                  <span class="text-xs text-red-600">{{ message }}</span>
+                }
               </label>
             </div>
 
@@ -240,6 +299,7 @@ interface MeasureCheckinLink extends MeasureCheckinTokenResponse {
                 <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Teilnahme</th>
                 <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Status</th>
                 <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Check-in</th>
+                <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Aktion</th>
               </tr>
               </thead>
               <tbody>
@@ -286,6 +346,7 @@ interface MeasureCheckinLink extends MeasureCheckinTokenResponse {
                         <div class="space-y-2">
                           <input readonly [value]="link.checkinUrl"
                                  class="w-72 max-w-full rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600"/>
+                          <div class="text-xs text-gray-500">Dieser Link wird nur direkt nach Erstellung oder Erneuerung angezeigt.</div>
                           <div class="flex gap-2">
                             <button type="button" (click)="copyCheckinLink(link.checkinUrl)"
                                     class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">
@@ -304,6 +365,16 @@ interface MeasureCheckinLink extends MeasureCheckinTokenResponse {
                                 class="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:bg-gray-300">
                           {{ isRotatingCheckin(measure.id) ? 'Wird erstellt…' : 'Link erstellen' }}
                         </button>
+                      }
+                    </td>
+                    <td class="px-4 py-3">
+                      @if (isEditableMeasure(measure)) {
+                        <button type="button" (click)="editMeasure(measure)"
+                                class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                          Bearbeiten
+                        </button>
+                      } @else {
+                        <span class="text-xs text-gray-400">Nicht bearbeitbar</span>
                       }
                     </td>
                   </tr>
@@ -329,6 +400,8 @@ export class CompanyMeasuresComponent implements OnInit {
   saving = signal(false);
   showForm = signal(false);
   formError = signal<string | null>(null);
+  fieldErrors = signal<Record<string, string>>({});
+  editingMeasureId = signal<number | null>(null);
   participationSummaries = signal<Record<number, MeasureParticipationSummary | null>>({});
   checkinLinks = signal<Record<number, MeasureCheckinLink>>({});
   rotatingCheckinIds = signal<Set<number>>(new Set());
@@ -349,7 +422,7 @@ export class CompanyMeasuresComponent implements OnInit {
     locationName: [null as string | null, [Validators.maxLength(255)]],
     locationAddress: [null as string | null, [Validators.maxLength(1000)]],
     capacity: [null as number | null, [Validators.min(1)]],
-  });
+  }, { validators: dateRangeValidator });
 
   ngOnInit() {
     if (this.managerDisabledByTeamLayer()) {
@@ -379,17 +452,44 @@ export class CompanyMeasuresComponent implements OnInit {
       return;
     }
 
-    this.showForm.update(value => !value);
+    const next = !this.showForm();
+    if (!next) {
+      this.resetForm();
+    }
+    this.showForm.set(next);
     this.formError.set(null);
   }
 
   invalid(control: string) {
     const field = this.measureForm.get(control);
-    return !!field && field.invalid && (field.dirty || field.touched);
+    return !!this.fieldErrors()[control] || (!!field && field.invalid && (field.dirty || field.touched));
+  }
+
+  fieldMessage(control: string) {
+    const backendMessage = this.fieldErrors()[control];
+    if (backendMessage) return backendMessage;
+
+    const field = this.measureForm.get(control);
+    if (!field || !(field.dirty || field.touched) || !field.errors) return null;
+
+    if (field.errors['required']) return 'Dieses Feld ist erforderlich.';
+    if (field.errors['email']) return 'Bitte eine gültige E-Mail-Adresse eingeben.';
+    if (field.errors['minlength']) return `Mindestens ${field.errors['minlength'].requiredLength} Zeichen erforderlich.`;
+    if (field.errors['maxlength']) return `Maximal ${field.errors['maxlength'].requiredLength} Zeichen erlaubt.`;
+    if (field.errors['min']) return `Muss mindestens ${field.errors['min'].min} sein.`;
+
+    return 'Eingabe ist ungültig.';
+  }
+
+  dateRangeInvalid() {
+    return this.measureForm.hasError('dateRange') && (
+      !!this.measureForm.get('startsAt')?.touched || !!this.measureForm.get('endsAt')?.touched
+    );
   }
 
   submit() {
     this.formError.set(null);
+    this.fieldErrors.set({});
     if (this.managerDisabledByTeamLayer()) {
       this.formError.set('Manager können Maßnahmen nur bei aktivierter Team-Ebene speichern.');
       return;
@@ -401,19 +501,28 @@ export class CompanyMeasuresComponent implements OnInit {
     }
 
     this.saving.set(true);
-    this.api.post<{ data: any }>('/company/measures', this.payload()).subscribe({
+    const editingId = this.editingMeasureId();
+    const request$ = editingId
+      ? this.companyMeasuresService.updateMeasure(editingId, this.payload())
+      : this.companyMeasuresService.createMeasure(this.payload());
+
+    request$.subscribe({
       next: res => {
-        this.measures.update(measures => [res.data, ...measures]);
+        if (editingId) {
+          this.measures.update(measures => measures.map(measure => measure.id === editingId ? res.data : measure));
+        } else {
+          this.measures.update(measures => [res.data, ...measures]);
+        }
         if (res.data?.id) {
           this.loadParticipationSummary(res.data.id);
         }
         this.resetForm();
         this.showForm.set(false);
-        this.notifications.success('Maßnahme wurde gespeichert.');
+        this.notifications.success(editingId ? 'Maßnahme wurde aktualisiert.' : 'Maßnahme wurde gespeichert.');
         this.saving.set(false);
       },
       error: err => {
-        const message = this.validationMessage(err);
+        const message = this.applyValidationErrors(err);
         this.formError.set(message);
         this.notifications.error(message);
         this.saving.set(false);
@@ -479,9 +588,57 @@ export class CompanyMeasuresComponent implements OnInit {
     return this.rotatingCheckinIds().has(measureId);
   }
 
+  isEditableMeasure(measure: CompanyMeasure) {
+    return ['SUGGESTED', 'ACTIVE'].includes(measure.status);
+  }
+
+  editMeasure(measure: CompanyMeasure) {
+    if (!this.isEditableMeasure(measure)) {
+      return;
+    }
+
+    this.editingMeasureId.set(measure.id);
+    this.fieldErrors.set({});
+    this.formError.set(null);
+    this.measureForm.reset({
+      title: measure.title,
+      category: measure.category,
+      description: measure.description,
+      teamId: null,
+      status: measure.status || 'ACTIVE',
+      deliveryType: measure.deliveryType || 'ONSITE',
+      executionType: measure.executionType || 'EVENT_PARTICIPATION',
+      verificationRequirement: measure.verificationRequirement || 'SELF_REPORT',
+      startsAt: this.toDateTimeLocal(measure.startsAt),
+      endsAt: this.toDateTimeLocal(measure.endsAt),
+      durationMinutes: measure.durationMinutes ?? null,
+      instructions: measure.instructions ?? null,
+      locationName: measure.locationName ?? null,
+      locationAddress: measure.locationAddress ?? null,
+      capacity: measure.capacity ?? null,
+    });
+    this.showForm.set(true);
+  }
+
+  durationPreviewMinutes() {
+    const executionType = this.measureForm.get('executionType')?.value;
+    if (!executionType || !SCHEDULED_EXECUTION_TYPES.includes(executionType)) return null;
+
+    const startsAt = this.measureForm.get('startsAt')?.value;
+    const endsAt = this.measureForm.get('endsAt')?.value;
+    if (!startsAt || !endsAt || this.measureForm.hasError('dateRange')) return null;
+
+    const minutes = Math.round((new Date(endsAt).getTime() - new Date(startsAt).getTime()) / 60000);
+    return minutes > 0 ? minutes : null;
+  }
+
   rotateCheckinLink(measure: CompanyMeasure) {
     if (measure.verificationRequirement !== 'QR_CODE') {
       this.notifications.error('Check-in-Links sind nur für QR-Maßnahmen verfügbar.');
+      return;
+    }
+
+    if (this.checkinLinkFor(measure.id) && !window.confirm('Bestehenden Check-in-Link ersetzen? Der bisherige Link wird ungültig.')) {
       return;
     }
 
@@ -527,6 +684,16 @@ export class CompanyMeasuresComponent implements OnInit {
     return value ? value.toLowerCase().replace(/_/g, ' ') : '-';
   }
 
+  statusLabel(value: string | null | undefined) {
+    switch (value) {
+      case 'ACTIVE': return 'Aktiv';
+      case 'SUGGESTED': return 'Vorgeschlagen';
+      case 'COMPLETED': return 'Abgeschlossen';
+      case 'DISMISSED': return 'Verworfen';
+      default: return value || '-';
+    }
+  }
+
   scheduleLabel(measure: CompanyMeasure) {
     const startsAt = measure.startsAt ? new Date(measure.startsAt).toLocaleString('de-DE') : null;
     const endsAt = measure.endsAt ? new Date(measure.endsAt).toLocaleString('de-DE') : null;
@@ -541,10 +708,29 @@ export class CompanyMeasuresComponent implements OnInit {
       Object.entries(rawPayload).map(([key, value]) => [key, value === '' ? null : value])
     );
 
+    // datetime-local values are timezone-less local wall time; the API
+    // contract expects explicit ISO date-time strings with timezone/UTC.
+    payload['startsAt'] = this.toIsoDateTime(rawPayload.startsAt);
+    payload['endsAt'] = this.toIsoDateTime(rawPayload.endsAt);
+
+    const durationPreview = this.durationPreviewMinutes();
+    if (durationPreview !== null) {
+      payload['durationMinutes'] = durationPreview;
+    }
+
+    const editingId = this.editingMeasureId();
+    if (editingId) {
+      delete payload['status'];
+      return payload;
+    }
+
     return this.teamLayerEnabled() ? { ...payload, teamId } : payload;
   }
 
-  private resetForm() {
+  resetForm() {
+    this.editingMeasureId.set(null);
+    this.fieldErrors.set({});
+    this.formError.set(null);
     this.measureForm.reset({
       title: '',
       category: '',
@@ -585,9 +771,32 @@ export class CompanyMeasuresComponent implements OnInit {
     return `${window.location.origin}${path}`;
   }
 
-  private validationMessage(err: any) {
-    const errors = err.error?.errors;
-    if (errors) return Object.values(errors).flat().join(' ');
+  private applyValidationErrors(err: any) {
+    const errors = err.error?.errors as Record<string, string[]> | undefined;
+    if (errors) {
+      const fieldErrors = Object.fromEntries(
+        Object.entries(errors).map(([key, messages]) => [key, messages[0]])
+      );
+      this.fieldErrors.set(fieldErrors);
+      return Object.values(errors).flat().join(' ');
+    }
     return err.error?.message || 'Maßnahme konnte nicht gespeichert werden.';
+  }
+
+  // datetime-local inputs represent local wall time, so the prefill must use
+  // local date parts; UTC formatting via toISOString() would shift the shown
+  // time by the timezone offset.
+  private toDateTimeLocal(value: string | null | undefined) {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    const pad = (part: number) => String(part).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  private toIsoDateTime(value: unknown) {
+    if (typeof value !== 'string' || value === '') return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
   }
 }

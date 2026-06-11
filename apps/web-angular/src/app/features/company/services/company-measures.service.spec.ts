@@ -4,12 +4,13 @@ import { ApiClient } from '../../../core/services/api-client.service';
 import { CompanyMeasuresService } from './company-measures.service';
 
 describe('CompanyMeasuresService', () => {
-  let api: { post: ReturnType<typeof vi.fn> };
+  let api: { post: ReturnType<typeof vi.fn>; patch: ReturnType<typeof vi.fn> };
   let service: CompanyMeasuresService;
 
   beforeEach(() => {
     api = {
       post: vi.fn(() => of({ data: { measureId: 3 } })),
+      patch: vi.fn(() => of({ data: { id: 3 } })),
     };
 
     TestBed.configureTestingModule({
@@ -37,5 +38,21 @@ describe('CompanyMeasuresService', () => {
     expect(body).not.toHaveProperty('companyId');
     expect(body).not.toHaveProperty('participated_at');
     expect(body).not.toHaveProperty('participatedAt');
+  });
+
+  it('creates a company measure through the company measure endpoint', () => {
+    const payload = { title: 'Measure' };
+
+    service.createMeasure(payload).subscribe();
+
+    expect(api.post).toHaveBeenCalledWith('/company/measures', payload);
+  });
+
+  it('updates a company measure through the existing patch endpoint', () => {
+    const payload = { title: 'Updated measure' };
+
+    service.updateMeasure(3, payload).subscribe();
+
+    expect(api.patch).toHaveBeenCalledWith('/company/measures/3', payload);
   });
 });

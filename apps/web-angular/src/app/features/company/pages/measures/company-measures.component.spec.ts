@@ -9,7 +9,11 @@ import { CompanyMeasuresComponent } from './company-measures.component';
 
 describe('CompanyMeasuresComponent', () => {
   let api: { get: ReturnType<typeof vi.fn>; post: ReturnType<typeof vi.fn> };
-  let companyMeasuresService: { generateMeasureCheckinToken: ReturnType<typeof vi.fn> };
+  let companyMeasuresService: {
+    createMeasure: ReturnType<typeof vi.fn>;
+    updateMeasure: ReturnType<typeof vi.fn>;
+    generateMeasureCheckinToken: ReturnType<typeof vi.fn>;
+  };
   let notifications: { success: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
@@ -62,6 +66,8 @@ describe('CompanyMeasuresComponent', () => {
       post: vi.fn(),
     };
     companyMeasuresService = {
+      createMeasure: vi.fn(() => of({ data: { id: 9, title: 'Created measure' } })),
+      updateMeasure: vi.fn(() => of({ data: { id: 1, title: 'Updated measure', category: 'mental', description: 'Updated description', status: 'ACTIVE' } })),
       generateMeasureCheckinToken: vi.fn(),
     };
 
@@ -216,5 +222,300 @@ describe('CompanyMeasuresComponent', () => {
     } as any);
 
     expect(notifications.error).toHaveBeenCalledWith('Check-in-Links sind nur für QR-Maßnahmen verfügbar.');
+  });
+
+  it('shows an error when end is not after start', () => {
+    const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.toggleForm();
+    fixture.componentInstance.measureForm.patchValue({
+      title: 'Invalid schedule',
+      category: 'sport',
+      description: 'A valid description.',
+      startsAt: '2026-06-20T10:00',
+      endsAt: '2026-06-20T10:00',
+    });
+    fixture.componentInstance.submit();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Ende muss nach dem Start liegen.');
+    expect(companyMeasuresService.createMeasure).not.toHaveBeenCalled();
+  });
+
+  it('does not call the create service for invalid required fields', () => {
+    const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.toggleForm();
+    fixture.componentInstance.submit();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Dieses Feld ist erforderlich.');
+    expect(companyMeasuresService.createMeasure).not.toHaveBeenCalled();
+  });
+
+  it('displays backend validation errors returned by the API', () => {
+    companyMeasuresService.createMeasure.mockReturnValue(throwError(() => ({
+      status: 422,
+      error: {
+        errors: {
+          endsAt: ['Ende muss nach dem Start liegen.'],
+        },
+      },
+    })));
+    const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.toggleForm();
+    fixture.componentInstance.measureForm.patchValue({
+      title: 'Valid title',
+      category: 'sport',
+      description: 'A valid description.',
+    });
+    fixture.componentInstance.submit();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Ende muss nach dem Start liegen.');
+  });
+
+  it('opens edit mode with a populated form', () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/company/measures') {
+        return of({
+          data: [{
+            id: 8,
+            title: 'Editable measure',
+            category: 'mental',
+            description: 'A measure that can be edited.',
+            status: 'ACTIVE',
+            startsAt: '2026-06-20T09:00:00.000000Z',
+            endsAt: '2026-06-20T10:00:00.000000Z',
+            team: null,
+          }],
+        });
+      }
+
+      if (path === '/company/measures/8/participation-summary') {
+        return of({ data: null });
+      }
+
+      throw new Error(`Unexpected API path: ${path}`);
+    });
+
+    const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.editMeasure(fixture.componentInstance.measures()[0]);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.editingMeasureId()).toBe(8);
+    expect(fixture.componentInstance.measureForm.value.title).toBe('Editable measure');
+    expect(fixture.nativeElement.textContent).toContain('Maßnahme bearbeiten');
+  });
+
+  it('prefills edit schedule fields with local wall time and round-trips the instant on save', () => {
+    const startsAtUtc = '2026-06-20T09:00:00.000000Z';
+    const endsAtUtc = '2026-06-20T10:00:00.000000Z';
+    api.get.mockImplementation((path: string) => {
+      if (path === '/company/measures') {
+        return of({
+          data: [{
+            id: 8,
+            title: 'Editable measure',
+            category: 'mental',
+            description: 'A measure that can be edited.',
+            status: 'ACTIVE',
+            startsAt: startsAtUtc,
+            endsAt: endsAtUtc,
+            team: null,
+          }],
+        });
+      }
+
+      if (path === '/company/measures/8/participation-summary') {
+        return of({ data: null });
+      }
+
+      throw new Error(`Unexpected API path: ${path}`);
+    });
+    companyMeasuresService.updateMeasure.mockReturnValue(of({ data: { id: 8, title: 'Editable measure' } }));
+
+    const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.editMeasure(fixture.componentInstance.measures()[0]);
+
+    // datetime-local controls hold local wall time, so the expected value is
+    // built from local date parts of the same instant - stable across runner
+    // timezones, and different from the raw UTC slice whenever TZ !== UTC.
+    const pad = (part: number) => String(part).padStart(2, '0');
+    const toLocal = (iso: string) => {
+      const date = new Date(iso);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+    expect(fixture.componentInstance.measureForm.value.startsAt).toBe(toLocal(startsAtUtc));
+    expect(fixture.componentInstance.measureForm.value.endsAt).toBe(toLocal(endsAtUtc));
+
+    fixture.componentInstance.submit();
+
+    // Saving without touching the schedule must not shift the stored instant.
+    expect(companyMeasuresService.updateMeasure).toHaveBeenCalledWith(8, expect.objectContaining({
+      startsAt: new Date(startsAtUtc).toISOString(),
+      endsAt: new Date(endsAtUtc).toISOString(),
+    }));
+  });
+
+  it('serializes datetime-local values to explicit ISO strings on create', () => {
+    const baseGet = api.get.getMockImplementation() as (path: string) => unknown;
+    api.get.mockImplementation((path: string) => {
+      if (path === '/company/measures/9/participation-summary') {
+        return of({ data: null });
+      }
+      return baseGet(path);
+    });
+
+    const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.toggleForm();
+    fixture.componentInstance.measureForm.patchValue({
+      title: 'Scheduled measure',
+      category: 'sport',
+      description: 'A valid description.',
+      startsAt: '2026-06-20T09:00',
+      endsAt: '2026-06-20T10:30',
+    });
+    fixture.componentInstance.submit();
+
+    expect(companyMeasuresService.createMeasure).toHaveBeenCalledWith(expect.objectContaining({
+      startsAt: new Date('2026-06-20T09:00').toISOString(),
+      endsAt: new Date('2026-06-20T10:30').toISOString(),
+    }));
+  });
+
+  it('calls the update service when saving a valid edit', () => {
+    const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    const measure = {
+      id: 1,
+      title: 'Workshop',
+      category: 'mental',
+      description: 'A workshop description.',
+      status: 'ACTIVE',
+    } as any;
+    fixture.componentInstance.editMeasure(measure);
+    fixture.componentInstance.measureForm.patchValue({
+      title: 'Updated workshop',
+      description: 'Updated workshop description.',
+    });
+    fixture.componentInstance.submit();
+
+    expect(companyMeasuresService.updateMeasure).toHaveBeenCalledWith(1, expect.objectContaining({
+      title: 'Updated workshop',
+      description: 'Updated workshop description.',
+    }));
+    expect(companyMeasuresService.updateMeasure.mock.calls[0][1]).not.toHaveProperty('status');
+  });
+
+  it('does not show an active edit action for completed measures', () => {
+    api.get.mockImplementation((path: string) => {
+      if (path === '/company/measures') {
+        return of({
+          data: [{
+            id: 10,
+            title: 'Completed measure',
+            category: 'sport',
+            description: 'A completed measure.',
+            status: 'COMPLETED',
+            team: null,
+          }],
+        });
+      }
+
+      if (path === '/company/measures/10/participation-summary') {
+        return of({ data: null });
+      }
+
+      throw new Error(`Unexpected API path: ${path}`);
+    });
+    const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Nicht bearbeitbar');
+    expect(fixture.nativeElement.textContent).not.toContain('Bearbeiten');
+  });
+
+  it('shows a read-only status without a status select in edit mode', () => {
+    const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    const measure = {
+      id: 4,
+      title: 'Active measure',
+      category: 'sport',
+      description: 'An active measure description.',
+      status: 'ACTIVE',
+    } as any;
+    fixture.componentInstance.editMeasure(measure);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('select[formcontrolname="status"]')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Vorgeschlagen');
+    expect(fixture.nativeElement.textContent).toContain('Der Status kann beim Bearbeiten nicht geändert werden.');
+  });
+
+  it('still offers the status select in create mode', () => {
+    const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.toggleForm();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('select[formcontrolname="status"]')).not.toBeNull();
+  });
+
+  it('displays backend status and verification errors returned for an edit', () => {
+    companyMeasuresService.updateMeasure.mockReturnValue(throwError(() => ({
+      status: 422,
+      error: {
+        errors: {
+          status: ['Completed or dismissed measures cannot be edited.'],
+          verificationRequirement: ['Verification requirement cannot be changed after participation exists.'],
+        },
+      },
+    })));
+    const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    const measure = {
+      id: 5,
+      title: 'Active measure',
+      category: 'sport',
+      description: 'An active measure description.',
+      status: 'ACTIVE',
+    } as any;
+    fixture.componentInstance.editMeasure(measure);
+    fixture.componentInstance.submit();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Completed or dismissed measures cannot be edited.');
+    expect(fixture.nativeElement.textContent).toContain('Verification requirement cannot be changed after participation exists.');
+  });
+
+  it('shows a derived duration preview for scheduled measures', () => {
+    const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.toggleForm();
+    fixture.componentInstance.measureForm.patchValue({
+      executionType: 'EVENT_PARTICIPATION',
+      startsAt: '2026-06-20T09:00',
+      endsAt: '2026-06-20T10:30',
+    });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('90 Min.');
   });
 });

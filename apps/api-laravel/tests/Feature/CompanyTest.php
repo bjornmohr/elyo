@@ -7,6 +7,7 @@ use App\Enums\Role;
 use App\Models\Company;
 use App\Models\Measure;
 use App\Models\MeasureCheckinToken;
+use App\Models\MeasureParticipation;
 use App\Models\Survey;
 use App\Models\SurveyAnswer;
 use App\Models\SurveyQuestion;
@@ -741,6 +742,73 @@ class CompanyTest extends TestCase
             ->assertJsonPath('data.visibilityScope', 'COMPANY');
     }
 
+    public function test_measure_creation_requires_valid_required_fields(): void
+    {
+        $response = $this->actingAs($this->admin)->postJson('/api/company/measures', []);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['title', 'category', 'description']);
+    }
+
+    public function test_measure_creation_rejects_end_at_or_before_start_at(): void
+    {
+        $payload = [
+            'title' => 'Invalid schedule',
+            'category' => 'sport',
+            'description' => 'A scheduled measure with invalid times.',
+            'executionType' => 'EVENT_PARTICIPATION',
+            'startsAt' => '2026-06-20 10:00:00',
+        ];
+
+        $this->actingAs($this->admin)
+            ->postJson('/api/company/measures', $payload + ['endsAt' => '2026-06-20 09:59:00'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['endsAt']);
+
+        $this->actingAs($this->admin)
+            ->postJson('/api/company/measures', $payload + ['endsAt' => '2026-06-20 10:00:00'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['endsAt']);
+    }
+
+    public function test_measure_creation_derives_duration_for_existing_scheduled_execution_types(): void
+    {
+        $response = $this->actingAs($this->admin)->postJson('/api/company/measures', [
+            'title' => 'Derived duration',
+            'category' => 'sport',
+            'description' => 'A scheduled measure with derived duration.',
+            'executionType' => 'GUIDED_SESSION',
+            'startsAt' => '2026-06-20 09:00:00',
+            'endsAt' => '2026-06-20 10:30:00',
+            'durationMinutes' => 15,
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.durationMinutes', 90);
+
+        $this->assertDatabaseHas('measures', [
+            'id' => $response->json('data.id'),
+            'execution_type' => 'GUIDED_SESSION',
+            'duration_minutes' => 90,
+        ]);
+    }
+
+    public function test_measure_creation_keeps_manual_duration_for_non_scheduled_execution_types(): void
+    {
+        $response = $this->actingAs($this->admin)->postJson('/api/company/measures', [
+            'title' => 'Challenge duration',
+            'category' => 'sport',
+            'description' => 'A challenge can use a window without session duration.',
+            'executionType' => 'CHALLENGE',
+            'startsAt' => '2026-06-20 09:00:00',
+            'endsAt' => '2026-06-21 09:00:00',
+            'durationMinutes' => 30,
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.durationMinutes', 30);
+    }
+
     public function test_company_admin_can_rotate_measure_checkin_token_without_storing_plaintext(): void
     {
         $this->travelTo(Carbon::parse('2026-06-10 09:00:00'));
@@ -900,6 +968,9 @@ class CompanyTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)->patchJson("/api/company/measures/{$measure->id}", [
+            'title' => 'Updated challenge',
+            'category' => 'mental',
+            'description' => 'Updated description for the challenge.',
             'deliveryType' => 'HYBRID',
             'executionType' => 'CHALLENGE',
             'verificationRequirement' => Measure::VERIFICATION_REQUIREMENT_SELF_REPORT,
@@ -915,6 +986,9 @@ class CompanyTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonPath('data.status', 'ACTIVE')
+            ->assertJsonPath('data.title', 'Updated challenge')
+            ->assertJsonPath('data.category', 'mental')
+            ->assertJsonPath('data.description', 'Updated description for the challenge.')
             ->assertJsonPath('data.deliveryType', 'HYBRID')
             ->assertJsonPath('data.executionType', 'CHALLENGE')
             ->assertJsonPath('data.pointsOverride', 0);
@@ -922,6 +996,9 @@ class CompanyTest extends TestCase
         $this->assertDatabaseHas('measures', [
             'id' => $measure->id,
             'status' => 'ACTIVE',
+            'title' => 'Updated challenge',
+            'category' => 'mental',
+            'description' => 'Updated description for the challenge.',
             'delivery_type' => 'HYBRID',
             'execution_type' => 'CHALLENGE',
             'verification_requirement' => Measure::VERIFICATION_REQUIREMENT_SELF_REPORT,
@@ -936,6 +1013,152 @@ class CompanyTest extends TestCase
         $this->actingAs($this->admin)->patchJson("/api/company/measures/{$measure->id}", [
             'status' => 'ACTIVE',
         ])->assertStatus(400);
+    }
+
+    public function test_measure_update_derives_duration_for_scheduled_execution_types(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'execution_type' => 'EVENT_PARTICIPATION',
+            'starts_at' => '2026-06-20 09:00:00',
+            'ends_at' => '2026-06-20 10:00:00',
+            'duration_minutes' => 60,
+            'created_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$measure->id}", ['endsAt' => '2026-06-20 10:45:00'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.durationMinutes', 105);
+
+        $this->assertDatabaseHas('measures', [
+            'id' => $measure->id,
+            'duration_minutes' => 105,
+        ]);
+    }
+
+    public function test_title_only_update_does_not_rewrite_duration_for_scheduled_execution_types(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'execution_type' => 'EVENT_PARTICIPATION',
+            'starts_at' => '2026-06-20 09:00:00',
+            'ends_at' => '2026-06-20 10:00:00',
+            'duration_minutes' => 999,
+            'created_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$measure->id}", ['title' => 'Schedule untouched'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.durationMinutes', 999);
+
+        $this->assertDatabaseHas('measures', [
+            'id' => $measure->id,
+            'duration_minutes' => 999,
+        ]);
+    }
+
+    public function test_measure_update_clears_derived_duration_when_schedule_boundary_is_cleared(): void
+    {
+        foreach (['startsAt', 'endsAt'] as $clearedField) {
+            $measure = Measure::factory()->create([
+                'company_id' => $this->company->id,
+                'team_id' => null,
+                'status' => 'ACTIVE',
+                'execution_type' => 'EVENT_PARTICIPATION',
+                'starts_at' => '2026-06-20 09:00:00',
+                'ends_at' => '2026-06-20 10:00:00',
+                'duration_minutes' => 60,
+                'created_by' => $this->admin->id,
+            ]);
+
+            $this->actingAs($this->admin)
+                ->patchJson("/api/company/measures/{$measure->id}", [$clearedField => null])
+                ->assertStatus(200)
+                ->assertJsonPath('data.durationMinutes', null);
+
+            $this->assertDatabaseHas('measures', [
+                'id' => $measure->id,
+                'duration_minutes' => null,
+            ]);
+        }
+    }
+
+    public function test_status_only_update_on_completed_or_dismissed_scheduled_measure_returns_transition_error(): void
+    {
+        foreach (['COMPLETED', 'DISMISSED'] as $status) {
+            $measure = Measure::factory()->create([
+                'company_id' => $this->company->id,
+                'team_id' => null,
+                'status' => $status,
+                'execution_type' => 'EVENT_PARTICIPATION',
+                'starts_at' => '2026-06-20 09:00:00',
+                'ends_at' => '2026-06-20 10:00:00',
+                'duration_minutes' => 60,
+                'created_by' => $this->admin->id,
+            ]);
+
+            $this->actingAs($this->admin)
+                ->patchJson("/api/company/measures/{$measure->id}", ['status' => 'ACTIVE'])
+                ->assertStatus(400)
+                ->assertJson(['error' => 'invalid_transition']);
+        }
+    }
+
+    public function test_completed_and_dismissed_measures_reject_mutable_edits(): void
+    {
+        foreach (['COMPLETED', 'DISMISSED'] as $status) {
+            $measure = Measure::factory()->create([
+                'company_id' => $this->company->id,
+                'team_id' => null,
+                'status' => $status,
+                'created_by' => $this->admin->id,
+            ]);
+
+            $this->actingAs($this->admin)
+                ->patchJson("/api/company/measures/{$measure->id}", ['title' => 'Should not change'])
+                ->assertStatus(422)
+                ->assertJsonValidationErrors(['status']);
+        }
+    }
+
+    public function test_measure_update_preserves_company_and_manager_scope(): void
+    {
+        $otherTeam = Team::factory()->create(['company_id' => $this->company->id]);
+        $otherTeamMeasure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $otherTeam->id,
+            'status' => 'ACTIVE',
+            'created_by' => $this->admin->id,
+        ]);
+        $managedMeasure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'status' => 'ACTIVE',
+            'created_by' => $this->admin->id,
+        ]);
+        $foreignMeasure = Measure::factory()->create([
+            'company_id' => Company::factory()->create()->id,
+            'status' => 'ACTIVE',
+        ]);
+
+        $this->actingAs($this->manager)
+            ->patchJson("/api/company/measures/{$otherTeamMeasure->id}", ['title' => 'Out of scope'])
+            ->assertStatus(403);
+
+        $this->actingAs($this->manager)
+            ->patchJson("/api/company/measures/{$managedMeasure->id}", ['title' => 'Managed update'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.title', 'Managed update');
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$foreignMeasure->id}", ['title' => 'Foreign update'])
+            ->assertStatus(404);
     }
 
     public function test_measure_creation_allows_qr_code_verification_requirement(): void
@@ -993,6 +1216,35 @@ class CompanyTest extends TestCase
         $this->actingAs($this->admin)->patchJson("/api/company/measures/{$measure->id}", [
             'verificationRequirement' => 'ADMIN_CONFIRMATION',
         ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['verificationRequirement']);
+    }
+
+    public function test_measure_update_rejects_verification_requirement_change_after_participation_exists(): void
+    {
+        $employee = User::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'verification_requirement' => Measure::VERIFICATION_REQUIREMENT_SELF_REPORT,
+            'created_by' => $this->admin->id,
+        ]);
+        MeasureParticipation::factory()->create([
+            'measure_id' => $measure->id,
+            'user_id' => $employee->id,
+            'company_id' => $this->company->id,
+            'team_id' => null,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$measure->id}", [
+                'verificationRequirement' => Measure::VERIFICATION_REQUIREMENT_QR_CODE,
+            ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['verificationRequirement']);
     }
@@ -1057,6 +1309,23 @@ class CompanyTest extends TestCase
             ->assertJsonValidationErrors(['endsAt']);
     }
 
+    public function test_measure_update_rejects_partial_ends_at_equal_to_existing_starts_at(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'starts_at' => '2026-06-20 09:00:00',
+            'ends_at' => '2026-06-20 10:00:00',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$measure->id}", ['endsAt' => '2026-06-20 09:00:00'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['endsAt']);
+    }
+
     public function test_measure_update_rejects_partial_starts_at_after_existing_ends_at(): void
     {
         $measure = Measure::factory()->create([
@@ -1070,6 +1339,54 @@ class CompanyTest extends TestCase
 
         $this->actingAs($this->admin)
             ->patchJson("/api/company/measures/{$measure->id}", ['startsAt' => '2026-06-20 10:01:00'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['endsAt']);
+    }
+
+    public function test_manager_patch_outside_managed_team_returns_403_before_date_validation(): void
+    {
+        $otherTeam = Team::factory()->create(['company_id' => $this->company->id]);
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $otherTeam->id,
+            'status' => 'ACTIVE',
+            'starts_at' => '2026-06-20 09:00:00',
+            'ends_at' => '2026-06-20 10:00:00',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->manager)
+            ->patchJson("/api/company/measures/{$measure->id}", ['endsAt' => '2026-06-20 08:59:00'])
+            ->assertStatus(403);
+    }
+
+    public function test_foreign_company_patch_returns_404_before_date_validation(): void
+    {
+        $foreignMeasure = Measure::factory()->create([
+            'company_id' => Company::factory()->create()->id,
+            'status' => 'ACTIVE',
+            'starts_at' => '2026-06-20 09:00:00',
+            'ends_at' => '2026-06-20 10:00:00',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$foreignMeasure->id}", ['endsAt' => '2026-06-20 08:59:00'])
+            ->assertStatus(404);
+    }
+
+    public function test_in_scope_manager_patch_with_invalid_partial_date_returns_422(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'status' => 'ACTIVE',
+            'starts_at' => '2026-06-20 09:00:00',
+            'ends_at' => '2026-06-20 10:00:00',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->manager)
+            ->patchJson("/api/company/measures/{$measure->id}", ['endsAt' => '2026-06-20 08:59:00'])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['endsAt']);
     }

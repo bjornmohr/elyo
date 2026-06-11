@@ -546,13 +546,21 @@ components:
         deliveryType: { type: string, enum: [REMOTE, ONSITE, HYBRID] }
         executionType: { type: string, enum: [INFORMATION_ONLY, GUIDED_SESSION, SELF_REPORTED_ACTION, EVENT_PARTICIPATION, CHALLENGE] }
         verificationRequirement: { type: string, enum: [SELF_REPORT, QR_CODE] }
-        startsAt: { type: string, format: date-time, nullable: true }
+        startsAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO 8601 date-time with an explicit timezone offset or UTC designator (e.g. 2026-06-20T09:00:00Z). Clients must not send timezone-less local datetime strings; the UI may display local wall time but serializes to an explicit instant.
         endsAt:
           type: string
           format: date-time
           nullable: true
-          description: Must not be before the effective startsAt value.
-        durationMinutes: { type: integer, nullable: true, minimum: 1 }
+          description: ISO 8601 date-time with an explicit timezone offset or UTC designator. Must be strictly after the effective startsAt value when both are present.
+        durationMinutes:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: For scheduled execution types EVENT_PARTICIPATION and GUIDED_SESSION the stored value mirrors the schedule window when the schedule is created or updated - derived from startsAt and endsAt when both are present, cleared to null on update when either boundary is missing. Updates that do not touch startsAt, endsAt, durationMinutes, or executionType leave the stored value unchanged.
         instructions: { type: string, nullable: true, maxLength: 2000 }
         locationName: { type: string, nullable: true, maxLength: 255 }
         locationAddress: { type: string, nullable: true, maxLength: 1000 }
@@ -576,6 +584,9 @@ components:
         - $ref: '#/components/schemas/CompanyMeasurePayload'
         - type: object
           properties:
+            title: { type: string, minLength: 3, maxLength: 100 }
+            category: { type: string, enum: [workshop, flexibility, sport, mental, nutrition] }
+            description: { type: string, minLength: 10, maxLength: 500 }
             status: { type: string, enum: [ACTIVE, COMPLETED, DISMISSED] }
 
     MeasureParticipationSummary:
@@ -874,7 +885,7 @@ paths:
         403:
           description: Requested portal is forbidden
         422:
-          description: Invalid credentials
+          description: Validation failure or invalid credentials.
 
   /auth/me:
     get:
@@ -2067,7 +2078,7 @@ paths:
         404:
           description: Measure not found for the authenticated company user
         422:
-          description: Laravel validation error for invalid request fields, including string length constraints, invalid enum values, unsupported verificationRequirement values, invalid date formats, invalid partial date ranges against persisted values, or invalid integer values
+          description: Laravel validation error for invalid request fields, including string length constraints, invalid enum values, unsupported verificationRequirement values, invalid date formats, invalid partial date ranges against persisted values (effective endsAt must be strictly after effective startsAt), or invalid integer values. Also returned when mutable fields are edited on COMPLETED or DISMISSED measures, or when verificationRequirement is changed after participations exist. Scoped authorization is evaluated first - out-of-scope measures return 403/404 and never leak date validation errors.
           content:
             application/json:
               schema:
