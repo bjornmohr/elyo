@@ -189,11 +189,6 @@ interface MeasureCheckinLink extends MeasureCheckinTokenResponse {
                 <input formControlName="locationName"
                        class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
               </label>
-              <label class="block">
-                <span class="text-sm font-medium text-gray-700">Punkte-Override</span>
-                <input type="number" min="0" formControlName="pointsOverride"
-                       class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500"/>
-              </label>
             </div>
 
             <label class="block">
@@ -354,7 +349,6 @@ export class CompanyMeasuresComponent implements OnInit {
     locationName: [null as string | null, [Validators.maxLength(255)]],
     locationAddress: [null as string | null, [Validators.maxLength(1000)]],
     capacity: [null as number | null, [Validators.min(1)]],
-    pointsOverride: [null as number | null, [Validators.min(0)]],
   });
 
   ngOnInit() {
@@ -567,7 +561,6 @@ export class CompanyMeasuresComponent implements OnInit {
       locationName: null,
       locationAddress: null,
       capacity: null,
-      pointsOverride: null,
     });
   }
 

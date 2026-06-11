@@ -29,6 +29,14 @@ import { NotificationBannerComponent } from '../notifications/notification-banne
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v8"></path><path d="M9.5 10.5c0-1.2 1.2-2 2.5-2s2.5.8 2.5 2-1.2 2-2.5 2-2.5.8-2.5 2 1.2 2 2.5 2 2.5-.8 2.5-2"></path></svg>
             Punkte
           </a>
+          <a routerLink="/admin/system-exercises" routerLinkActive="bg-teal-50 text-teal-700" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5h11v11h-11z"></path><path d="M3 10v4"></path><path d="M21 10v4"></path><path d="M6.5 12h11"></path></svg>
+            System-Übungen
+          </a>
+          <a routerLink="/admin/system-measure-templates" routerLinkActive="bg-teal-50 text-teal-700" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path></svg>
+            System-Templates
+          </a>
         </nav>
         <div class="p-4 border-t border-gray-100">
           <button (click)="logout()" class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">

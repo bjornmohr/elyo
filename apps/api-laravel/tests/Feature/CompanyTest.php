@@ -686,7 +686,7 @@ class CompanyTest extends TestCase
             'measureOrigin' => 'ELYO_TEMPLATE',
             'deliveryType' => 'ONSITE',
             'executionType' => 'GUIDED_SESSION',
-            'verificationRequirement' => 'SELF_REPORT',
+            'verificationRequirement' => Measure::VERIFICATION_REQUIREMENT_SELF_REPORT,
             'startsAt' => '2026-06-20 09:00:00',
             'endsAt' => '2026-06-20 10:00:00',
             'durationMinutes' => 60,
@@ -701,7 +701,7 @@ class CompanyTest extends TestCase
             ->assertJsonPath('data.deliveryType', 'ONSITE')
             ->assertJsonPath('data.executionType', 'GUIDED_SESSION')
             ->assertJsonPath('data.measureOrigin', 'COMPANY_CREATED')
-            ->assertJsonPath('data.verificationRequirement', 'SELF_REPORT')
+            ->assertJsonPath('data.verificationRequirement', Measure::VERIFICATION_REQUIREMENT_SELF_REPORT)
             ->assertJsonPath('data.visibilityScope', 'TEAM')
             ->assertJsonPath('data.durationMinutes', 60)
             ->assertJsonPath('data.locationName', 'Training Room A')
@@ -714,7 +714,7 @@ class CompanyTest extends TestCase
             'measure_origin' => 'COMPANY_CREATED',
             'delivery_type' => 'ONSITE',
             'execution_type' => 'GUIDED_SESSION',
-            'verification_requirement' => 'SELF_REPORT',
+            'verification_requirement' => Measure::VERIFICATION_REQUIREMENT_SELF_REPORT,
             'visibility_scope' => 'TEAM',
             'duration_minutes' => 60,
             'instructions' => 'Bring comfortable clothes.',
@@ -737,7 +737,7 @@ class CompanyTest extends TestCase
             ->assertJsonPath('data.measureOrigin', 'COMPANY_CREATED')
             ->assertJsonPath('data.deliveryType', 'ONSITE')
             ->assertJsonPath('data.executionType', 'EVENT_PARTICIPATION')
-            ->assertJsonPath('data.verificationRequirement', 'SELF_REPORT')
+            ->assertJsonPath('data.verificationRequirement', Measure::VERIFICATION_REQUIREMENT_SELF_REPORT)
             ->assertJsonPath('data.visibilityScope', 'COMPANY');
     }
 
@@ -902,7 +902,7 @@ class CompanyTest extends TestCase
         $response = $this->actingAs($this->admin)->patchJson("/api/company/measures/{$measure->id}", [
             'deliveryType' => 'HYBRID',
             'executionType' => 'CHALLENGE',
-            'verificationRequirement' => 'SELF_REPORT',
+            'verificationRequirement' => Measure::VERIFICATION_REQUIREMENT_SELF_REPORT,
             'startsAt' => '2026-07-01 08:00:00',
             'endsAt' => '2026-07-01 09:00:00',
             'durationMinutes' => 45,
@@ -924,7 +924,7 @@ class CompanyTest extends TestCase
             'status' => 'ACTIVE',
             'delivery_type' => 'HYBRID',
             'execution_type' => 'CHALLENGE',
-            'verification_requirement' => 'SELF_REPORT',
+            'verification_requirement' => Measure::VERIFICATION_REQUIREMENT_SELF_REPORT,
             'duration_minutes' => 45,
             'location_name' => 'Courtyard',
             'location_address' => 'Office Campus',
