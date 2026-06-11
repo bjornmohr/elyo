@@ -86,8 +86,7 @@ class MeasureParticipationSummaryService
     private function eligibleEmployeesQuery(User $user, ?array $scopeTeamIds): Builder
     {
         return User::query()
-            ->where('company_id', $user->company_id)
-            ->reportableForCompanyAggregates($scopeTeamIds);
+            ->reportableForCompanyAggregates($user->company_id, $scopeTeamIds);
     }
 
     private function participantCount(Measure $measure, Builder $eligibleEmployeesQuery): int

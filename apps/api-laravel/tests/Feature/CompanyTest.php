@@ -449,6 +449,80 @@ class CompanyTest extends TestCase
             ->assertJsonPath('data.responsesCount', 1);
     }
 
+    public function test_aggregate_does_not_count_reportable_employee_from_different_company(): void
+    {
+        // Employees in $this->company — below threshold on their own.
+        $employees = User::factory()->count(2)->create([
+            'company_id' => $this->company->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        foreach ($employees as $emp) {
+            WellbeingEntry::factory()->create([
+                'user_id' => $emp->id,
+                'company_id' => $this->company->id,
+                'score' => 9.0,
+                'period_key' => '2026-W20',
+            ]);
+        }
+
+        // A pure EMPLOYEE in a different company — their entry must not bleed
+        // into $this->company's aggregates regardless of scope constraints.
+        $otherCompany = Company::factory()->create();
+        $otherEmployee = User::factory()->create([
+            'company_id' => $otherCompany->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        WellbeingEntry::factory()->create([
+            'user_id' => $otherEmployee->id,
+            'company_id' => $otherCompany->id,
+            'score' => 1.0,
+            'period_key' => '2026-W20',
+        ]);
+
+        // 2 employees — below default threshold of 5, so aggregates are suppressed.
+        $this->actingAs($this->admin)->getJson('/api/company/dashboard')
+            ->assertStatus(200)
+            ->assertJsonPath('company.isAboveThreshold', false);
+    }
+
+    public function test_survey_aggregation_does_not_count_reportable_employee_from_different_company(): void
+    {
+        $survey = Survey::factory()->create(['company_id' => $this->company->id]);
+        $question = SurveyQuestion::factory()->create([
+            'survey_id' => $survey->id,
+            'type' => QuestionType::SCALE,
+        ]);
+
+        // 2 reportable employees in $this->company — below threshold of 5.
+        $employees = User::factory()->count(2)->create([
+            'company_id' => $this->company->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        foreach ($employees as $emp) {
+            $this->createSurveyAnswer($survey, $question, $emp, ['scale_value' => 8]);
+        }
+
+        // A pure EMPLOYEE in a different company who somehow has a response
+        // record attached to this survey's company_id must not be counted.
+        $otherCompany = Company::factory()->create();
+        $otherEmployee = User::factory()->create([
+            'company_id' => $otherCompany->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        // Manually insert a cross-company response to test the guard.
+        SurveyResponse::factory()->create([
+            'survey_id' => $survey->id,
+            'company_id' => $this->company->id,
+            'user_id' => $otherEmployee->id,
+        ]);
+
+        // Only 2 reportable responses from this company — below threshold.
+        $this->actingAs($this->admin)
+            ->getJson("/api/company/surveys/{$survey->id}/results")
+            ->assertStatus(403)
+            ->assertJsonPath('isAboveThreshold', false);
+    }
+
     public function test_survey_results_show_scale_distribution_when_all_buckets_meet_threshold()
     {
         $survey = Survey::factory()->create(['company_id' => $this->company->id, 'status' => 'ACTIVE']);

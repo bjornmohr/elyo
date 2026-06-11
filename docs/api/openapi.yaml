@@ -2107,7 +2107,7 @@ paths:
         404:
           description: Measure not found for the authenticated company user
         422:
-          description: Laravel validation error for invalid request fields, including string length constraints, invalid enum values, unsupported verificationRequirement values, invalid date formats, invalid partial date ranges against persisted values (effective endsAt must be strictly after effective startsAt), or invalid integer values. Also returned when mutable fields are edited on COMPLETED or DISMISSED measures (status-only transition attempts return 400 invalid_transition instead), or when verificationRequirement is changed after participations exist. Scoped authorization is evaluated first - out-of-scope measures return 403/404 and never leak date validation errors.
+          description: Laravel validation error for invalid request fields, including string length constraints, invalid enum values, unsupported verificationRequirement values, invalid date formats, invalid partial date ranges against persisted values (effective endsAt must be strictly after effective startsAt), or invalid integer values. Also returned when mutable fields are edited on COMPLETED or DISMISSED measures (status-only transition attempts return 400 invalid_transition instead), or when verificationRequirement is changed after participations exist. Scoped authorization is evaluated before effective persisted date-range validation — out-of-scope measures return 403/404 before cross-field date-range errors are raised. Syntactic per-field validation (e.g. invalid date format) may still run before the scoped measure lookup.
           content:
             application/json:
               schema:

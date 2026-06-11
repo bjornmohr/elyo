@@ -428,6 +428,49 @@ class MeasureParticipationSummaryTest extends TestCase
         $this->assertNoIndividualParticipationData($response->getContent());
     }
 
+    public function test_summary_does_not_count_reportable_employee_from_different_company(): void
+    {
+        $company = Company::factory()->create(['anonymity_threshold' => 3]);
+        $admin = $this->companyUser($company, Role::COMPANY_ADMIN);
+        $measure = Measure::factory()->create([
+            'company_id' => $company->id,
+            'team_id' => null,
+            'created_by' => $admin->id,
+        ]);
+
+        // 3 reportable employees in the measure's company — exactly at threshold.
+        $employees = User::factory()->count(3)->create([
+            'company_id' => $company->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $employees->each(fn (User $emp) => MeasureParticipation::factory()->create([
+            'measure_id' => $measure->id,
+            'user_id' => $emp->id,
+            'company_id' => $company->id,
+            'team_id' => $emp->team_id,
+        ]));
+
+        // A pure EMPLOYEE from another company also participates — must be excluded.
+        $otherCompany = Company::factory()->create();
+        $otherEmployee = User::factory()->create([
+            'company_id' => $otherCompany->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        MeasureParticipation::factory()->create([
+            'measure_id' => $measure->id,
+            'user_id' => $otherEmployee->id,
+            'company_id' => $otherCompany->id,
+        ]);
+
+        // Eligible and participant counts must reflect only the 3 in-company employees.
+        $this->actingAs($admin)
+            ->getJson("/api/company/measures/{$measure->id}/participation-summary")
+            ->assertOk()
+            ->assertJsonPath('data.isAboveThreshold', true)
+            ->assertJsonPath('data.eligibleCount', 3)
+            ->assertJsonPath('data.participantCount', 3);
+    }
+
     private function companyUser(Company $company, Role $role): User
     {
         return User::factory()->create([

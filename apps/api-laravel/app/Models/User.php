@@ -265,14 +265,18 @@ class User extends Authenticatable
 
     /**
      * Reportable participants for company/team aggregates and thresholds:
-     * active employees without any report-viewer role. Multi-role users
-     * (e.g. EMPLOYEE + COMPANY_MANAGER) are excluded.
+     * active employees without any report-viewer role within a given company.
+     * Multi-role users (e.g. EMPLOYEE + COMPANY_MANAGER) are excluded.
+     * The company_id constraint is enforced inside the scope so callers using
+     * it in a whereHas('user', ...) context cannot accidentally count users
+     * from a different company.
      */
-    public function scopeReportableForCompanyAggregates(Builder $query, ?array $teamIds = null): Builder
+    public function scopeReportableForCompanyAggregates(Builder $query, int|string $companyId, ?array $teamIds = null): Builder
     {
         $reportViewerRoles = array_map(fn (Role $role) => $role->value, Role::companyPortalRoles());
 
         return $query
+            ->where('company_id', $companyId)
             ->where('status', 'active')
             ->whereHas('roles', fn (Builder $roleQuery) => $roleQuery->where('role', Role::EMPLOYEE->value))
             ->whereDoesntHave('roles', fn (Builder $roleQuery) => $roleQuery->whereIn('role', $reportViewerRoles))

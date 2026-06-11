@@ -20,7 +20,7 @@ class AnonymityService
 
         $query = WellbeingEntry::where('company_id', $companyId);
 
-        $query->whereHas('user', fn ($q) => $q->reportableForCompanyAggregates($this->teamIds($options)));
+        $query->whereHas('user', fn ($q) => $q->reportableForCompanyAggregates($companyId, $this->teamIds($options)));
 
         if (! empty($options['periodKey'])) {
             $query->where('period_key', $options['periodKey']);
@@ -89,7 +89,7 @@ class AnonymityService
 
         $query = WellbeingEntry::where('company_id', $companyId);
 
-        $query->whereHas('user', fn ($q) => $q->reportableForCompanyAggregates($this->teamIds($options)));
+        $query->whereHas('user', fn ($q) => $q->reportableForCompanyAggregates($companyId, $this->teamIds($options)));
 
         $raw = $query->groupBy('period_key')
             ->selectRaw('
@@ -139,7 +139,7 @@ class AnonymityService
         $currentPeriod = $this->currentPeriodKey();
         $reportableUserConstraint = fn ($query) => $query->whereHas(
             'user',
-            fn ($q) => $q->reportableForCompanyAggregates($this->teamIds($options))
+            fn ($q) => $q->reportableForCompanyAggregates($companyId, $this->teamIds($options))
         );
 
         $checkedInThisPeriod = WellbeingEntry::where('company_id', $companyId)
@@ -178,8 +178,8 @@ class AnonymityService
 
     private function eligibleEmployeeCount(string $companyId, array $options = []): int
     {
-        return User::where('company_id', $companyId)
-            ->reportableForCompanyAggregates($this->teamIds($options))
+        return User::query()
+            ->reportableForCompanyAggregates($companyId, $this->teamIds($options))
             ->count();
     }
 

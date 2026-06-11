@@ -142,8 +142,7 @@ class SurveyResultsAggregationService
     private function eligibleUsersQuery(?array $scopeTeamIds, int $companyId): Builder
     {
         return User::query()
-            ->where('company_id', $companyId)
-            ->reportableForCompanyAggregates($scopeTeamIds);
+            ->reportableForCompanyAggregates($companyId, $scopeTeamIds);
     }
 
     private function scopedResponsesQuery(Survey $survey, ?array $scopeTeamIds): Builder
@@ -151,7 +150,7 @@ class SurveyResultsAggregationService
         return SurveyResponse::query()
             ->where('survey_id', $survey->id)
             ->where('company_id', $survey->company_id)
-            ->whereHas('user', fn (Builder $query) => $query->reportableForCompanyAggregates($scopeTeamIds));
+            ->whereHas('user', fn (Builder $query) => $query->reportableForCompanyAggregates($survey->company_id, $scopeTeamIds));
     }
 
     private function scopedAnswersQuery(int $questionId, Survey $survey, ?array $scopeTeamIds): Builder
@@ -165,7 +164,7 @@ class SurveyResultsAggregationService
     {
         $query->where('survey_id', $survey->id)
             ->where('company_id', $survey->company_id)
-            ->whereHas('user', fn (Builder $userQuery) => $userQuery->reportableForCompanyAggregates($scopeTeamIds));
+            ->whereHas('user', fn (Builder $userQuery) => $userQuery->reportableForCompanyAggregates($survey->company_id, $scopeTeamIds));
     }
 
     private function participation(int $eligibleCount, int $responseCount): array

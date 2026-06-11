@@ -44,7 +44,7 @@ class CompanySurveyController extends Controller
                         ->orWhere('created_by', $user->id);
                 });
             })
-            ->withCount($this->surveyCounts())
+            ->withCount($this->surveyCounts($user->company_id))
             ->with('teams:id')
             ->orderBy('created_at', 'desc')
             ->get();
@@ -83,7 +83,7 @@ class CompanySurveyController extends Controller
 
             $survey->teams()->sync($this->normalizedWritableTeamIds($request->user(), $request->teamIds ?? []));
 
-            return new SurveyResource($survey->load(['teams:id'])->loadCount($this->surveyCounts()));
+            return new SurveyResource($survey->load(['teams:id'])->loadCount($this->surveyCounts($request->user()->company_id)));
         });
     }
 
@@ -92,7 +92,7 @@ class CompanySurveyController extends Controller
         $survey = Survey::where('id', $id)
             ->where('company_id', $request->user()->company_id)
             ->with(['teams:id', 'questions' => fn ($q) => $q->orderBy('order', 'asc')])
-            ->withCount($this->surveyCounts())
+            ->withCount($this->surveyCounts($request->user()->company_id))
             ->firstOrFail();
 
         $this->abortDisabledTeamScopedSurvey($request->user(), $survey);
@@ -139,7 +139,7 @@ class CompanySurveyController extends Controller
             }
         }
 
-        return new SurveyResource($survey->refresh()->load(['teams:id', 'questions' => fn ($q) => $q->orderBy('order')])->loadCount($this->surveyCounts()));
+        return new SurveyResource($survey->refresh()->load(['teams:id', 'questions' => fn ($q) => $q->orderBy('order')])->loadCount($this->surveyCounts($request->user()->company_id)));
     }
 
     public function activate(Request $request, $id)
@@ -159,7 +159,7 @@ class CompanySurveyController extends Controller
 
         $survey->update(['status' => SurveyStatus::ACTIVE]);
 
-        return new SurveyResource($survey->refresh()->load(['teams:id'])->loadCount($this->surveyCounts()));
+        return new SurveyResource($survey->refresh()->load(['teams:id'])->loadCount($this->surveyCounts($request->user()->company_id)));
     }
 
     public function destroy(Request $request, $id)
@@ -315,15 +315,15 @@ class CompanySurveyController extends Controller
 
     /**
      * Survey response counts shown in the company portal count only
-     * reportable participants, mirroring the report-viewer exclusion
-     * used by the thresholded aggregates.
+     * reportable participants in the given company, mirroring the
+     * report-viewer exclusion used by the thresholded aggregates.
      */
-    private function surveyCounts(): array
+    private function surveyCounts(int|string $companyId): array
     {
         return [
             'responses' => fn (Builder $query) => $query->whereHas(
                 'user',
-                fn (Builder $userQuery) => $userQuery->reportableForCompanyAggregates()
+                fn (Builder $userQuery) => $userQuery->reportableForCompanyAggregates($companyId)
             ),
             'questions',
         ];
