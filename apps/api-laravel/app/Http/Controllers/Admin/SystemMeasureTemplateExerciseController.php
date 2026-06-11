@@ -99,11 +99,17 @@ class SystemMeasureTemplateExerciseController extends Controller
     public function reorder(ReorderSystemMeasureTemplateExercisesRequest $request, SystemMeasureTemplate $systemMeasureTemplate)
     {
         $items = collect($request->validated('items'));
-        $ids = $items->pluck('id')->all();
+        $submittedIds = $items->pluck('id')->all();
+        $existingIds = $systemMeasureTemplate->templateExercises()->pluck('id')->all();
 
-        $ownedCount = $systemMeasureTemplate->templateExercises()->whereIn('id', $ids)->count();
-        if ($ownedCount !== count($ids)) {
+        if (array_diff($submittedIds, $existingIds) !== []) {
             abort(404);
+        }
+
+        if (count($submittedIds) !== count($existingIds) || array_diff($existingIds, $submittedIds) !== []) {
+            throw ValidationException::withMessages([
+                'items' => ['The reorder payload must include every template exercise exactly once.'],
+            ]);
         }
 
         DB::transaction(function () use ($systemMeasureTemplate, $items) {

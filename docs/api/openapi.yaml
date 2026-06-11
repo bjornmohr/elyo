@@ -399,10 +399,12 @@ components:
 
     AdminSystemMeasureTemplateExercisesReorderPayload:
       type: object
+      description: Reorder requires the complete set of template exercise IDs for the template exactly once. Partial payloads, duplicate IDs, and duplicate sortOrder values return 422.
       required: [items]
       properties:
         items:
           type: array
+          description: Complete ordered set of template exercise rows for the template.
           minItems: 1
           items:
             type: object
@@ -2630,7 +2632,7 @@ paths:
     post:
       tags: [Admin]
       summary: Reorder template exercises
-      description: Updates template exercise sortOrder values in a transaction. Child rows outside the template return 404 and no positions are changed.
+      description: Updates template exercise sortOrder values in a transaction. The payload must include every template exercise ID for the template exactly once. Partial payloads, duplicate IDs, and duplicate sortOrder values return 422. Child rows outside the template return 404 and no positions are changed.
       security: [{ Sanctum: [] }]
       parameters:
         - name: systemMeasureTemplate

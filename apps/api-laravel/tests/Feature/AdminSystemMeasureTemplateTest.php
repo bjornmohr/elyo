@@ -284,6 +284,75 @@ class AdminSystemMeasureTemplateTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_partial_reorder_is_rejected_and_positions_remain_unchanged(): void
+    {
+        $template = SystemMeasureTemplate::factory()->create();
+        $first = SystemMeasureTemplateExercise::create([
+            'system_measure_template_id' => $template->id,
+            'system_exercise_id' => SystemExercise::factory()->create()->id,
+            'position' => 1,
+        ]);
+        $second = SystemMeasureTemplateExercise::create([
+            'system_measure_template_id' => $template->id,
+            'system_exercise_id' => SystemExercise::factory()->create()->id,
+            'position' => 2,
+        ]);
+        $third = SystemMeasureTemplateExercise::create([
+            'system_measure_template_id' => $template->id,
+            'system_exercise_id' => SystemExercise::factory()->create()->id,
+            'position' => 3,
+        ]);
+
+        $this->actingAs($this->platformAdmin)
+            ->postJson("/api/admin/system-measure-templates/{$template->id}/exercises/reorder", [
+                'items' => [
+                    ['id' => $first->id, 'sortOrder' => 2],
+                    ['id' => $third->id, 'sortOrder' => 1],
+                ],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['items']);
+
+        $this->assertSame(1, $first->fresh()->position);
+        $this->assertSame(2, $second->fresh()->position);
+        $this->assertSame(3, $third->fresh()->position);
+    }
+
+    public function test_reorder_rejects_duplicate_sort_order_and_positions_remain_unchanged(): void
+    {
+        $template = SystemMeasureTemplate::factory()->create();
+        $first = SystemMeasureTemplateExercise::create([
+            'system_measure_template_id' => $template->id,
+            'system_exercise_id' => SystemExercise::factory()->create()->id,
+            'position' => 1,
+        ]);
+        $second = SystemMeasureTemplateExercise::create([
+            'system_measure_template_id' => $template->id,
+            'system_exercise_id' => SystemExercise::factory()->create()->id,
+            'position' => 2,
+        ]);
+        $third = SystemMeasureTemplateExercise::create([
+            'system_measure_template_id' => $template->id,
+            'system_exercise_id' => SystemExercise::factory()->create()->id,
+            'position' => 3,
+        ]);
+
+        $this->actingAs($this->platformAdmin)
+            ->postJson("/api/admin/system-measure-templates/{$template->id}/exercises/reorder", [
+                'items' => [
+                    ['id' => $first->id, 'sortOrder' => 1],
+                    ['id' => $second->id, 'sortOrder' => 1],
+                    ['id' => $third->id, 'sortOrder' => 3],
+                ],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['items.1.sortOrder']);
+
+        $this->assertSame(1, $first->fresh()->position);
+        $this->assertSame(2, $second->fresh()->position);
+        $this->assertSame(3, $third->fresh()->position);
+    }
+
     public function test_reorder_updates_positions_transaction_safely(): void
     {
         $template = SystemMeasureTemplate::factory()->create();
