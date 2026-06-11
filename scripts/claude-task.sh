@@ -13,5 +13,5 @@ if [ ! -f "$TASK_FILE" ]; then
   exit 1
 fi
 
-codex "Read AGENTS.md and execute ${TASK_FILE}. Keep changes minimal. Run the validation commands from the task if possible. At the end, summarize files changed, commands run, test/build results, and open questions."
+claude "Read AGENTS.md and execute ${TASK_FILE}. Keep changes minimal. Run the validation commands from the task if possible. At the end, summarize files changed, commands run, test/build results, and open questions."
 ./scripts/create-handoff.sh
