@@ -58,6 +58,7 @@ export const routes: Routes = [
       { path: 'users', loadComponent: () => import('./features/admin/pages/users/admin-users.component').then(m => m.AdminUsersComponent) },
       { path: 'points', loadComponent: () => import('./features/admin/pages/points/admin-points.component').then(m => m.AdminPointsComponent) },
       { path: 'system-exercises', loadComponent: () => import('./features/admin/pages/system-exercises/admin-system-exercises.component').then(m => m.AdminSystemExercisesComponent) },
+      { path: 'system-measure-templates', loadComponent: () => import('./features/admin/pages/system-measure-templates/admin-system-measure-templates.component').then(m => m.AdminSystemMeasureTemplatesComponent) },
       { path: '', redirectTo: 'companies', pathMatch: 'full' },
     ]
   },

@@ -765,3 +765,181 @@ The task is complete when:
 - no recommendation engine exists
 - no point/streak logic is implemented
 - tests and build pass
+
+## Implementation Plan
+
+Plan date: 2026-06-11. Plan only — no implementation files have been modified yet.
+
+### A. Codebase Findings That Shape the Plan
+
+1. The admin route group already exists in `apps/api-laravel/routes/api.php` (lines 52-70) with `auth:sanctum` + `role:ELYO_ADMIN,ELYO_SUPPORT` middleware and `admin` prefix. New routes go inside this group; no new auth work is needed.
+2. The System Exercise Catalog (`SystemExerciseController`, `CreateSystemExerciseRequest`, `SystemExerciseResource`, `AdminSystemExerciseTest`) is the convention template: camelCase API fields mapped to snake_case columns via a `COLUMN_MAP`, lowercase `LIKE` search across title/short_description/description/slug, enum validation via model constants with `Rule::in`, `paginate()->appends()` resource collection (`data`/`links`/`meta`), newest-first sort (`created_at` desc, `id` desc), `generateUniqueSlug()` with numeric suffix, and a POST `/archive` action that sets status and returns the resource.
+3. **Schema gap:** `system_measure_templates` (migration `2026_06_10_030000_create_system_measures_tables.php`) has **no `category` and no `is_featured` column**. The task requires both as form fields, list/detail fields, and filters. The existing schema cannot support this, so one small additive migration is justified under the task's migration rule.
+4. The template exercise order column is **`position`**, not `sort_order` (`system_measure_template_exercises.position`, with a **unique constraint on `(system_measure_template_id, position)`**). The API will expose `sortOrder` (camelCase, per task) and map it to `position` server-side.
+5. The `(template, position)` unique constraint is non-deferrable in PostgreSQL, so reorder must avoid transient collisions: inside the transaction, first shift all affected rows by a large offset (single statement), then write final positions.
+6. There is **no unique constraint on `(system_measure_template_id, system_exercise_id)`**, so duplicate prevention must be application-layer validation (task's stated preference applies).
+7. `SystemMeasureTemplate::booted()` has a `saving` hook that sets `slug ??= Str::slug(title)` (not unique-safe), `difficulty ??= BEGINNER`, `status ??= ACTIVE`. The controller must generate the unique slug explicitly before save (same pattern as `SystemExerciseController::generateUniqueSlug()`), so the hook fallback never produces collisions. Model/schema status default is `ACTIVE`, so per the task ("default `DRAFT` or existing schema/model default") the create default is **`ACTIVE`**, consistent with the exercise catalog.
+8. `system_measure_templates` also has `goal_summary`, `recommended_frequency`, `default_points`, `streak_enabled`, `requires_feedback`. These are **not exposed or accepted** in v1: the task's field lists omit them, and the acceptance criteria forbid point/streak logic. They keep their DB defaults. (Intentional deviation noted in handoff.)
+9. Factories: `SystemMeasureTemplateFactory` exists (with `withExercises()` and `draft()` states). There is **no `SystemMeasureTemplateExerciseFactory`** — add one for tests (test support, not a data-model change).
+10. Angular conventions: standalone components with inline templates under `features/admin/pages/<feature>/`, `ApiClient`-based services under `features/admin/services/`, interfaces under `features/admin/models/`, lazy routes in `app.routes.ts` under the `admin` shell, nav links in `shared/shells/admin-shell.component.ts`, German UI labels, signals + `ReactiveFormsModule`. `PaginatedResponse<T>` already exists in `admin-system-exercise.models.ts` and will be reused.
+11. OpenAPI (`docs/api/openapi.yaml`, ~2357 lines) already documents `/admin/system-exercises*` with reusable schemas (`SystemExerciseStatus`, `AdminSystemExercise`, `AdminSystemExerciseListResponse`, etc.). New template schemas/paths follow that exact style.
+
+### B. Step 1 — Additive migration + model update (category, isFeatured)
+
+New file: `apps/api-laravel/database/migrations/2026_06_11_000000_add_category_and_is_featured_to_system_measure_templates_table.php`
+
+- `up()`: add `category` (string, default `'MIXED'`) and `is_featured` (boolean, default `false`) to `system_measure_templates`; add index on `category`.
+- `down()`: drop both columns. Fully additive and reversible; no destructive change; user snapshot tables untouched.
+
+Update `app/Models/SystemMeasureTemplate.php`:
+
+- Add the fixed category constants from the task's Final Decisions, exactly: `CATEGORY_MOBILITY`, `CATEGORY_STRENGTH`, `CATEGORY_BREATHING`, `CATEGORY_MINDFULNESS`, `CATEGORY_EDUCATION`, `CATEGORY_REFLECTION`, `CATEGORY_MIXED` (values `MOBILITY`, `STRENGTH`, `BREATHING`, `MINDFULNESS`, `EDUCATION`, `REFLECTION`, `MIXED`). No other values (`STRESS_RELIEF`, `SLEEP`, `GENERAL` are explicitly excluded).
+- Add `category`, `is_featured` to `$fillable`; add `'is_featured' => 'boolean'` cast; add `category ??= self::CATEGORY_MIXED` to the `saving` hook (default `MIXED` when not provided) for consistency with existing defaults.
+
+Update `database/factories/SystemMeasureTemplateFactory.php`: include `category` and `is_featured` in `definition()`, add `featured()` and `archived()` states.
+
+New file: `database/factories/SystemMeasureTemplateExerciseFactory.php` (template/exercise FKs, sequential `position`, `is_required` true, null overrides).
+
+### C. Step 2 — Backend routes, requests, resources, controllers
+
+Routes (inside the existing admin group in `routes/api.php`, after the system-exercise block):
+
+```php
+Route::get('/system-measure-templates', [SystemMeasureTemplateController::class, 'index']);
+Route::post('/system-measure-templates', [SystemMeasureTemplateController::class, 'store']);
+Route::get('/system-measure-templates/{systemMeasureTemplate}', [SystemMeasureTemplateController::class, 'show']);
+Route::patch('/system-measure-templates/{systemMeasureTemplate}', [SystemMeasureTemplateController::class, 'update']);
+Route::post('/system-measure-templates/{systemMeasureTemplate}/archive', [SystemMeasureTemplateController::class, 'archive']);
+Route::post('/system-measure-templates/{systemMeasureTemplate}/exercises', [SystemMeasureTemplateExerciseController::class, 'store']);
+Route::patch('/system-measure-templates/{systemMeasureTemplate}/exercises/{templateExercise}', [SystemMeasureTemplateExerciseController::class, 'update']);
+Route::delete('/system-measure-templates/{systemMeasureTemplate}/exercises/{templateExercise}', [SystemMeasureTemplateExerciseController::class, 'destroy']);
+Route::post('/system-measure-templates/{systemMeasureTemplate}/exercises/reorder', [SystemMeasureTemplateExerciseController::class, 'reorder']);
+```
+
+No DELETE route for templates (archive only). Child ownership (`templateExercise` belongs to `systemMeasureTemplate`) is enforced with an explicit check in the controller returning 404 on mismatch (explicit check preferred over implicit `scopeBindings()` for testability and parity with existing explicit style).
+
+New controllers:
+
+1. `app/Http/Controllers/Admin/SystemMeasureTemplateController.php`
+   - `index`: validate `search`, `status`, `category`, `difficulty`, `isFeatured` (boolean), `perPage` (1-100, default 25), `page`; build query with `withCount('templateExercises as exercise_count')`; lowercase `LIKE` search over `title`, `short_description`, `description`, `slug`; newest-first sort; return `SystemMeasureTemplateResource::collection($query->paginate($perPage)->appends($request->query()))`.
+   - `store`: `CreateSystemMeasureTemplateRequest`; map camelCase→snake_case via `COLUMN_MAP`; `slug = generateUniqueSlug(title)` (fallback base `'template'` per task); `status` default `ACTIVE`, `is_featured` default `false`, `category` default `MIXED`; `created_by_user_id = $request->user()?->id`; return resource with 201.
+   - `show`: eager-load `templateExercises.exercise.tags` (ordered by `position` via existing relation) and `withCount`; return detail resource with nested exercises.
+   - `update`: `UpdateSystemMeasureTemplateRequest`; apply only present fields; **never touch `slug`**; return updated resource (loaded like `show`).
+   - `archive`: set `status = ARCHIVED`, save, return resource. Idempotent by construction (re-setting `ARCHIVED` is a no-op); does not touch template exercises.
+   - `generateUniqueSlug()`: `Str::slug($title)`, fallback `'template'`, numeric suffix starting at 2 (`stress-reset`, `stress-reset-2`, …) — same as `SystemExerciseController`.
+2. `app/Http/Controllers/Admin/SystemMeasureTemplateExerciseController.php`
+   - `store`: `CreateSystemMeasureTemplateExerciseRequest`; reject archived exercises with 422 (validation error on `systemExerciseId`, task-preferred); reject duplicates (exercise already in this template) with 422 at application layer (finding A6); if `sortOrder` missing, append at `max(position) + 1`; if provided and already taken, insert by shifting subsequent rows (offset-then-renumber inside a transaction to respect the unique constraint) — simplest compliant alternative: treat provided `sortOrder` colliding with an existing position as 422 and document it; decision in Open Questions, default to **append-or-explicit-free-position with 422 on collision** to keep v1 controlled. Returns created `SystemMeasureTemplateExerciseResource` (with nested exercise) and 201.
+   - `update`: `UpdateSystemMeasureTemplateExerciseRequest`; verify child ownership (404 otherwise); update overrides + `is_required`; `sortOrder` change follows the same collision rule as `store`; never writes to the underlying `system_exercises` row; returns updated resource.
+   - `destroy`: verify ownership; delete the pivot-style row only; 204. Underlying `SystemExercise` untouched.
+   - `reorder`: `ReorderSystemMeasureTemplateExercisesRequest`; **requires the complete set of the template's exercise IDs** and rejects partial payloads before any write. Exact check order:
+     1. Validation (form request): `items` shape, distinct `items.*.id`, distinct `items.*.sortOrder` → 422 on duplicate sortOrder values.
+     2. Fetch all existing template exercise IDs for `{systemMeasureTemplate}`; fetch submitted IDs from the payload.
+     3. If any submitted ID does not belong to this template (foreign or unknown) → **404**.
+     4. If the submitted ID set does not exactly match the full existing ID set (missing IDs / partial payload) → **422**.
+     5. Only after all checks pass: inside `DB::transaction()`, single statement shifting all the template's rows by a large offset (e.g. `position + 100000`), then per-item final `position` writes (avoids transient unique-constraint violations, finding A5).
+     No positions are written if any check fails. Returns the full ordered exercise list (`data: [...]`) so the UI can re-render.
+
+New form requests (all `authorize(): true` — route middleware owns authorization, matching existing admin requests):
+
+- `CreateSystemMeasureTemplateRequest`: `title` required string max:255; `shortDescription`/`description` nullable string; `category` sometimes + `Rule::in` (model constants); `difficulty` sometimes + `Rule::in(BEGINNER, INTERMEDIATE, ADVANCED)`; `estimatedDurationMinutes` nullable integer min:1 max:100000; `status` sometimes + `Rule::in(DRAFT, ACTIVE, ARCHIVED)`; `isFeatured` sometimes boolean.
+- `UpdateSystemMeasureTemplateRequest`: same rules, all `sometimes`; no `slug` field accepted.
+- `CreateSystemMeasureTemplateExerciseRequest`: `systemExerciseId` required integer `exists:system_exercises,id`; `sortOrder` sometimes integer min:1; `customTitle` nullable string max:255; `customInstructions`/`customFeedbackPrompt` nullable string; `customDurationMinutes`/`customSets`/`customRepetitions`/`customHoldSeconds` nullable integer min:1 max:100000; `isRequired` sometimes boolean (default true server-side). Archived-exercise and duplicate checks live in the controller/`withValidator` so they produce 422 with field-level errors.
+- `UpdateSystemMeasureTemplateExerciseRequest`: same as create minus `systemExerciseId`, all optional.
+- `ReorderSystemMeasureTemplateExercisesRequest`: `items` required array min:1; `items.*.id` required integer; `items.*.sortOrder` required integer min:1; `distinct` on both ids and sortOrders (duplicate `sortOrder` → 422 via validation). The complete-set and ownership checks (404 for foreign IDs, 422 for partial payloads) run in the controller before any write — see the `reorder` action above.
+
+New resources:
+
+- `app/Http/Resources/Admin/SystemMeasureTemplateResource.php`: `id`, `slug`, `title`, `shortDescription`, `description`, `category`, `difficulty`, `estimatedDurationMinutes`, `status`, `isFeatured`, `exerciseCount` (`whenCounted`), `exercises` (`SystemMeasureTemplateExerciseResource::collection($this->whenLoaded('templateExercises'))` — present on detail, absent on list), `createdAt`, `updatedAt`. One resource serves list and detail via conditional fields, mirroring `SystemExerciseResource` usage.
+- `app/Http/Resources/Admin/SystemMeasureTemplateExerciseResource.php`: `id`, `systemExerciseId`, `sortOrder` (from `position`), `customTitle`, `customInstructions`, `customDurationMinutes`, `customSets`, `customRepetitions`, `customHoldSeconds`, `customFeedbackPrompt`, `isRequired`, `exercise` (nested, `whenLoaded`): `id`, `slug`, `title`, `shortDescription`, `exerciseType`, `difficulty`, `defaultDurationMinutes`, `status`, `tags` (reuse `SystemExerciseTagResource`).
+
+### D. Step 3 — OpenAPI (`docs/api/openapi.yaml`)
+
+Add component schemas following the existing `AdminSystemExercise*` style:
+
+- `SystemMeasureTemplateStatus` (`DRAFT|ACTIVE|ARCHIVED`), `SystemMeasureTemplateCategory` (new constants), reuse `SystemExerciseDifficulty` for difficulty (same values) or add `SystemMeasureTemplateDifficulty` if separation is preferred — plan: reuse `SystemExerciseDifficulty` to avoid duplicate enums, note in handoff.
+- `AdminSystemMeasureTemplate` (list shape incl. `exerciseCount`), `AdminSystemMeasureTemplateDetail` (extends with `exercises`), `AdminSystemMeasureTemplateExercise` (incl. nested `exercise`), `AdminSystemMeasureTemplateCreatePayload`, `AdminSystemMeasureTemplateUpdatePayload`, `AdminSystemMeasureTemplateExerciseCreatePayload`, `AdminSystemMeasureTemplateExerciseUpdatePayload`, `AdminSystemMeasureTemplateExercisesReorderPayload`, `AdminSystemMeasureTemplateListResponse` (`data`/`links`/`meta`).
+
+Add paths (all tagged `Admin`, documenting 401 unauthenticated, 403 forbidden for company/employee roles, 404 not found / wrong-parent child, 422 validation incl. archived-exercise and duplicate cases, enum values, pagination params):
+
+- `GET|POST /admin/system-measure-templates`
+- `GET|PATCH /admin/system-measure-templates/{systemMeasureTemplate}`
+- `POST /admin/system-measure-templates/{systemMeasureTemplate}/archive`
+- `POST /admin/system-measure-templates/{systemMeasureTemplate}/exercises`
+- `PATCH|DELETE /admin/system-measure-templates/{systemMeasureTemplate}/exercises/{templateExercise}` (DELETE → 204)
+- `POST /admin/system-measure-templates/{systemMeasureTemplate}/exercises/reorder` — the description and 422 response must explicitly document that the payload requires the **complete set** of the template's exercise IDs: partial payloads (missing IDs) and duplicate `sortOrder` values return 422 with no positions changed; IDs not belonging to the template return 404.
+
+No user-facing, assignment, or recommendation endpoints are documented.
+
+### E. Step 4 — Angular admin UI
+
+New files (mirroring the system-exercises feature):
+
+1. `apps/web-angular/src/app/features/admin/models/admin-system-measure-template.models.ts`
+   - `SystemMeasureTemplateStatus`, `SystemMeasureTemplateCategory`, reuse `SystemExerciseDifficulty` import for difficulty; `AdminSystemMeasureTemplate`, `AdminSystemMeasureTemplateExercise` (with nested exercise summary), `ListSystemMeasureTemplatesParams`, `CreateSystemMeasureTemplatePayload`, `UpdateSystemMeasureTemplatePayload`, `CreateSystemMeasureTemplateExercisePayload`, `UpdateSystemMeasureTemplateExercisePayload`, `ReorderSystemMeasureTemplateExercisesPayload`. Reuse `PaginatedResponse<T>` from `admin-system-exercise.models.ts`.
+2. `apps/web-angular/src/app/features/admin/services/admin-system-measure-template.service.ts`
+   - `ApiClient`-based methods: `listTemplates(filters)`, `getTemplate(id)`, `createTemplate(payload)`, `updateTemplate(id, payload)`, `archiveTemplate(id)`, `addExercise(templateId, payload)`, `updateTemplateExercise(templateId, templateExerciseId, payload)`, `removeTemplateExercise(templateId, templateExerciseId)`, `reorderExercises(templateId, payload)`. No direct `fetch`.
+3. `apps/web-angular/src/app/features/admin/pages/system-measure-templates/admin-system-measure-templates.component.ts`
+   - Standalone, inline template, signals + reactive forms, German labels, same visual style as `admin-system-exercises.component.ts`.
+   - List view: search box; status/category/difficulty/featured filters; paginated table with `title`, `slug`, `category`, `difficulty`, `estimatedDurationMinutes`, `status`, `isFeatured`, `exerciseCount`; create button; per-row edit + archive (with confirm) actions.
+   - Create/edit form: title, short description, description, category, difficulty, estimated duration minutes, status, featured checkbox; slug shown read-only when editing; no slug input.
+   - Detail/exercise management section (expanded inline for the selected template, same single-page pattern the admin area already uses — no new routing concepts): ordered exercise list by `sortOrder`; up/down buttons calling `reorderExercises` with the full recomputed `items` array (no drag-and-drop); "add exercise" select fed by `AdminSystemExerciseService.listExercises({ status: 'ACTIVE' })` (reused service, active-only); per-row override edit form (custom title/instructions/duration/sets/repetitions/hold seconds/feedback prompt, required flag); remove button (relationship delete, with confirm). No affordance to create or edit underlying exercises; no assignment/recommendation/points UI.
+4. Routing/nav:
+   - `app.routes.ts`: add `{ path: 'system-measure-templates', loadComponent: ... }` under the existing admin shell children (after `system-exercises`).
+   - `shared/shells/admin-shell.component.ts`: add a `System-Templates` sidebar link next to the existing `System-Übungen` link (straightforward and consistent, so included).
+
+### F. Step 5 — Tests
+
+Backend — new `apps/api-laravel/tests/Feature/AdminSystemMeasureTemplateTest.php` (and optionally a separate `AdminSystemMeasureTemplateExerciseTest.php` if it grows large), following `AdminSystemExerciseTest` style (`RefreshDatabase`, `User::factory()->platformAdmin()`, `actingAs`):
+
+- Authorization: platform admin (ELYO_ADMIN) can list; ELYO_SUPPORT can list (matches existing admin group middleware); unauthenticated → 401; EMPLOYEE/COMPANY_ADMIN/COMPANY_MANAGER → 403 (list and at least one write endpoint).
+- List: expected fields incl. `exerciseCount`; pagination shape `data`/`links`/`meta`; newest-first; each filter (`search` across title/shortDescription/description/slug, `status`, `category`, `difficulty`, `isFeatured`).
+- Create: 201 + fields; slug generated server-side (payload slug ignored/absent); slug collision → `-2`/`-3` suffix; empty-slug title falls back to `template`; invalid enum → 422; invalid numeric → 422; `created_by_user_id` set.
+- Update: fields updated; **slug stable when title changes**; invalid values → 422.
+- Archive: sets `ARCHIVED`; idempotent (second call 200, still `ARCHIVED`); template row still exists; template exercises still attached (count unchanged).
+- Template exercises: add active exercise (appends at end when `sortOrder` omitted); adding archived exercise → 422; duplicate exercise in same template → 422; update overrides; updating a template exercise via another template's URL → 404; remove → 204, underlying `system_exercises` row still exists.
+- Reorder (all "unchanged" assertions verify every row's `position` in the DB after the call):
+  - valid complete reorder (all template exercise IDs present) succeeds and applies the new order;
+  - **partial payload** (subset of the template's exercise IDs) → 422, positions unchanged;
+  - **duplicate `sortOrder` values** → 422 (validation), positions unchanged;
+  - **foreign template exercise ID** (belongs to another template or does not exist) → 404, positions unchanged.
+
+Angular — `admin-system-measure-template.service.spec.ts` and `admin-system-measure-templates.component.spec.ts`, following the existing exercise spec style (HttpClientTesting / service spies, no brittle DOM assertions):
+
+- Service methods hit expected URLs/verbs/payloads (all nine methods).
+- List page loads templates on init; filter submit triggers reload with params.
+- Create/edit flows call service with expected payload; archive action calls `archiveTemplate`.
+- Detail view renders exercises in `sortOrder` order; add/update-override/remove/reorder flows call service with expected payloads.
+- Exercise selection calls `AdminSystemExerciseService.listExercises` with `status: 'ACTIVE'`.
+- No create-exercise affordance exists in the template builder (assert absence of such an action/button hook).
+
+### G. Step 6 — Validation (non-destructive only)
+
+- `docker compose exec api php artisan test --filter='AdminSystemMeasureTemplate'` (plus `AdminSystemExerciseTest|SystemMeasureDataModelTest` as regression guard)
+- `docker compose exec api php artisan migrate` (additive migration only — **no** `migrate:fresh` / `db:wipe`)
+- Angular tests for the new admin specs via the project's existing test runner
+- `docker compose exec web npm run build`
+- `git diff --check`, `git status --short`
+
+### H. Confirmed Decisions / Remaining Notes
+
+1. **Category enum values (confirmed by user, 2026-06-11)** — exactly `MOBILITY`, `STRENGTH`, `BREATHING`, `MINDFULNESS`, `EDUCATION`, `REFLECTION`, `MIXED`; default `MIXED`. `STRESS_RELIEF`, `SLEEP`, and `GENERAL` must not be used.
+2. **`sortOrder` collision on add/update (non-reorder paths) — confirmed** — an explicitly provided colliding `sortOrder` returns 422; rows are never auto-shifted. The reorder endpoint is the only way to change multiple positions.
+3. **Reorder requires the complete ID set (confirmed by user, 2026-06-11)** — partial payloads → 422, foreign IDs → 404, duplicate sortOrders → 422 via validation; all checked before any write; positions only updated inside a transaction after all checks pass.
+4. **Difficulty enum reuse in OpenAPI/Angular** — plan reuses the existing `SystemExerciseDifficulty` enum (identical values) instead of duplicating; a separate `SystemMeasureTemplateDifficulty` alias type will be exported in Angular per the task's suggested type list.
+5. **Hidden existing columns** (`goal_summary`, `recommended_frequency`, `default_points`, `streak_enabled`, `requires_feedback`) stay unexposed in v1 (see Finding A8).
+
+### I. Explicitly Out of Scope (per task)
+
+- User assignment of templates, snapshot tables, recommendation engine, points/streak logic, employee/company-facing endpoints or UI, hard deletes of templates or exercises, drag-and-drop reordering, changes to existing company measure / QR check-in / survey behavior, changes to `../ELYO`.
+
+### J. File Inventory (planned changes)
+
+Backend (new): migration `2026_06_11_000000_add_category_and_is_featured_to_system_measure_templates_table.php`; `SystemMeasureTemplateController`; `SystemMeasureTemplateExerciseController`; 5 form requests (`CreateSystemMeasureTemplateRequest`, `UpdateSystemMeasureTemplateRequest`, `CreateSystemMeasureTemplateExerciseRequest`, `UpdateSystemMeasureTemplateExerciseRequest`, `ReorderSystemMeasureTemplateExercisesRequest`); 2 resources (`SystemMeasureTemplateResource`, `SystemMeasureTemplateExerciseResource`); `SystemMeasureTemplateExerciseFactory`; `tests/Feature/AdminSystemMeasureTemplateTest.php`.
+
+Backend (modified): `routes/api.php` (9 routes in existing admin group); `app/Models/SystemMeasureTemplate.php` (category/is_featured fillable, cast, constants, saving default); `database/factories/SystemMeasureTemplateFactory.php` (new columns + states).
+
+Frontend (new): `admin-system-measure-template.models.ts`; `admin-system-measure-template.service.ts` + spec; `pages/system-measure-templates/admin-system-measure-templates.component.ts` + spec.
+
+Frontend (modified): `app.routes.ts` (one lazy route); `shared/shells/admin-shell.component.ts` (one nav link).
+
+Contract (modified): `docs/api/openapi.yaml` (9 paths + ~10 schemas).

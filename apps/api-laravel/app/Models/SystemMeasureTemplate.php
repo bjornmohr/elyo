@@ -12,6 +12,14 @@ class SystemMeasureTemplate extends Model
 {
     use HasFactory;
 
+    public const CATEGORY_MOBILITY = 'MOBILITY';
+    public const CATEGORY_STRENGTH = 'STRENGTH';
+    public const CATEGORY_BREATHING = 'BREATHING';
+    public const CATEGORY_MINDFULNESS = 'MINDFULNESS';
+    public const CATEGORY_EDUCATION = 'EDUCATION';
+    public const CATEGORY_REFLECTION = 'REFLECTION';
+    public const CATEGORY_MIXED = 'MIXED';
+
     public const DIFFICULTY_BEGINNER = 'BEGINNER';
     public const DIFFICULTY_INTERMEDIATE = 'INTERMEDIATE';
     public const DIFFICULTY_ADVANCED = 'ADVANCED';
@@ -26,8 +34,8 @@ class SystemMeasureTemplate extends Model
 
     protected $fillable = [
         'slug', 'title', 'short_description', 'description', 'goal_summary',
-        'difficulty', 'estimated_duration_minutes', 'recommended_frequency',
-        'default_points', 'streak_enabled', 'requires_feedback',
+        'category', 'difficulty', 'estimated_duration_minutes', 'recommended_frequency',
+        'default_points', 'streak_enabled', 'requires_feedback', 'is_featured',
         'status', 'created_by_user_id',
     ];
 
@@ -36,12 +44,14 @@ class SystemMeasureTemplate extends Model
         'default_points' => 'integer',
         'streak_enabled' => 'boolean',
         'requires_feedback' => 'boolean',
+        'is_featured' => 'boolean',
     ];
 
     protected static function booted(): void
     {
         static::saving(function (SystemMeasureTemplate $template): void {
             $template->slug ??= Str::slug($template->title);
+            $template->category ??= self::CATEGORY_MIXED;
             $template->difficulty ??= self::DIFFICULTY_BEGINNER;
             $template->status ??= self::STATUS_ACTIVE;
         });

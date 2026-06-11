@@ -22,12 +22,14 @@ class SystemMeasureTemplateFactory extends Factory
             'short_description' => fake()->sentence(),
             'description' => fake()->paragraph(),
             'goal_summary' => null,
+            'category' => SystemMeasureTemplate::CATEGORY_MIXED,
             'difficulty' => SystemMeasureTemplate::DIFFICULTY_BEGINNER,
             'estimated_duration_minutes' => fake()->randomElement([15, 30, 45, 60]),
             'recommended_frequency' => SystemMeasureTemplate::FREQUENCY_DAILY,
             'default_points' => fake()->randomElement([5, 10, 20]),
             'streak_enabled' => true,
             'requires_feedback' => true,
+            'is_featured' => false,
             'status' => SystemMeasureTemplate::STATUS_ACTIVE,
             'created_by_user_id' => null,
         ];
@@ -51,6 +53,20 @@ class SystemMeasureTemplateFactory extends Factory
     {
         return $this->state(fn () => [
             'status' => SystemMeasureTemplate::STATUS_DRAFT,
+        ]);
+    }
+
+    public function archived(): static
+    {
+        return $this->state(fn () => [
+            'status' => SystemMeasureTemplate::STATUS_ARCHIVED,
+        ]);
+    }
+
+    public function featured(): static
+    {
+        return $this->state(fn () => [
+            'is_featured' => true,
         ]);
     }
 }

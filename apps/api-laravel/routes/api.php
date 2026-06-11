@@ -5,6 +5,8 @@ use App\Http\Controllers\Admin\AdminPartnerController;
 use App\Http\Controllers\Admin\AdminPointsController;
 use App\Http\Controllers\Admin\SystemExerciseController;
 use App\Http\Controllers\Admin\SystemExerciseTagController;
+use App\Http\Controllers\Admin\SystemMeasureTemplateController;
+use App\Http\Controllers\Admin\SystemMeasureTemplateExerciseController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\InviteController;
 use App\Http\Controllers\Company\CompanyController;
@@ -67,6 +69,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/system-exercises/{systemExercise}', [SystemExerciseController::class, 'update']);
         Route::post('/system-exercises/{systemExercise}/archive', [SystemExerciseController::class, 'archive']);
         Route::get('/system-exercise-tags', [SystemExerciseTagController::class, 'index']);
+
+        Route::get('/system-measure-templates', [SystemMeasureTemplateController::class, 'index']);
+        Route::post('/system-measure-templates', [SystemMeasureTemplateController::class, 'store']);
+        Route::get('/system-measure-templates/{systemMeasureTemplate}', [SystemMeasureTemplateController::class, 'show']);
+        Route::patch('/system-measure-templates/{systemMeasureTemplate}', [SystemMeasureTemplateController::class, 'update']);
+        Route::post('/system-measure-templates/{systemMeasureTemplate}/archive', [SystemMeasureTemplateController::class, 'archive']);
+        Route::post('/system-measure-templates/{systemMeasureTemplate}/exercises', [SystemMeasureTemplateExerciseController::class, 'store']);
+        Route::post('/system-measure-templates/{systemMeasureTemplate}/exercises/reorder', [SystemMeasureTemplateExerciseController::class, 'reorder']);
+        Route::patch('/system-measure-templates/{systemMeasureTemplate}/exercises/{templateExercise}', [SystemMeasureTemplateExerciseController::class, 'update']);
+        Route::delete('/system-measure-templates/{systemMeasureTemplate}/exercises/{templateExercise}', [SystemMeasureTemplateExerciseController::class, 'destroy']);
     });
 
     // Company portal routes (COMPANY_OWNER, COMPANY_ADMIN, COMPANY_MANAGER)
