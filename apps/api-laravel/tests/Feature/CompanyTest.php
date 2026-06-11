@@ -1063,6 +1063,45 @@ class CompanyTest extends TestCase
         ]);
     }
 
+    public function test_scheduled_measure_keeps_manual_duration_when_schedule_window_is_incomplete(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'execution_type' => 'EVENT_PARTICIPATION',
+            'starts_at' => null,
+            'ends_at' => null,
+            'duration_minutes' => 60,
+            'created_by' => $this->admin->id,
+        ]);
+
+        // The edit form resubmits the unchanged manual duration alongside
+        // unrelated changes; this must not clear the stored value.
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$measure->id}", [
+                'title' => 'Updated without schedule',
+                'durationMinutes' => 60,
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('data.durationMinutes', 60);
+
+        $this->assertDatabaseHas('measures', [
+            'id' => $measure->id,
+            'duration_minutes' => 60,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$measure->id}", ['durationMinutes' => 45])
+            ->assertStatus(200)
+            ->assertJsonPath('data.durationMinutes', 45);
+
+        $this->assertDatabaseHas('measures', [
+            'id' => $measure->id,
+            'duration_minutes' => 45,
+        ]);
+    }
+
     public function test_measure_update_clears_derived_duration_when_schedule_boundary_is_cleared(): void
     {
         foreach (['startsAt', 'endsAt'] as $clearedField) {
@@ -1411,6 +1450,30 @@ class CompanyTest extends TestCase
             'id' => $measure->id,
             'ends_at' => '2026-06-20 11:00:00',
         ]);
+    }
+
+    public function test_measure_schedule_accepts_explicit_timezone_offsets_and_stores_utc(): void
+    {
+        $response = $this->actingAs($this->admin)->postJson('/api/company/measures', [
+            'title' => 'Offset measure',
+            'category' => 'sport',
+            'description' => 'A measure created with timezone offsets.',
+            'startsAt' => '2026-06-20T11:00:00+02:00',
+            'endsAt' => '2026-06-20T12:30:00+02:00',
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.startsAt', '2026-06-20T09:00:00.000000Z')
+            ->assertJsonPath('data.endsAt', '2026-06-20T10:30:00.000000Z')
+            ->assertJsonPath('data.durationMinutes', 90);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$response->json('data.id')}", [
+                'endsAt' => '2026-06-20T11:00:00Z',
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('data.endsAt', '2026-06-20T11:00:00.000000Z')
+            ->assertJsonPath('data.durationMinutes', 120);
     }
 
     public function test_measure_domain_field_validation_rejects_invalid_values(): void

@@ -550,17 +550,17 @@ components:
           type: string
           format: date-time
           nullable: true
-          description: ISO 8601 date-time with an explicit timezone offset or UTC designator (e.g. 2026-06-20T09:00:00Z). Clients must not send timezone-less local datetime strings; the UI may display local wall time but serializes to an explicit instant.
+          description: ISO 8601 date-time. Clients should send an explicit timezone offset or UTC designator (e.g. 2026-06-20T09:00:00Z); the web UI displays local wall time but always serializes to an explicit UTC instant. Timezone-less values are accepted for backward compatibility and interpreted as UTC.
         endsAt:
           type: string
           format: date-time
           nullable: true
-          description: ISO 8601 date-time with an explicit timezone offset or UTC designator. Must be strictly after the effective startsAt value when both are present.
+          description: ISO 8601 date-time; same timezone semantics as startsAt. Must be strictly after the effective startsAt value when both are present.
         durationMinutes:
           type: integer
           nullable: true
           minimum: 1
-          description: For scheduled execution types EVENT_PARTICIPATION and GUIDED_SESSION the stored value mirrors the schedule window when the schedule is created or updated - derived from startsAt and endsAt when both are present, cleared to null on update when either boundary is missing. Updates that do not touch startsAt, endsAt, durationMinutes, or executionType leave the stored value unchanged.
+          description: For scheduled execution types EVENT_PARTICIPATION and GUIDED_SESSION the stored value mirrors the schedule window whenever both effective startsAt and endsAt are present - derived on create or update, overriding any submitted value. When the effective schedule window is incomplete, an explicitly submitted durationMinutes is stored as manual duration (null clears it); a previously derived value is cleared only when a startsAt/endsAt update leaves the window incomplete without submitting durationMinutes. Updates that do not touch startsAt, endsAt, durationMinutes, or executionType leave the stored value unchanged.
         instructions: { type: string, nullable: true, maxLength: 2000 }
         locationName: { type: string, nullable: true, maxLength: 255 }
         locationAddress: { type: string, nullable: true, maxLength: 1000 }
@@ -2063,7 +2063,7 @@ paths:
                 properties:
                   data: { $ref: '#/components/schemas/Measure' }
         400:
-          description: Invalid measure status transition
+          description: Invalid measure status transition. Returned for any disallowed status value in the payload, including status-only updates on COMPLETED or DISMISSED measures; non-status field edits on those measures return 422 keyed to status instead.
           content:
             application/json:
               schema:
@@ -2078,7 +2078,7 @@ paths:
         404:
           description: Measure not found for the authenticated company user
         422:
-          description: Laravel validation error for invalid request fields, including string length constraints, invalid enum values, unsupported verificationRequirement values, invalid date formats, invalid partial date ranges against persisted values (effective endsAt must be strictly after effective startsAt), or invalid integer values. Also returned when mutable fields are edited on COMPLETED or DISMISSED measures, or when verificationRequirement is changed after participations exist. Scoped authorization is evaluated first - out-of-scope measures return 403/404 and never leak date validation errors.
+          description: Laravel validation error for invalid request fields, including string length constraints, invalid enum values, unsupported verificationRequirement values, invalid date formats, invalid partial date ranges against persisted values (effective endsAt must be strictly after effective startsAt), or invalid integer values. Also returned when mutable fields are edited on COMPLETED or DISMISSED measures (status-only transition attempts return 400 invalid_transition instead), or when verificationRequirement is changed after participations exist. Scoped authorization is evaluated first - out-of-scope measures return 403/404 and never leak date validation errors.
           content:
             application/json:
               schema:

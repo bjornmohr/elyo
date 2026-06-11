@@ -266,6 +266,14 @@ class MeasureController extends Controller
             }
         }
 
+        // Normalize explicit timezone offsets to UTC; Eloquent would otherwise
+        // store the wall time of the submitted offset as if it were UTC.
+        foreach (['starts_at', 'ends_at'] as $column) {
+            if (isset($data[$column])) {
+                $data[$column] = CarbonImmutable::parse($data[$column])->utc();
+            }
+        }
+
         $this->deriveScheduledDuration($data, $validated, $measure);
 
         return $data;
@@ -297,7 +305,19 @@ class MeasureController extends Controller
 
         if ($startsAt && $endsAt) {
             $data['duration_minutes'] = (int) $startsAt->diffInMinutes($endsAt);
-        } elseif ($measure !== null) {
+
+            return;
+        }
+
+        // Incomplete schedule window: an explicitly provided durationMinutes
+        // stays as manual duration (measureDomainData already copied it).
+        if (array_key_exists('durationMinutes', $validated)) {
+            return;
+        }
+
+        // Only clear a previously derived value when a boundary update leaves
+        // the window incomplete, never on unrelated schedule-field updates.
+        if ($measure !== null && (array_key_exists('startsAt', $validated) || array_key_exists('endsAt', $validated))) {
             $data['duration_minutes'] = null;
         }
     }

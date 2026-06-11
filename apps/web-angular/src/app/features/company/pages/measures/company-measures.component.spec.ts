@@ -1,19 +1,21 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { Role } from '../../../../core/models/auth.models';
-import { ApiClient } from '../../../../core/services/api-client.service';
 import { AuthStore } from '../../../../core/store/auth.store';
 import { NotificationService } from '../../../../shared/notifications/notification.service';
 import { CompanyMeasuresService } from '../../services/company-measures.service';
+import { CompanyTeamsService } from '../../services/company-teams.service';
 import { CompanyMeasuresComponent } from './company-measures.component';
 
 describe('CompanyMeasuresComponent', () => {
-  let api: { get: ReturnType<typeof vi.fn>; post: ReturnType<typeof vi.fn> };
   let companyMeasuresService: {
+    listMeasures: ReturnType<typeof vi.fn>;
+    getParticipationSummary: ReturnType<typeof vi.fn>;
     createMeasure: ReturnType<typeof vi.fn>;
     updateMeasure: ReturnType<typeof vi.fn>;
     generateMeasureCheckinToken: ReturnType<typeof vi.fn>;
   };
+  let companyTeamsService: { listTeams: ReturnType<typeof vi.fn> };
   let notifications: { success: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
@@ -21,18 +23,15 @@ describe('CompanyMeasuresComponent', () => {
       success: vi.fn(),
       error: vi.fn(),
     };
-    api = {
-      get: vi.fn((path: string) => {
-        if (path === '/company/measures') {
-          return of({
-            data: [
-              { id: 1, title: 'Workshop', category: 'mental', status: 'ACTIVE', team: null },
-              { id: 2, title: 'Coaching', category: 'workshop', status: 'ACTIVE', team: null },
-            ],
-          });
-        }
-
-        if (path === '/company/measures/1/participation-summary') {
+    companyMeasuresService = {
+      listMeasures: vi.fn(() => of({
+        data: [
+          { id: 1, title: 'Workshop', category: 'mental', status: 'ACTIVE', team: null },
+          { id: 2, title: 'Coaching', category: 'workshop', status: 'ACTIVE', team: null },
+        ],
+      })),
+      getParticipationSummary: vi.fn((measureId: number) => {
+        if (measureId === 1) {
           return of({
             data: {
               measureId: 1,
@@ -46,7 +45,7 @@ describe('CompanyMeasuresComponent', () => {
           });
         }
 
-        if (path === '/company/measures/2/participation-summary') {
+        if (measureId === 2) {
           return of({
             data: {
               measureId: 2,
@@ -61,21 +60,21 @@ describe('CompanyMeasuresComponent', () => {
           });
         }
 
-        throw new Error(`Unexpected API path: ${path}`);
+        return of({ data: null });
       }),
-      post: vi.fn(),
-    };
-    companyMeasuresService = {
       createMeasure: vi.fn(() => of({ data: { id: 9, title: 'Created measure' } })),
       updateMeasure: vi.fn(() => of({ data: { id: 1, title: 'Updated measure', category: 'mental', description: 'Updated description', status: 'ACTIVE' } })),
       generateMeasureCheckinToken: vi.fn(),
+    };
+    companyTeamsService = {
+      listTeams: vi.fn(() => of({ data: [] })),
     };
 
     await TestBed.configureTestingModule({
       imports: [CompanyMeasuresComponent],
       providers: [
-        { provide: ApiClient, useValue: api },
         { provide: CompanyMeasuresService, useValue: companyMeasuresService },
+        { provide: CompanyTeamsService, useValue: companyTeamsService },
         {
           provide: AuthStore,
           useValue: {
@@ -131,38 +130,18 @@ describe('CompanyMeasuresComponent', () => {
   });
 
   it('composes check-in links from checkinPath returned by the API', () => {
-    api.get.mockImplementation((path: string) => {
-      if (path === '/company/measures') {
-        return of({
-          data: [
-            {
-              id: 3,
-              title: 'QR measure',
-              category: 'sport',
-              status: 'ACTIVE',
-              verificationRequirement: 'QR_CODE',
-              team: null,
-            },
-          ],
-        });
-      }
-
-      if (path === '/company/measures/3/participation-summary') {
-        return of({
-          data: {
-            measureId: 3,
-            isAboveThreshold: false,
-            eligibleCount: null,
-            participantCount: null,
-            participationRate: null,
-            suppressionReason: 'minimum_group_size',
-            teamBreakdown: null,
-          },
-        });
-      }
-
-      throw new Error(`Unexpected API path: ${path}`);
-    });
+    companyMeasuresService.listMeasures.mockReturnValue(of({
+      data: [
+        {
+          id: 3,
+          title: 'QR measure',
+          category: 'sport',
+          status: 'ACTIVE',
+          verificationRequirement: 'QR_CODE',
+          team: null,
+        },
+      ],
+    }));
     companyMeasuresService.generateMeasureCheckinToken.mockReturnValue(of({
       data: {
         measureId: 3,
@@ -280,28 +259,18 @@ describe('CompanyMeasuresComponent', () => {
   });
 
   it('opens edit mode with a populated form', () => {
-    api.get.mockImplementation((path: string) => {
-      if (path === '/company/measures') {
-        return of({
-          data: [{
-            id: 8,
-            title: 'Editable measure',
-            category: 'mental',
-            description: 'A measure that can be edited.',
-            status: 'ACTIVE',
-            startsAt: '2026-06-20T09:00:00.000000Z',
-            endsAt: '2026-06-20T10:00:00.000000Z',
-            team: null,
-          }],
-        });
-      }
-
-      if (path === '/company/measures/8/participation-summary') {
-        return of({ data: null });
-      }
-
-      throw new Error(`Unexpected API path: ${path}`);
-    });
+    companyMeasuresService.listMeasures.mockReturnValue(of({
+      data: [{
+        id: 8,
+        title: 'Editable measure',
+        category: 'mental',
+        description: 'A measure that can be edited.',
+        status: 'ACTIVE',
+        startsAt: '2026-06-20T09:00:00.000000Z',
+        endsAt: '2026-06-20T10:00:00.000000Z',
+        team: null,
+      }],
+    }));
 
     const fixture = TestBed.createComponent(CompanyMeasuresComponent);
     fixture.detectChanges();
@@ -317,28 +286,18 @@ describe('CompanyMeasuresComponent', () => {
   it('prefills edit schedule fields with local wall time and round-trips the instant on save', () => {
     const startsAtUtc = '2026-06-20T09:00:00.000000Z';
     const endsAtUtc = '2026-06-20T10:00:00.000000Z';
-    api.get.mockImplementation((path: string) => {
-      if (path === '/company/measures') {
-        return of({
-          data: [{
-            id: 8,
-            title: 'Editable measure',
-            category: 'mental',
-            description: 'A measure that can be edited.',
-            status: 'ACTIVE',
-            startsAt: startsAtUtc,
-            endsAt: endsAtUtc,
-            team: null,
-          }],
-        });
-      }
-
-      if (path === '/company/measures/8/participation-summary') {
-        return of({ data: null });
-      }
-
-      throw new Error(`Unexpected API path: ${path}`);
-    });
+    companyMeasuresService.listMeasures.mockReturnValue(of({
+      data: [{
+        id: 8,
+        title: 'Editable measure',
+        category: 'mental',
+        description: 'A measure that can be edited.',
+        status: 'ACTIVE',
+        startsAt: startsAtUtc,
+        endsAt: endsAtUtc,
+        team: null,
+      }],
+    }));
     companyMeasuresService.updateMeasure.mockReturnValue(of({ data: { id: 8, title: 'Editable measure' } }));
 
     const fixture = TestBed.createComponent(CompanyMeasuresComponent);
@@ -367,14 +326,6 @@ describe('CompanyMeasuresComponent', () => {
   });
 
   it('serializes datetime-local values to explicit ISO strings on create', () => {
-    const baseGet = api.get.getMockImplementation() as (path: string) => unknown;
-    api.get.mockImplementation((path: string) => {
-      if (path === '/company/measures/9/participation-summary') {
-        return of({ data: null });
-      }
-      return baseGet(path);
-    });
-
     const fixture = TestBed.createComponent(CompanyMeasuresComponent);
     fixture.detectChanges();
 
@@ -391,6 +342,40 @@ describe('CompanyMeasuresComponent', () => {
     expect(companyMeasuresService.createMeasure).toHaveBeenCalledWith(expect.objectContaining({
       startsAt: new Date('2026-06-20T09:00').toISOString(),
       endsAt: new Date('2026-06-20T10:30').toISOString(),
+    }));
+  });
+
+  it('keeps the manual duration when editing a scheduled measure without a full schedule window', () => {
+    companyMeasuresService.listMeasures.mockReturnValue(of({
+      data: [{
+        id: 11,
+        title: 'Manual duration measure',
+        category: 'sport',
+        description: 'A scheduled measure with manual duration.',
+        status: 'ACTIVE',
+        executionType: 'EVENT_PARTICIPATION',
+        startsAt: null,
+        endsAt: null,
+        durationMinutes: 60,
+        team: null,
+      }],
+    }));
+    companyMeasuresService.updateMeasure.mockReturnValue(of({ data: { id: 11, title: 'Manual duration measure' } }));
+
+    const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.editMeasure(fixture.componentInstance.measures()[0]);
+
+    expect(fixture.componentInstance.durationPreviewMinutes()).toBeNull();
+    expect(fixture.componentInstance.measureForm.value.durationMinutes).toBe(60);
+
+    fixture.componentInstance.submit();
+
+    expect(companyMeasuresService.updateMeasure).toHaveBeenCalledWith(11, expect.objectContaining({
+      durationMinutes: 60,
+      startsAt: null,
+      endsAt: null,
     }));
   });
 
@@ -420,26 +405,16 @@ describe('CompanyMeasuresComponent', () => {
   });
 
   it('does not show an active edit action for completed measures', () => {
-    api.get.mockImplementation((path: string) => {
-      if (path === '/company/measures') {
-        return of({
-          data: [{
-            id: 10,
-            title: 'Completed measure',
-            category: 'sport',
-            description: 'A completed measure.',
-            status: 'COMPLETED',
-            team: null,
-          }],
-        });
-      }
-
-      if (path === '/company/measures/10/participation-summary') {
-        return of({ data: null });
-      }
-
-      throw new Error(`Unexpected API path: ${path}`);
-    });
+    companyMeasuresService.listMeasures.mockReturnValue(of({
+      data: [{
+        id: 10,
+        title: 'Completed measure',
+        category: 'sport',
+        description: 'A completed measure.',
+        status: 'COMPLETED',
+        team: null,
+      }],
+    }));
     const fixture = TestBed.createComponent(CompanyMeasuresComponent);
     fixture.detectChanges();
 

@@ -1,11 +1,11 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
-import { ApiClient } from '../../../../core/services/api-client.service';
 import { Role } from '../../../../core/models/auth.models';
 import { AuthStore } from '../../../../core/store/auth.store';
 import { NotificationService } from '../../../../shared/notifications/notification.service';
 import { CompanyMeasuresService, MeasureCheckinTokenResponse } from '../../services/company-measures.service';
+import { CompanyTeamsService } from '../../services/company-teams.service';
 
 interface MeasureParticipationSummary {
   measureId: number;
@@ -388,8 +388,8 @@ function dateRangeValidator(control: AbstractControl): ValidationErrors | null {
   `
 })
 export class CompanyMeasuresComponent implements OnInit {
-  private api = inject(ApiClient);
   private companyMeasuresService = inject(CompanyMeasuresService);
+  private companyTeamsService = inject(CompanyTeamsService);
   private authStore = inject(AuthStore);
   private fb = inject(FormBuilder);
   private notifications = inject(NotificationService);
@@ -432,7 +432,7 @@ export class CompanyMeasuresComponent implements OnInit {
 
     this.loadMeasures();
     if (this.teamLayerEnabled()) {
-      this.api.get<{ data: any[] }>('/company/teams').subscribe({
+      this.companyTeamsService.listTeams().subscribe({
         next: res => this.teams.set(res.data ?? []),
       });
     }
@@ -531,7 +531,7 @@ export class CompanyMeasuresComponent implements OnInit {
   }
 
   private loadMeasures() {
-    this.api.get<{ data: CompanyMeasure[] }>('/company/measures').subscribe({
+    this.companyMeasuresService.listMeasures().subscribe({
       next: res => {
         const measures = res.data ?? [];
         this.measures.set(measures);
@@ -544,7 +544,7 @@ export class CompanyMeasuresComponent implements OnInit {
   }
 
   private loadParticipationSummary(measureId: number) {
-    this.api.get<{ data: MeasureParticipationSummary }>(`/company/measures/${measureId}/participation-summary`).subscribe({
+    this.companyMeasuresService.getParticipationSummary(measureId).subscribe({
       next: res => {
         this.participationSummaries.update(summaries => ({
           ...summaries,
