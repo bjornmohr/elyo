@@ -34,13 +34,5 @@ class PatchMeasureRequest extends FormRequest
         ];
     }
 
-    public function withValidator($validator): void
-    {
-        // Syntactic payload validation only. Effective date validation against
-        // persisted measure values runs in MeasureController after the scoped
-        // measure lookup, so out-of-scope managers get 403 instead of 422.
-        $validator->sometimes('endsAt', 'after:startsAt', function (): bool {
-            return $this->filled('startsAt') && $this->filled('endsAt');
-        });
-    }
+
 }

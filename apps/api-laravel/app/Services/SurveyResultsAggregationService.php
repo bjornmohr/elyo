@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\Role;
 use App\Models\Survey;
 use App\Models\SurveyAnswer;
 use App\Models\SurveyResponse;
@@ -144,9 +143,7 @@ class SurveyResultsAggregationService
     {
         return User::query()
             ->where('company_id', $companyId)
-            ->where('status', 'active')
-            ->whereHas('roles', fn (Builder $query) => $query->where('role', Role::EMPLOYEE->value))
-            ->when($scopeTeamIds !== null, fn (Builder $query) => $query->whereIn('team_id', $scopeTeamIds));
+            ->reportableForCompanyAggregates($scopeTeamIds);
     }
 
     private function scopedResponsesQuery(Survey $survey, ?array $scopeTeamIds): Builder
@@ -154,11 +151,7 @@ class SurveyResultsAggregationService
         return SurveyResponse::query()
             ->where('survey_id', $survey->id)
             ->where('company_id', $survey->company_id)
-            ->whereHas('user', function (Builder $query) use ($scopeTeamIds) {
-                $query->where('status', 'active')
-                    ->whereHas('roles', fn (Builder $roleQuery) => $roleQuery->where('role', Role::EMPLOYEE->value))
-                    ->when($scopeTeamIds !== null, fn (Builder $teamQuery) => $teamQuery->whereIn('team_id', $scopeTeamIds));
-            });
+            ->whereHas('user', fn (Builder $query) => $query->reportableForCompanyAggregates($scopeTeamIds));
     }
 
     private function scopedAnswersQuery(int $questionId, Survey $survey, ?array $scopeTeamIds): Builder
@@ -172,11 +165,7 @@ class SurveyResultsAggregationService
     {
         $query->where('survey_id', $survey->id)
             ->where('company_id', $survey->company_id)
-            ->whereHas('user', function (Builder $userQuery) use ($scopeTeamIds) {
-                $userQuery->where('status', 'active')
-                    ->whereHas('roles', fn (Builder $roleQuery) => $roleQuery->where('role', Role::EMPLOYEE->value))
-                    ->when($scopeTeamIds !== null, fn (Builder $teamQuery) => $teamQuery->whereIn('team_id', $scopeTeamIds));
-            });
+            ->whereHas('user', fn (Builder $userQuery) => $userQuery->reportableForCompanyAggregates($scopeTeamIds));
     }
 
     private function participation(int $eligibleCount, int $responseCount): array

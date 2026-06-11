@@ -128,15 +128,18 @@ class MeasureController extends Controller
             abort(403);
         }
 
-        $this->validateEffectiveDateRange($request, $measure);
-
         $updateData = $this->measureDomainData($request->validated(), $measure);
 
+        // Non-editable measures must reject domain-field changes before per-field
+        // validation so that a COMPLETED/DISMISSED measure with invalid dates
+        // returns the status editability error, not an endsAt date error.
         if (in_array($measure->status, ['COMPLETED', 'DISMISSED'], true) && $updateData !== []) {
             throw ValidationException::withMessages([
                 'status' => ['Completed or dismissed measures cannot be edited.'],
             ]);
         }
+
+        $this->validateEffectiveDateRange($request, $measure);
 
         if (
             array_key_exists('verification_requirement', $updateData)

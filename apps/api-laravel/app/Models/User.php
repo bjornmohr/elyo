@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Role;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -248,5 +249,33 @@ class User extends Authenticatable
     public function roleNames(): array
     {
         return $this->roles->pluck('role')->map(fn ($r) => $r->value)->toArray();
+    }
+
+    // Aggregate reporting helpers
+
+    /**
+     * Report viewers can see company/team aggregates, so counting them as
+     * participants would let them subtract their own input and weaken the
+     * anonymity threshold for the remaining employees.
+     */
+    public function isExcludedFromCompanyAggregates(): bool
+    {
+        return $this->hasAnyRole(Role::companyPortalRoles());
+    }
+
+    /**
+     * Reportable participants for company/team aggregates and thresholds:
+     * active employees without any report-viewer role. Multi-role users
+     * (e.g. EMPLOYEE + COMPANY_MANAGER) are excluded.
+     */
+    public function scopeReportableForCompanyAggregates(Builder $query, ?array $teamIds = null): Builder
+    {
+        $reportViewerRoles = array_map(fn (Role $role) => $role->value, Role::companyPortalRoles());
+
+        return $query
+            ->where('status', 'active')
+            ->whereHas('roles', fn (Builder $roleQuery) => $roleQuery->where('role', Role::EMPLOYEE->value))
+            ->whereDoesntHave('roles', fn (Builder $roleQuery) => $roleQuery->whereIn('role', $reportViewerRoles))
+            ->when($teamIds !== null, fn (Builder $teamQuery) => $teamQuery->whereIn('team_id', $teamIds));
     }
 }

@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\Role;
 use App\Models\Measure;
 use App\Models\MeasureParticipation;
 use App\Models\Team;
@@ -88,9 +87,7 @@ class MeasureParticipationSummaryService
     {
         return User::query()
             ->where('company_id', $user->company_id)
-            ->where('status', 'active')
-            ->whereHas('roles', fn (Builder $query) => $query->where('role', Role::EMPLOYEE->value))
-            ->when($scopeTeamIds !== null, fn (Builder $query) => $query->whereIn('team_id', $scopeTeamIds));
+            ->reportableForCompanyAggregates($scopeTeamIds);
     }
 
     private function participantCount(Measure $measure, Builder $eligibleEmployeesQuery): int

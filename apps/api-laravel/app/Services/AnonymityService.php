@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\Role;
 use App\Models\User;
 use App\Models\WellbeingEntry;
 use Carbon\Carbon;
@@ -21,11 +20,7 @@ class AnonymityService
 
         $query = WellbeingEntry::where('company_id', $companyId);
 
-        $query->whereHas('user', function ($q) use ($options) {
-            $q->where('status', 'active')
-                ->whereHas('roles', fn ($roleQuery) => $roleQuery->where('role', Role::EMPLOYEE->value))
-                ->when(! empty($options['teamId']), fn ($teamQuery) => $teamQuery->where('team_id', $options['teamId']));
-        });
+        $query->whereHas('user', fn ($q) => $q->reportableForCompanyAggregates($this->teamIds($options)));
 
         if (! empty($options['periodKey'])) {
             $query->where('period_key', $options['periodKey']);
@@ -94,11 +89,7 @@ class AnonymityService
 
         $query = WellbeingEntry::where('company_id', $companyId);
 
-        $query->whereHas('user', function ($q) use ($options) {
-            $q->where('status', 'active')
-                ->whereHas('roles', fn ($roleQuery) => $roleQuery->where('role', Role::EMPLOYEE->value))
-                ->when(! empty($options['teamId']), fn ($teamQuery) => $teamQuery->where('team_id', $options['teamId']));
-        });
+        $query->whereHas('user', fn ($q) => $q->reportableForCompanyAggregates($this->teamIds($options)));
 
         $raw = $query->groupBy('period_key')
             ->selectRaw('
@@ -146,19 +137,20 @@ class AnonymityService
         }
 
         $currentPeriod = $this->currentPeriodKey();
+        $reportableUserConstraint = fn ($query) => $query->whereHas(
+            'user',
+            fn ($q) => $q->reportableForCompanyAggregates($this->teamIds($options))
+        );
+
         $checkedInThisPeriod = WellbeingEntry::where('company_id', $companyId)
             ->where('period_key', $currentPeriod)
-            ->when(! empty($options['teamId']), function ($query) use ($options) {
-                $query->whereHas('user', fn ($q) => $q->where('team_id', $options['teamId']));
-            })
+            ->tap($reportableUserConstraint)
             ->distinct('user_id')
             ->count('user_id');
 
         // Get last 4 periods present in the DB for this company
         $periodKeys = WellbeingEntry::where('company_id', $companyId)
-            ->when(! empty($options['teamId']), function ($query) use ($options) {
-                $query->whereHas('user', fn ($q) => $q->where('team_id', $options['teamId']));
-            })
+            ->tap($reportableUserConstraint)
             ->orderBy('period_key', 'desc')
             ->distinct()
             ->limit(4)
@@ -168,9 +160,7 @@ class AnonymityService
         if ($periodKeys->count() >= 3) {
             $continuousUsers = WellbeingEntry::where('company_id', $companyId)
                 ->whereIn('period_key', $periodKeys)
-                ->when(! empty($options['teamId']), function ($query) use ($options) {
-                    $query->whereHas('user', fn ($q) => $q->where('team_id', $options['teamId']));
-                })
+                ->tap($reportableUserConstraint)
                 ->groupBy('user_id')
                 ->havingRaw('COUNT(DISTINCT period_key) >= 3')
                 ->get()
@@ -189,10 +179,13 @@ class AnonymityService
     private function eligibleEmployeeCount(string $companyId, array $options = []): int
     {
         return User::where('company_id', $companyId)
-            ->where('status', 'active')
-            ->whereHas('roles', fn ($query) => $query->where('role', Role::EMPLOYEE->value))
-            ->when(! empty($options['teamId']), fn ($query) => $query->where('team_id', $options['teamId']))
+            ->reportableForCompanyAggregates($this->teamIds($options))
             ->count();
+    }
+
+    private function teamIds(array $options): ?array
+    {
+        return ! empty($options['teamId']) ? [$options['teamId']] : null;
     }
 
     /**

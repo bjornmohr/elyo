@@ -8,6 +8,7 @@ use App\Models\Measure;
 use App\Models\MeasureParticipation;
 use App\Models\Team;
 use App\Models\User;
+use App\Models\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -54,6 +55,80 @@ class MeasureParticipationSummaryTest extends TestCase
             ->assertJsonPath('data.teamBreakdown', null);
 
         $this->assertNoIndividualParticipationData($response->getContent());
+    }
+
+    public function test_summary_excludes_report_viewer_participation_from_counts(): void
+    {
+        $company = Company::factory()->create(['anonymity_threshold' => 3]);
+        $admin = $this->companyUser($company, Role::COMPANY_ADMIN);
+        $measure = Measure::factory()->create([
+            'company_id' => $company->id,
+            'team_id' => null,
+            'created_by' => $admin->id,
+        ]);
+        $employees = User::factory()->count(3)->create([
+            'company_id' => $company->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $reportViewer = User::factory()->create([
+            'company_id' => $company->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        UserRole::create(['user_id' => $reportViewer->id, 'role' => Role::COMPANY_MANAGER]);
+
+        $employees->push($reportViewer)->each(fn (User $participant) => MeasureParticipation::factory()->create([
+            'measure_id' => $measure->id,
+            'user_id' => $participant->id,
+            'company_id' => $company->id,
+            'team_id' => $participant->team_id,
+        ]));
+
+        // The report viewer participates personally but must not appear in the
+        // eligible denominator or the participant numerator.
+        $this->actingAs($admin)
+            ->getJson("/api/company/measures/{$measure->id}/participation-summary")
+            ->assertOk()
+            ->assertJsonPath('data.isAboveThreshold', true)
+            ->assertJsonPath('data.eligibleCount', 3)
+            ->assertJsonPath('data.participantCount', 3)
+            ->assertJsonPath('data.participationRate', 100);
+    }
+
+    public function test_summary_stays_suppressed_when_only_report_viewer_participation_reaches_threshold(): void
+    {
+        $company = Company::factory()->create(['anonymity_threshold' => 3]);
+        $admin = $this->companyUser($company, Role::COMPANY_ADMIN);
+        $measure = Measure::factory()->create([
+            'company_id' => $company->id,
+            'team_id' => null,
+            'created_by' => $admin->id,
+        ]);
+        $employees = User::factory()->count(5)->create([
+            'company_id' => $company->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $reportViewer = User::factory()->create([
+            'company_id' => $company->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        UserRole::create(['user_id' => $reportViewer->id, 'role' => Role::COMPANY_ADMIN]);
+
+        // 2 reportable participants + 1 report viewer: raw participation
+        // reaches the threshold of 3, but the summary must stay suppressed.
+        $employees->take(2)->push($reportViewer)->each(fn (User $participant) => MeasureParticipation::factory()->create([
+            'measure_id' => $measure->id,
+            'user_id' => $participant->id,
+            'company_id' => $company->id,
+            'team_id' => $participant->team_id,
+        ]));
+
+        $this->actingAs($admin)
+            ->getJson("/api/company/measures/{$measure->id}/participation-summary")
+            ->assertOk()
+            ->assertJsonPath('data.isAboveThreshold', false)
+            ->assertJsonPath('data.eligibleCount', null)
+            ->assertJsonPath('data.participantCount', null)
+            ->assertJsonPath('data.suppressionReason', 'ANONYMITY_THRESHOLD_NOT_MET');
     }
 
     public function test_summary_suppresses_counts_when_anonymity_threshold_is_not_met(): void

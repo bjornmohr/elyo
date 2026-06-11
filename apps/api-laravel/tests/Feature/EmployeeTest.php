@@ -579,6 +579,91 @@ class EmployeeTest extends TestCase
         ]);
     }
 
+    public function test_company_admin_can_list_employee_surveys_for_themselves(): void
+    {
+        $admin = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::COMPANY_ADMIN,
+        ]);
+
+        Survey::create([
+            'company_id' => $this->company->id,
+            'title' => 'Admin Visible Survey',
+            'status' => SurveyStatus::ACTIVE,
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/employee/surveys')
+            ->assertStatus(200)
+            ->assertJsonFragment(['title' => 'Admin Visible Survey']);
+    }
+
+    public function test_company_admin_can_respond_to_employee_survey_and_view_own_result(): void
+    {
+        $admin = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::COMPANY_ADMIN,
+        ]);
+
+        $survey = Survey::create([
+            'company_id' => $this->company->id,
+            'title' => 'Admin Survey',
+            'status' => SurveyStatus::ACTIVE,
+        ]);
+
+        $question = SurveyQuestion::create([
+            'survey_id' => $survey->id,
+            'text' => 'Rate your energy',
+            'type' => QuestionType::SCALE,
+            'order' => 1,
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/employee/surveys/{$survey->id}/respond", [
+                'answers' => [['questionId' => $question->id, 'scaleValue' => 7]],
+            ])
+            ->assertStatus(200)
+            ->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('survey_responses', [
+            'user_id' => $admin->id,
+            'survey_id' => $survey->id,
+        ]);
+
+        // Admin can retrieve their own result; no other user's data is exposed.
+        $this->actingAs($admin, 'sanctum')
+            ->getJson("/api/employee/surveys/{$survey->id}/result")
+            ->assertStatus(200)
+            ->assertJsonPath('survey.id', $survey->id);
+    }
+
+    public function test_company_admin_cannot_retrieve_another_users_survey_result(): void
+    {
+        $admin = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::COMPANY_ADMIN,
+        ]);
+
+        $survey = Survey::create([
+            'company_id' => $this->company->id,
+            'title' => 'Employee Survey',
+            'status' => SurveyStatus::ACTIVE,
+        ]);
+
+        // Employee responds; admin has no response.
+        SurveyResponse::create([
+            'survey_id' => $survey->id,
+            'user_id' => $this->employee->id,
+            'company_id' => $this->company->id,
+            'submitted_at' => now(),
+        ]);
+
+        // Admin's own result is not found (no response for their user_id).
+        $this->actingAs($admin, 'sanctum')
+            ->getJson("/api/employee/surveys/{$survey->id}/result")
+            ->assertStatus(404);
+    }
+
     public function test_employee_team_targeted_surveys_are_not_available_when_team_layer_is_disabled(): void
     {
         $this->company->update(['team_layer_enabled' => false]);
@@ -1352,7 +1437,7 @@ class EmployeeTest extends TestCase
         ]);
     }
 
-    public function test_company_user_cannot_use_employee_measure_participation_endpoint()
+    public function test_company_admin_can_self_participate_through_employee_measure_endpoint()
     {
         $companyUser = User::factory()->create([
             'company_id' => $this->company->id,
@@ -1362,14 +1447,144 @@ class EmployeeTest extends TestCase
             'company_id' => $this->company->id,
             'team_id' => null,
             'status' => 'ACTIVE',
+            'verification_requirement' => Measure::VERIFICATION_REQUIREMENT_SELF_REPORT,
         ]);
 
         $this->actingAs($companyUser, 'sanctum')
             ->postJson("/api/employee/measures/{$measure->id}/participate")
-            ->assertStatus(403);
+            ->assertStatus(201);
+
+        $this->assertDatabaseHas('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $companyUser->id,
+            'company_id' => $this->company->id,
+        ]);
+        $this->assertSame(1, PointTransaction::query()
+            ->where('user_id', $companyUser->id)
+            ->where('reason', 'measure_participation')
+            ->count());
+    }
+
+    public function test_company_admin_can_list_own_visible_employee_measures()
+    {
+        $companyUser = User::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'role' => Role::COMPANY_ADMIN,
+        ]);
+        $globalMeasure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+        ]);
+        $teamMeasure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => Team::factory()->create(['company_id' => $this->company->id])->id,
+            'status' => 'ACTIVE',
+        ]);
+
+        $response = $this->actingAs($companyUser, 'sanctum')
+            ->getJson('/api/employee/measures')
+            ->assertStatus(200);
+
+        $ids = collect($response->json('data'))->pluck('id');
+        $this->assertTrue($ids->contains($globalMeasure->id));
+        $this->assertFalse($ids->contains($teamMeasure->id));
+    }
+
+    public function test_company_manager_participation_uses_own_team_scope_not_managed_team()
+    {
+        $managedTeam = Team::factory()->create(['company_id' => $this->company->id]);
+        $ownTeam = Team::factory()->create(['company_id' => $this->company->id]);
+        $manager = User::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $ownTeam->id,
+            'role' => Role::COMPANY_MANAGER,
+        ]);
+        $managedTeam->update(['manager_id' => $manager->id]);
+
+        $managedTeamMeasure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $managedTeam->id,
+            'status' => 'ACTIVE',
+            'verification_requirement' => Measure::VERIFICATION_REQUIREMENT_SELF_REPORT,
+        ]);
+        $ownTeamMeasure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $ownTeam->id,
+            'status' => 'ACTIVE',
+            'verification_requirement' => Measure::VERIFICATION_REQUIREMENT_SELF_REPORT,
+        ]);
+
+        $this->actingAs($manager, 'sanctum')
+            ->postJson("/api/employee/measures/{$managedTeamMeasure->id}/participate")
+            ->assertStatus(404);
+
+        $this->actingAs($manager, 'sanctum')
+            ->postJson("/api/employee/measures/{$ownTeamMeasure->id}/participate")
+            ->assertStatus(201);
+
+        $this->assertDatabaseHas('measure_participations', [
+            'measure_id' => $ownTeamMeasure->id,
+            'user_id' => $manager->id,
+            'team_id' => $ownTeam->id,
+        ]);
+        $this->assertDatabaseMissing('measure_participations', [
+            'measure_id' => $managedTeamMeasure->id,
+            'user_id' => $manager->id,
+        ]);
+    }
+
+    public function test_company_admin_can_redeem_qr_checkin_token_for_own_visible_measure(): void
+    {
+        $this->travelTo(Carbon::parse('2026-06-10 10:00:00'));
+        $companyUser = User::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'role' => Role::COMPANY_ADMIN,
+        ]);
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'verification_requirement' => 'QR_CODE',
+        ]);
+        $token = $this->actingAs($companyUser, 'sanctum')
+            ->postJson("/api/company/measures/{$measure->id}/checkin-token")
+            ->assertStatus(201)
+            ->json('data.token');
+
+        $this->actingAs($companyUser, 'sanctum')
+            ->postJson("/api/employee/measure-checkins/{$token}")
+            ->assertStatus(201)
+            ->assertJsonPath('data.participation.verificationType', 'QR_CHECKIN');
+
+        $this->assertDatabaseHas('measure_participations', [
+            'measure_id' => $measure->id,
+            'user_id' => $companyUser->id,
+            'verification_type' => 'QR_CHECKIN',
+        ]);
+    }
+
+    public function test_company_admin_cannot_participate_in_cross_company_measure()
+    {
+        $companyUser = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::COMPANY_ADMIN,
+        ]);
+        $foreignMeasure = Measure::factory()->create([
+            'company_id' => Company::factory()->create()->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'verification_requirement' => Measure::VERIFICATION_REQUIREMENT_SELF_REPORT,
+        ]);
+
+        $this->actingAs($companyUser, 'sanctum')
+            ->postJson("/api/employee/measures/{$foreignMeasure->id}/participate")
+            ->assertStatus(404);
 
         $this->assertDatabaseMissing('measure_participations', [
-            'measure_id' => $measure->id,
+            'measure_id' => $foreignMeasure->id,
             'user_id' => $companyUser->id,
         ]);
     }
@@ -1479,6 +1694,172 @@ class EmployeeTest extends TestCase
             'user_id' => $this->employee->id,
             'file_name' => 'report.pdf',
         ]);
+    }
+
+    public function test_pure_company_admin_can_submit_own_daily_checkin(): void
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $admin = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::COMPANY_ADMIN,
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/employee/checkin', ['mood' => 7, 'stress' => 4, 'energy' => 6])
+            ->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('wellbeing_entries', [
+            'user_id' => $admin->id,
+            'company_id' => $this->company->id,
+            'period_key' => '2026-05-25',
+        ]);
+        $this->assertDatabaseHas('point_transactions', [
+            'user_id' => $admin->id,
+            'reason' => 'daily_checkin',
+        ]);
+    }
+
+    public function test_pure_company_manager_can_submit_own_daily_checkin(): void
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $manager = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::COMPANY_MANAGER,
+        ]);
+
+        $this->actingAs($manager, 'sanctum')
+            ->postJson('/api/employee/checkin', ['mood' => 6, 'stress' => 5, 'energy' => 5])
+            ->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('wellbeing_entries', [
+            'user_id' => $manager->id,
+            'company_id' => $this->company->id,
+            'period_key' => '2026-05-25',
+        ]);
+    }
+
+    public function test_pure_company_owner_can_submit_own_daily_checkin(): void
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $owner = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::COMPANY_OWNER,
+        ]);
+
+        $this->actingAs($owner, 'sanctum')
+            ->postJson('/api/employee/checkin', ['mood' => 8, 'stress' => 2, 'energy' => 8])
+            ->assertStatus(200)
+            ->assertJson(['success' => true]);
+    }
+
+    public function test_company_admin_duplicate_checkin_is_rejected_like_employee(): void
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $admin = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::COMPANY_ADMIN,
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/employee/checkin', ['mood' => 7, 'stress' => 4, 'energy' => 6])
+            ->assertStatus(200);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/employee/checkin', ['mood' => 7, 'stress' => 4, 'energy' => 6])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'CHECKIN_ALREADY_DONE');
+    }
+
+    public function test_company_role_user_without_company_cannot_submit_checkin(): void
+    {
+        // users.company_id is NOT NULL, so this state cannot be persisted;
+        // exercise the controller's defensive guard with an in-memory user.
+        $admin = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::COMPANY_ADMIN,
+        ]);
+        $admin->company_id = null;
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/employee/checkin', ['mood' => 7, 'stress' => 4, 'energy' => 6])
+            ->assertStatus(403)
+            ->assertJson(['error' => 'Employee must belong to a company']);
+    }
+
+    public function test_company_admin_can_access_own_employee_dashboard_profile_and_history(): void
+    {
+        $admin = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::COMPANY_ADMIN,
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/employee/dashboard')
+            ->assertStatus(200)
+            ->assertJsonStructure(['latest', 'entries', 'streakCount']);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/employee/profile')
+            ->assertStatus(200)
+            ->assertJsonPath('data.id', $admin->id);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/employee/history')
+            ->assertStatus(200);
+    }
+
+    public function test_employee_checkin_ignores_injected_user_identifiers(): void
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+        $otherEmployee = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $admin = User::factory()->create([
+            'company_id' => $this->company->id,
+            'role' => Role::COMPANY_ADMIN,
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/employee/checkin', [
+                'mood' => 7,
+                'stress' => 4,
+                'energy' => 6,
+                'user_id' => $otherEmployee->id,
+                'userId' => $otherEmployee->id,
+                'employeeId' => $otherEmployee->id,
+            ])
+            ->assertStatus(200);
+
+        $this->assertDatabaseHas('wellbeing_entries', ['user_id' => $admin->id]);
+        $this->assertDatabaseMissing('wellbeing_entries', ['user_id' => $otherEmployee->id]);
+    }
+
+    public function test_internal_platform_user_remains_blocked_from_employee_routes(): void
+    {
+        $platformAdmin = User::factory()->platformAdmin()->create(['role' => Role::ELYO_ADMIN]);
+
+        $this->actingAs($platformAdmin, 'sanctum')
+            ->getJson('/api/employee/dashboard')
+            ->assertStatus(403)
+            ->assertJsonPath('error.code', 'PORTAL_FORBIDDEN');
+
+        $this->actingAs($platformAdmin, 'sanctum')
+            ->postJson('/api/employee/checkin', ['mood' => 7, 'stress' => 4, 'energy' => 6])
+            ->assertStatus(403)
+            ->assertJsonPath('error.code', 'PORTAL_FORBIDDEN');
+    }
+
+    public function test_internal_company_admin_without_employee_role_cannot_use_employee_portal(): void
+    {
+        $internalAdmin = User::factory()->platformAdmin()->create(['role' => Role::COMPANY_ADMIN]);
+
+        $this->actingAs($internalAdmin, 'sanctum')
+            ->postJson('/api/employee/checkin', ['mood' => 7, 'stress' => 4, 'energy' => 6])
+            ->assertStatus(403)
+            ->assertJsonPath('error.code', 'PORTAL_FORBIDDEN');
     }
 
     private function createDailyWellbeingEntry(User $user, string $periodKey, ?Company $company = null): WellbeingEntry

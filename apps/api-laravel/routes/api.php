@@ -113,8 +113,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/reports', [ReportController::class, 'index']);
     });
 
-    // Employee routes (EMPLOYEE only)
-    Route::middleware('role:EMPLOYEE')->prefix('employee')->group(function () {
+    // Employee self-service routes: eligibility is centralized in
+    // User::canUseEmployeePortal() via the portal middleware, so company
+    // roles can act on their own data without duplicating role lists here.
+    Route::middleware('portal:employee')->prefix('employee')->group(function () {
         Route::get('/dashboard', [EmployeeController::class, 'dashboard']);
         Route::get('/checkin/status', [EmployeeController::class, 'checkinStatus']);
         Route::post('/checkin', [EmployeeController::class, 'checkin']);

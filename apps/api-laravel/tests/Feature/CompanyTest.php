@@ -256,6 +256,199 @@ class CompanyTest extends TestCase
         $this->assertEquals(10.0, $response->json('data.questions.0.avgValue'));
     }
 
+    public function test_survey_results_exclude_report_viewer_responses_from_threshold_and_values()
+    {
+        $survey = Survey::factory()->create(['company_id' => $this->company->id]);
+        $question = SurveyQuestion::factory()->create([
+            'survey_id' => $survey->id,
+            'type' => QuestionType::SCALE,
+        ]);
+        $employees = User::factory()->count(3)->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $reportViewer = User::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        UserRole::create(['user_id' => $reportViewer->id, 'role' => Role::COMPANY_ADMIN]);
+
+        // 2 employee responses + 1 report-viewer response: raw count reaches the
+        // threshold of 3, but reportable count is 2, so results stay suppressed.
+        foreach ([$employees[0], $employees[1], $reportViewer] as $respondent) {
+            $this->createSurveyAnswer($survey, $question, $respondent, ['scale_value' => $respondent->is($reportViewer) ? 2 : 10]);
+        }
+
+        $this->actingAs($this->admin)
+            ->getJson("/api/company/surveys/{$survey->id}/results")
+            ->assertStatus(403)
+            ->assertJsonPath('isAboveThreshold', false)
+            ->assertJsonPath('suppressionReason', 'ANONYMITY_THRESHOLD_NOT_MET');
+
+        // Third employee response passes the reportable threshold; the report
+        // viewer must stay out of counts, eligible users, and averages.
+        $this->createSurveyAnswer($survey, $question, $employees[2], ['scale_value' => 10]);
+
+        $response = $this->actingAs($this->admin)->getJson("/api/company/surveys/{$survey->id}/results");
+        $response->assertStatus(200)
+            ->assertJsonPath('data.isAboveThreshold', true)
+            ->assertJsonPath('data.responseCount', 3)
+            ->assertJsonPath('data.participation.eligibleCount', 3)
+            ->assertJsonPath('data.participation.responseCount', 3);
+        $this->assertEquals(10.0, $response->json('data.questions.0.avgValue'));
+        $this->assertEquals(3, $response->json('data.questions.0.answerCount'));
+    }
+
+    public function test_company_dashboard_excludes_report_viewer_checkins_from_aggregates()
+    {
+        $employees = User::factory()->count(3)->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $reportViewer = User::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        UserRole::create(['user_id' => $reportViewer->id, 'role' => Role::COMPANY_MANAGER]);
+
+        foreach ($employees as $employee) {
+            WellbeingEntry::factory()->create([
+                'user_id' => $employee->id,
+                'company_id' => $this->company->id,
+                'score' => 6.0,
+                'period_key' => '2026-W10',
+            ]);
+        }
+        WellbeingEntry::factory()->create([
+            'user_id' => $reportViewer->id,
+            'company_id' => $this->company->id,
+            'score' => 1.0,
+            'period_key' => '2026-W10',
+        ]);
+
+        $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
+        $response->assertStatus(200);
+        $this->assertEquals(6.0, $response->json('company.avgScore'));
+        $this->assertEquals(3, $response->json('company.respondentCount'));
+        $this->assertEquals(3, $response->json('company.eligibleEmployeeCount'));
+    }
+
+    public function test_company_dashboard_stays_suppressed_when_only_report_viewer_checkins_reach_threshold()
+    {
+        $employees = User::factory()->count(2)->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $reportViewer = User::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        UserRole::create(['user_id' => $reportViewer->id, 'role' => Role::COMPANY_ADMIN]);
+
+        foreach ([$employees[0], $employees[1], $reportViewer] as $user) {
+            WellbeingEntry::factory()->create([
+                'user_id' => $user->id,
+                'company_id' => $this->company->id,
+                'score' => 5.0,
+                'period_key' => '2026-W10',
+            ]);
+        }
+
+        $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
+        $response->assertStatus(200);
+        $this->assertNull($response->json('company.avgScore'));
+        $this->assertFalse($response->json('company.isAboveThreshold'));
+    }
+
+    public function test_company_report_trends_exclude_report_viewer_checkins()
+    {
+        $employees = User::factory()->count(3)->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $reportViewer = User::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        UserRole::create(['user_id' => $reportViewer->id, 'role' => Role::COMPANY_MANAGER]);
+
+        // Period above threshold from employees alone; report viewer would
+        // drag the average down if counted.
+        foreach ($employees as $employee) {
+            WellbeingEntry::factory()->create([
+                'user_id' => $employee->id,
+                'company_id' => $this->company->id,
+                'score' => 8.0,
+                'period_key' => '2026-W01',
+            ]);
+        }
+        WellbeingEntry::factory()->create([
+            'user_id' => $reportViewer->id,
+            'company_id' => $this->company->id,
+            'score' => 0.0,
+            'period_key' => '2026-W01',
+        ]);
+
+        // Period where only the report viewer's entry would reach the threshold.
+        foreach ([$employees[0], $employees[1], $reportViewer] as $user) {
+            WellbeingEntry::factory()->create([
+                'user_id' => $user->id,
+                'company_id' => $this->company->id,
+                'score' => 5.0,
+                'period_key' => '2026-W02',
+            ]);
+        }
+
+        $response = $this->actingAs($this->admin)->getJson('/api/company/reports');
+        $response->assertStatus(200);
+
+        $periods = collect($response->json('data'))->keyBy('period');
+        $this->assertEquals(8.0, $periods->get('2026-W01')['avgScore']);
+        $this->assertFalse($periods->has('2026-W02'));
+    }
+
+    public function test_company_survey_response_count_excludes_report_viewers()
+    {
+        $survey = Survey::factory()->create(['company_id' => $this->company->id]);
+        $employee = User::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        $reportViewer = User::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => $this->team->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+        UserRole::create(['user_id' => $reportViewer->id, 'role' => Role::COMPANY_ADMIN]);
+
+        foreach ([$employee, $reportViewer] as $respondent) {
+            SurveyResponse::factory()->create([
+                'survey_id' => $survey->id,
+                'company_id' => $this->company->id,
+                'user_id' => $respondent->id,
+            ]);
+        }
+
+        $this->actingAs($this->admin)
+            ->getJson('/api/company/surveys')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.responsesCount', 1);
+
+        $this->actingAs($this->admin)
+            ->getJson("/api/company/surveys/{$survey->id}")
+            ->assertStatus(200)
+            ->assertJsonPath('data.responsesCount', 1);
+    }
+
     public function test_survey_results_show_scale_distribution_when_all_buckets_meet_threshold()
     {
         $survey = Survey::factory()->create(['company_id' => $this->company->id, 'status' => 'ACTIVE']);
@@ -1164,6 +1357,73 @@ class CompanyTest extends TestCase
                 ->assertStatus(422)
                 ->assertJsonValidationErrors(['status']);
         }
+    }
+
+    public function test_completed_measure_with_invalid_dates_returns_editability_error_not_date_error(): void
+    {
+        foreach (['COMPLETED', 'DISMISSED'] as $status) {
+            $measure = Measure::factory()->create([
+                'company_id' => $this->company->id,
+                'team_id' => null,
+                'status' => $status,
+                'execution_type' => 'EVENT_PARTICIPATION',
+                'starts_at' => '2026-06-20 09:00:00',
+                'ends_at' => '2026-06-20 10:00:00',
+                'duration_minutes' => 60,
+                'created_by' => $this->admin->id,
+            ]);
+
+            // Payload with inverted dates — date validation would fire endsAt error.
+            // Status/editability error must win because the measure is not editable.
+            $this->actingAs($this->admin)
+                ->patchJson("/api/company/measures/{$measure->id}", [
+                    'startsAt' => '2026-06-20 11:00:00',
+                    'endsAt'   => '2026-06-20 08:00:00',
+                ])
+                ->assertStatus(422)
+                ->assertJsonValidationErrors(['status'])
+                ->assertJsonMissingValidationErrors(['endsAt']);
+        }
+    }
+
+    public function test_active_measure_with_invalid_effective_dates_returns_field_level_validation(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'ACTIVE',
+            'execution_type' => 'EVENT_PARTICIPATION',
+            'starts_at' => '2026-06-20 09:00:00',
+            'ends_at' => '2026-06-20 10:00:00',
+            'duration_minutes' => 60,
+            'created_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$measure->id}", [
+                'startsAt' => '2026-06-20 11:00:00',
+                'endsAt'   => '2026-06-20 08:00:00',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['endsAt'])
+            ->assertJsonMissingValidationErrors(['status']);
+    }
+
+    public function test_status_only_patch_on_completed_measure_returns_transition_error_not_editability_error(): void
+    {
+        $measure = Measure::factory()->create([
+            'company_id' => $this->company->id,
+            'team_id' => null,
+            'status' => 'COMPLETED',
+            'created_by' => $this->admin->id,
+        ]);
+
+        // Status-only PATCH: domain data is empty, so editability check is skipped.
+        // Transition validation handles it and returns 400.
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$measure->id}", ['status' => 'ACTIVE'])
+            ->assertStatus(400)
+            ->assertJson(['error' => 'invalid_transition']);
     }
 
     public function test_measure_update_preserves_company_and_manager_scope(): void

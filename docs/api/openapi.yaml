@@ -11,7 +11,7 @@ tags:
   - name: Auth
     description: User authentication and registration
   - name: Employee
-    description: Endpoints for employees (check-ins, dashboard)
+    description: Self-service endpoints (check-ins, dashboard, measures, surveys, profile) available to all authenticated users with employee portal eligibility - EMPLOYEE as well as COMPANY_OWNER, COMPANY_ADMIN, and COMPANY_MANAGER acting on their own data. Every route operates only on the authenticated user. Users without employee portal eligibility (e.g. internal ELYO platform users) receive 403 PORTAL_FORBIDDEN.
   - name: Company
     description: Endpoints for company admins and managers
   - name: Partner
@@ -1002,6 +1002,7 @@ paths:
     get:
       tags: [Employee]
       summary: Get employee dashboard data
+      description: Returns the authenticated user's own wellbeing dashboard. Available to all users with employee portal eligibility, including COMPANY_OWNER, COMPANY_ADMIN, and COMPANY_MANAGER acting on their own data.
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -1020,11 +1021,14 @@ paths:
                   todayCheckinCompleted: { type: boolean }
         401:
           description: Unauthorized
+        403:
+          description: User lacks employee portal eligibility (PORTAL_FORBIDDEN).
 
   /employee/checkin:
     post:
       tags: [Employee]
       summary: Submit a wellbeing check-in
+      description: Writes a check-in for the authenticated user only. Company roles may check in for themselves; their entries are excluded from company/team aggregate reports and thresholds. Personal points and streaks are awarded regardless of role.
       security: [{ Sanctum: [] }]
       requestBody:
         required: true
@@ -1058,12 +1062,14 @@ paths:
                 error:
                   code: CHECKIN_ALREADY_DONE
                   message: Der Check-in wurde heute bereits abgeschlossen.
+        403:
+          description: User lacks employee portal eligibility (PORTAL_FORBIDDEN) or does not belong to a company.
 
   /employee/checkin/status:
     get:
       tags: [Employee]
       summary: Get daily check-in status
-      description: Returns whether the authenticated employee has already completed the check-in for the current daily period.
+      description: Returns whether the authenticated user has already completed the check-in for the current daily period. Available to all users with employee portal eligibility, including COMPANY_OWNER, COMPANY_ADMIN, and COMPANY_MANAGER acting on their own data.
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -1093,11 +1099,14 @@ paths:
                     entry: null
         401:
           description: Unauthorized
+        403:
+          description: User lacks employee portal eligibility (PORTAL_FORBIDDEN).
 
   /employee/history:
     get:
       tags: [Employee]
       summary: Get wellbeing history
+      description: Returns the authenticated user's own wellbeing history. Available to all users with employee portal eligibility, including COMPANY_OWNER, COMPANY_ADMIN, and COMPANY_MANAGER acting on their own data.
       security: [{ Sanctum: [] }]
       parameters:
         - name: limit
@@ -1114,11 +1123,14 @@ paths:
                   entries:
                     type: array
                     items: { $ref: '#/components/schemas/WellbeingEntry' }
+        403:
+          description: User lacks employee portal eligibility (PORTAL_FORBIDDEN).
 
   /employee/profile:
     get:
       tags: [Employee]
       summary: Get employee profile
+      description: Returns the authenticated user's own profile. Available to all users with employee portal eligibility, including COMPANY_OWNER, COMPANY_ADMIN, and COMPANY_MANAGER acting on their own data.
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -1129,9 +1141,12 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/User' }
+        403:
+          description: User lacks employee portal eligibility (PORTAL_FORBIDDEN).
     put:
       tags: [Employee]
       summary: Update employee profile
+      description: Updates the authenticated user's own profile. Available to all users with employee portal eligibility, including COMPANY_OWNER, COMPANY_ADMIN, and COMPANY_MANAGER acting on their own data.
       security: [{ Sanctum: [] }]
       requestBody:
         required: true
@@ -1150,12 +1165,14 @@ paths:
                 type: object
                 properties:
                   data: { $ref: '#/components/schemas/User' }
+        403:
+          description: User lacks employee portal eligibility (PORTAL_FORBIDDEN).
 
   /employee/measures:
     get:
       tags: [Employee]
       summary: List active measures visible to the authenticated employee
-      description: Returns active company-wide measures and active measures targeted to the authenticated employee's current team, including only that employee's participation state.
+      description: Returns active company-wide measures and active measures targeted to the authenticated user's current team, including only that user's own participation state. Available to all users with employee portal eligibility, including COMPANY_OWNER, COMPANY_ADMIN, and COMPANY_MANAGER acting on their own data.
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -1169,12 +1186,14 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/EmployeeMeasure'
+        403:
+          description: User lacks employee portal eligibility (PORTAL_FORBIDDEN).
 
   /employee/measures/{measure}/participate:
     post:
       tags: [Employee]
       summary: Participate in an active measure
-      description: Creates a participation for the authenticated employee. The request body is ignored; user, company, team, and participation time are derived server-side.
+      description: Creates a participation for the authenticated user. The request body is ignored; user, company, team, and participation time are derived server-side. Available to all users with employee portal eligibility, including COMPANY_OWNER, COMPANY_ADMIN, and COMPANY_MANAGER acting on their own data.
       security: [{ Sanctum: [] }]
       parameters:
         - name: measure
@@ -1191,8 +1210,10 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/EmployeeMeasure'
+        403:
+          description: User lacks employee portal eligibility (PORTAL_FORBIDDEN).
         404:
-          description: Measure not found or not visible to the authenticated employee
+          description: Measure not found or not visible to the authenticated user
         409:
           description: Duplicate participation, inactive visible measure, or measure requiring QR check-in
           content:
@@ -1207,7 +1228,7 @@ paths:
     post:
       tags: [Employee]
       summary: Redeem an authenticated QR measure check-in token
-      description: Creates a QR_CHECKIN participation for the authenticated employee when the token belongs to a QR_CODE measure. The request body is ignored; user, company, team, participation time, verification type, and points are derived server-side. Employees can only redeem tokens for active measures in their company and team scope.
+      description: Creates a QR_CHECKIN participation for the authenticated user when the token belongs to a QR_CODE measure. The request body is ignored; user, company, team, participation time, verification type, and points are derived server-side. Users can only redeem tokens for active measures in their company and team scope. Available to all users with employee portal eligibility, including COMPANY_OWNER, COMPANY_ADMIN, and COMPANY_MANAGER acting on their own data.
       security: [{ Sanctum: [] }]
       parameters:
         - name: token
@@ -1224,6 +1245,8 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/EmployeeMeasure'
+        403:
+          description: User lacks employee portal eligibility (PORTAL_FORBIDDEN).
         404:
           description: Token not found, measure not found, wrong company, or wrong team scope. All cases return CHECKIN_TOKEN_NOT_FOUND to avoid revealing token state across tenant boundaries.
           content:
@@ -1241,7 +1264,7 @@ paths:
     get:
       tags: [Employee]
       summary: List available surveys
-      description: When the company team layer is disabled, only company-wide surveys are returned; team-targeted surveys are filtered out.
+      description: Returns surveys visible to the authenticated user within their company scope. When the company team layer is disabled, only company-wide surveys are returned; team-targeted surveys are filtered out. Available to all users with employee portal eligibility, including COMPANY_OWNER, COMPANY_ADMIN, and COMPANY_MANAGER acting on their own data.
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -1262,12 +1285,14 @@ paths:
                         questionCount: { type: integer }
                         completed: { type: boolean }
                         endsAt: { type: string, format: date-time, nullable: true }
+        403:
+          description: User lacks employee portal eligibility (PORTAL_FORBIDDEN).
 
   /employee/surveys/{surveyId}:
     get:
       tags: [Employee]
       summary: Get survey details
-      description: Team-targeted surveys are not available to employees when the company team layer is disabled and return 404.
+      description: Returns survey details and questions for the authenticated user. Team-targeted surveys are not available when the company team layer is disabled and return 404. Available to all users with employee portal eligibility, including COMPANY_OWNER, COMPANY_ADMIN, and COMPANY_MANAGER acting on their own data.
       security: [{ Sanctum: [] }]
       parameters:
         - name: surveyId
@@ -1301,6 +1326,8 @@ paths:
                             options: { type: object, nullable: true }
                             scaleMinLabel: { type: string, nullable: true }
                             scaleMaxLabel: { type: string, nullable: true }
+        403:
+          description: User lacks employee portal eligibility (PORTAL_FORBIDDEN).
         404:
           description: Not found or not active
         409:
@@ -1310,7 +1337,7 @@ paths:
     post:
       tags: [Employee]
       summary: Submit survey responses
-      description: Team-targeted surveys are not answerable by employees when the company team layer is disabled and return 404.
+      description: Submits responses for the authenticated user. Team-targeted surveys are not answerable when the company team layer is disabled and return 404. Available to all users with employee portal eligibility, including COMPANY_OWNER, COMPANY_ADMIN, and COMPANY_MANAGER acting on their own data.
       security: [{ Sanctum: [] }]
       parameters:
         - name: surveyId
@@ -1343,6 +1370,8 @@ paths:
                 type: object
                 properties:
                   ok: { type: boolean }
+        403:
+          description: User lacks employee portal eligibility (PORTAL_FORBIDDEN).
         404:
           description: Survey not found, not active, or unavailable because the company team layer is disabled
 
@@ -1387,7 +1416,7 @@ paths:
     get:
       tags: [Company]
       summary: Get company dashboard data
-      description: Company-level dashboard remains available to company admins and owners when the team layer is disabled. Team-level aggregates are omitted in that state. Manager-only users are not company-portal eligible while the team layer is disabled and receive PORTAL_FORBIDDEN.
+      description: Company-level dashboard remains available to company admins and owners when the team layer is disabled. Team-level aggregates are omitted in that state. Manager-only users are not company-portal eligible while the team layer is disabled and receive PORTAL_FORBIDDEN. Users with reporting access (COMPANY_OWNER, COMPANY_ADMIN, COMPANY_MANAGER - including multi-role users who also hold EMPLOYEE) are excluded from aggregate values, eligible counts, and anonymity threshold calculations even when they check in personally.
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -1798,7 +1827,7 @@ paths:
     get:
       tags: [Company]
       summary: Get aggregated survey results
-      description: Team-scoped survey results are rejected with TEAM_LAYER_DISABLED when the company team layer is disabled. Company-wide survey results remain available.
+      description: Team-scoped survey results are rejected with TEAM_LAYER_DISABLED when the company team layer is disabled. Company-wide survey results remain available. Report-viewer roles (COMPANY_OWNER, COMPANY_ADMIN, COMPANY_MANAGER, including multi-role users who also hold EMPLOYEE) may respond personally, but their responses are excluded from response counts, eligible counts, aggregate values, and anonymity threshold checks.
       security: [{ Sanctum: [] }]
       parameters:
         - name: id
@@ -2011,7 +2040,7 @@ paths:
     get:
       tags: [Company]
       summary: Get aggregate measure participation summary
-      description: Returns measure-level aggregate participation metrics only. Individual participant records, user IDs, names, emails, raw participation rows, and per-user participation timestamps are never returned. teamBreakdown is a nullable future field; current backend responses return it as null, and non-null array data is reserved for a future privacy-reviewed team breakdown feature. Metrics are null when anonymity threshold suppression applies.
+      description: Returns measure-level aggregate participation metrics only. Individual participant records, user IDs, names, emails, raw participation rows, and per-user participation timestamps are never returned. teamBreakdown is a nullable future field; current backend responses return it as null, and non-null array data is reserved for a future privacy-reviewed team breakdown feature. Metrics are null when anonymity threshold suppression applies. Report-viewer roles (COMPANY_OWNER, COMPANY_ADMIN, COMPANY_MANAGER, including multi-role users) may participate personally but are excluded from eligible counts, participant counts, rates, and threshold checks.
       security: [{ Sanctum: [] }]
       parameters:
         - name: id
@@ -2088,7 +2117,7 @@ paths:
     get:
       tags: [Company]
       summary: Get aggregated report trend
-      description: Company-level trend reports remain available when the team layer is disabled. teamId filters return TEAM_LAYER_DISABLED; manager-only users without the team layer receive PORTAL_FORBIDDEN at the company portal guard.
+      description: Company-level trend reports remain available when the team layer is disabled. teamId filters return TEAM_LAYER_DISABLED; manager-only users without the team layer receive PORTAL_FORBIDDEN at the company portal guard. Report-viewer roles (COMPANY_OWNER, COMPANY_ADMIN, COMPANY_MANAGER, including multi-role users) are excluded from trend values and per-period threshold counts.
       security: [{ Sanctum: [] }]
       parameters:
         - name: limit
