@@ -12,6 +12,7 @@ class Measure extends Model
     use HasFactory;
 
     public const VERIFICATION_REQUIREMENT_SELF_REPORT = 'SELF_REPORT';
+    public const VERIFICATION_REQUIREMENT_QR_CODE = 'QR_CODE';
 
     protected $fillable = [
         'company_id', 'team_id', 'title', 'category',
@@ -58,5 +59,10 @@ class Measure extends Model
     public function participations(): HasMany
     {
         return $this->hasMany(MeasureParticipation::class);
+    }
+
+    public function checkinTokens(): HasMany
+    {
+        return $this->hasMany(MeasureCheckinToken::class);
     }
 }

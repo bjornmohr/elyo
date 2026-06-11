@@ -3,6 +3,8 @@
 use App\Http\Controllers\Admin\AdminCompanyController;
 use App\Http\Controllers\Admin\AdminPartnerController;
 use App\Http\Controllers\Admin\AdminPointsController;
+use App\Http\Controllers\Admin\SystemExerciseController;
+use App\Http\Controllers\Admin\SystemExerciseTagController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\InviteController;
 use App\Http\Controllers\Company\CompanyController;
@@ -58,6 +60,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/partners/{id}', [AdminPartnerController::class, 'update']);
         Route::get('/points-config', [AdminPointsController::class, 'index']);
         Route::put('/points-config', [AdminPointsController::class, 'update']);
+
+        Route::get('/system-exercises', [SystemExerciseController::class, 'index']);
+        Route::post('/system-exercises', [SystemExerciseController::class, 'store']);
+        Route::get('/system-exercises/{systemExercise}', [SystemExerciseController::class, 'show']);
+        Route::patch('/system-exercises/{systemExercise}', [SystemExerciseController::class, 'update']);
+        Route::post('/system-exercises/{systemExercise}/archive', [SystemExerciseController::class, 'archive']);
+        Route::get('/system-exercise-tags', [SystemExerciseTagController::class, 'index']);
     });
 
     // Company portal routes (COMPANY_OWNER, COMPANY_ADMIN, COMPANY_MANAGER)
@@ -85,6 +94,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/measures', [MeasureController::class, 'index']);
         Route::post('/measures', [MeasureController::class, 'store']);
+        Route::post('/measures/{measure}/checkin-token', [MeasureController::class, 'rotateCheckinToken']);
         Route::get('/measures/{id}/participation-summary', [MeasureController::class, 'participationSummary']);
         Route::patch('/measures/{id}', [MeasureController::class, 'update']);
 
@@ -102,6 +112,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/documents', [EmployeeController::class, 'uploadDocument']);
         Route::get('/measures', [EmployeeController::class, 'measures']);
         Route::post('/measures/{measure}/participate', [EmployeeController::class, 'participateInMeasure']);
+        Route::post('/measure-checkins/{token}', [EmployeeController::class, 'redeemMeasureCheckin']);
 
         Route::get('/surveys', [SurveyController::class, 'index']);
         Route::get('/surveys/{id}', [SurveyController::class, 'show']);

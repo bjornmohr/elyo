@@ -54,7 +54,7 @@ export interface SurveyResult {
 export interface EmployeeMeasureParticipation {
   isParticipating: boolean;
   participatedAt: string | null;
-  verificationType?: 'SELF_REPORTED';
+  verificationType?: 'SELF_REPORTED' | 'QR_CHECKIN' | null;
   verifiedAt?: string | null;
 }
 
@@ -65,7 +65,7 @@ export interface EmployeeMeasure {
   category: string | null;
   deliveryType?: 'REMOTE' | 'ONSITE' | 'HYBRID' | null;
   executionType?: string | null;
-  verificationRequirement?: string | null;
+  verificationRequirement?: 'SELF_REPORT' | 'QR_CODE' | null;
   startsAt?: string | null;
   endsAt?: string | null;
   durationMinutes?: number | null;
@@ -168,6 +168,10 @@ export class EmployeeService {
 
   participateInMeasure(measureId: number): Observable<{ data: EmployeeMeasure }> {
     return this.api.post<{ data: EmployeeMeasure }>(`/employee/measures/${measureId}/participate`, {});
+  }
+
+  redeemMeasureCheckin(token: string): Observable<{ data: EmployeeMeasure }> {
+    return this.api.post<{ data: EmployeeMeasure }>(`/employee/measure-checkins/${token}`, {});
   }
 
   uploadDocument(file: File): Observable<any> {

@@ -25,6 +25,7 @@ export const routes: Routes = [
       { path: 'profile', loadComponent: () => import('./features/employee/pages/profile/profile.component').then(m => m.ProfileComponent) },
       { path: 'surveys', loadComponent: () => import('./features/employee/pages/surveys/surveys.component').then(m => m.SurveysComponent) },
       { path: 'measures', loadComponent: () => import('./features/employee/pages/measures/measures.component').then(m => m.EmployeeMeasuresComponent) },
+      { path: 'measure-checkins/:token', loadComponent: () => import('./features/employee/pages/measure-checkin/measure-checkin.component').then(m => m.EmployeeMeasureCheckinComponent) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     ]
   },
@@ -56,6 +57,7 @@ export const routes: Routes = [
       { path: 'companies/create', loadComponent: () => import('./features/admin/pages/companies-create/companies-create.component').then(m => m.AdminCompaniesCreateComponent) },
       { path: 'users', loadComponent: () => import('./features/admin/pages/users/admin-users.component').then(m => m.AdminUsersComponent) },
       { path: 'points', loadComponent: () => import('./features/admin/pages/points/admin-points.component').then(m => m.AdminPointsComponent) },
+      { path: 'system-exercises', loadComponent: () => import('./features/admin/pages/system-exercises/admin-system-exercises.component').then(m => m.AdminSystemExercisesComponent) },
       { path: '', redirectTo: 'companies', pathMatch: 'full' },
     ]
   },

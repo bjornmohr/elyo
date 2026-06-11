@@ -5,6 +5,7 @@ import { ApiClient } from '../../../../core/services/api-client.service';
 import { Role } from '../../../../core/models/auth.models';
 import { AuthStore } from '../../../../core/store/auth.store';
 import { NotificationService } from '../../../../shared/notifications/notification.service';
+import { CompanyMeasuresService, MeasureCheckinTokenResponse } from '../../services/company-measures.service';
 
 interface MeasureParticipationSummary {
   measureId: number;
@@ -24,7 +25,7 @@ interface CompanyMeasure {
   status: string;
   deliveryType?: string | null;
   executionType?: string | null;
-  verificationRequirement?: string | null;
+  verificationRequirement?: 'SELF_REPORT' | 'QR_CODE' | null;
   startsAt?: string | null;
   endsAt?: string | null;
   durationMinutes?: number | null;
@@ -34,6 +35,10 @@ interface CompanyMeasure {
   capacity?: number | null;
   pointsOverride?: number | null;
   team?: { name: string } | null;
+}
+
+interface MeasureCheckinLink extends MeasureCheckinTokenResponse {
+  checkinUrl: string;
 }
 
 @Component({
@@ -150,6 +155,7 @@ interface CompanyMeasure {
                 <select formControlName="verificationRequirement"
                         class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500">
                   <option value="SELF_REPORT">Selbstmeldung</option>
+                  <option value="QR_CODE">QR-Check-in</option>
                 </select>
               </label>
             </div>
@@ -233,6 +239,7 @@ interface CompanyMeasure {
                 <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Details</th>
                 <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Teilnahme</th>
                 <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Status</th>
+                <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Check-in</th>
               </tr>
               </thead>
               <tbody>
@@ -272,6 +279,33 @@ interface CompanyMeasure {
                     </td>
                     <td class="px-4 py-3"><span
                       class="px-2 py-0.5 rounded-full text-xs bg-teal-50 text-teal-700">{{ measure.status }}</span></td>
+                    <td class="px-4 py-3">
+                      @if (measure.verificationRequirement !== 'QR_CODE') {
+                        <span class="text-xs text-gray-400">Nicht erforderlich</span>
+                      } @else if (checkinLinkFor(measure.id); as link) {
+                        <div class="space-y-2">
+                          <input readonly [value]="link.checkinUrl"
+                                 class="w-72 max-w-full rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600"/>
+                          <div class="flex gap-2">
+                            <button type="button" (click)="copyCheckinLink(link.checkinUrl)"
+                                    class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                              Kopieren
+                            </button>
+                            <button type="button" (click)="rotateCheckinLink(measure)"
+                                    [disabled]="isRotatingCheckin(measure.id)"
+                                    class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:text-gray-300">
+                              Erneuern
+                            </button>
+                          </div>
+                        </div>
+                      } @else {
+                        <button type="button" (click)="rotateCheckinLink(measure)"
+                                [disabled]="measure.status !== 'ACTIVE' || isRotatingCheckin(measure.id)"
+                                class="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:bg-gray-300">
+                          {{ isRotatingCheckin(measure.id) ? 'Wird erstellt…' : 'Link erstellen' }}
+                        </button>
+                      }
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -284,6 +318,7 @@ interface CompanyMeasure {
 })
 export class CompanyMeasuresComponent implements OnInit {
   private api = inject(ApiClient);
+  private companyMeasuresService = inject(CompanyMeasuresService);
   private authStore = inject(AuthStore);
   private fb = inject(FormBuilder);
   private notifications = inject(NotificationService);
@@ -295,6 +330,8 @@ export class CompanyMeasuresComponent implements OnInit {
   showForm = signal(false);
   formError = signal<string | null>(null);
   participationSummaries = signal<Record<number, MeasureParticipationSummary | null>>({});
+  checkinLinks = signal<Record<number, MeasureCheckinLink>>({});
+  rotatingCheckinIds = signal<Set<number>>(new Set());
 
   measureForm = this.fb.group({
     title: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(100)]],
@@ -434,6 +471,58 @@ export class CompanyMeasuresComponent implements OnInit {
     return `${summary.participantCount} von ${summary.eligibleCount} Berechtigten`;
   }
 
+  checkinLinkFor(measureId: number) {
+    return this.checkinLinks()[measureId] ?? null;
+  }
+
+  isRotatingCheckin(measureId: number) {
+    return this.rotatingCheckinIds().has(measureId);
+  }
+
+  rotateCheckinLink(measure: CompanyMeasure) {
+    if (measure.verificationRequirement !== 'QR_CODE') {
+      this.notifications.error('Check-in-Links sind nur für QR-Maßnahmen verfügbar.');
+      return;
+    }
+
+    this.setRotatingCheckin(measure.id, true);
+    this.companyMeasuresService.generateMeasureCheckinToken(measure.id).subscribe({
+      next: res => {
+        const link = res.data;
+        this.checkinLinks.update(links => ({
+          ...links,
+          [measure.id]: {
+            ...link,
+            checkinUrl: this.browserCheckinUrl(link.checkinPath),
+          },
+        }));
+        this.notifications.success('Check-in-Link wurde erstellt.');
+        this.setRotatingCheckin(measure.id, false);
+      },
+      error: err => {
+        const code = err.error?.error?.code;
+        const message = code === 'MEASURE_NOT_ACTIVE'
+          ? 'Nur aktive Maßnahmen können Check-in-Links erhalten.'
+          : code === 'MEASURE_DOES_NOT_ALLOW_QR_CHECKIN'
+            ? 'Check-in-Links sind nur für QR-Maßnahmen verfügbar.'
+            : 'Check-in-Link konnte nicht erstellt werden.';
+        this.notifications.error(message);
+        this.setRotatingCheckin(measure.id, false);
+      },
+    });
+  }
+
+  copyCheckinLink(url: string) {
+    if (!navigator.clipboard) {
+      this.notifications.error('Link konnte nicht kopiert werden.');
+      return;
+    }
+
+    navigator.clipboard.writeText(url)
+      .then(() => this.notifications.success('Check-in-Link wurde kopiert.'))
+      .catch(() => this.notifications.error('Link konnte nicht kopiert werden.'));
+  }
+
   label(value: string | null | undefined) {
     return value ? value.toLowerCase().replace(/_/g, ' ') : '-';
   }
@@ -478,6 +567,22 @@ export class CompanyMeasuresComponent implements OnInit {
   private isManagerOnly() {
     const roles = this.authStore.roles();
     return roles.includes(Role.COMPANY_MANAGER) && !roles.some(role => [Role.COMPANY_ADMIN, Role.COMPANY_OWNER].includes(role as Role));
+  }
+
+  private setRotatingCheckin(measureId: number, loading: boolean) {
+    this.rotatingCheckinIds.update(ids => {
+      const next = new Set(ids);
+      if (loading) {
+        next.add(measureId);
+      } else {
+        next.delete(measureId);
+      }
+      return next;
+    });
+  }
+
+  private browserCheckinUrl(path: string) {
+    return `${window.location.origin}${path}`;
   }
 
   private validationMessage(err: any) {

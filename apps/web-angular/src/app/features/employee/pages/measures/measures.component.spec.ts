@@ -20,6 +20,7 @@ describe('EmployeeMeasuresComponent', () => {
     title: 'Workshop',
     description: 'Stressbewusster Arbeitsalltag',
     category: 'mental',
+    verificationRequirement: 'SELF_REPORT',
     team: null,
     participation: {
       isParticipating: false,
@@ -54,6 +55,31 @@ describe('EmployeeMeasuresComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Teilnehmen');
   });
 
+  it('shows QR check-in guidance instead of self-report for QR-required measures', () => {
+    employeeService.getMeasures.mockReturnValue(of([{
+      ...availableMeasure,
+      verificationRequirement: 'QR_CODE',
+    }]));
+    const fixture = TestBed.createComponent(EmployeeMeasuresComponent);
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('QR-Check-in erforderlich');
+    expect(text).toContain('Teilnahme vor Ort per QR-Code');
+    expect(text).not.toContain('Teilnehmen');
+  });
+
+  it('does not call the self-report endpoint for QR-required measures', () => {
+    const qrMeasure: EmployeeMeasure = { ...availableMeasure, verificationRequirement: 'QR_CODE' };
+    const fixture = TestBed.createComponent(EmployeeMeasuresComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.participate(qrMeasure);
+
+    expect(employeeService.participateInMeasure).not.toHaveBeenCalled();
+    expect(notifications.error).toHaveBeenCalledWith('Diese Maßnahme erfordert einen QR-Check-in vor Ort.');
+  });
+
   it('marks a measure as participated after successful participation', () => {
     employeeService.participateInMeasure.mockReturnValue(of({
       data: {
@@ -76,6 +102,7 @@ describe('EmployeeMeasuresComponent', () => {
 
   it('treats duplicate participation as already participated', () => {
     employeeService.participateInMeasure.mockReturnValue(throwError(() => ({
+      status: 409,
       error: {
         error: {
           code: 'MEASURE_ALREADY_PARTICIPATED',
