@@ -49,7 +49,7 @@ class CreateMeasureRequest extends FormRequest
 
     public function withValidator($validator): void
     {
-        $validator->sometimes('endsAt', 'after_or_equal:startsAt', function (): bool {
+        $validator->sometimes('endsAt', 'after:startsAt', function (): bool {
             return $this->filled('startsAt') && $this->filled('endsAt');
         });
     }

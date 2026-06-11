@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Company;
 
 use App\Enums\Role;
-use App\Models\Measure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -17,6 +16,9 @@ class PatchMeasureRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'title' => ['sometimes', 'required', 'string', 'min:3', 'max:100'],
+            'category' => ['sometimes', 'required', 'string', 'in:workshop,flexibility,sport,mental,nutrition'],
+            'description' => ['sometimes', 'required', 'string', 'min:10', 'max:500'],
             'status' => 'sometimes|required|string|in:ACTIVE,COMPLETED,DISMISSED',
             'deliveryType' => ['sometimes', 'string', Rule::in(CreateMeasureRequest::DELIVERY_TYPES)],
             'executionType' => ['sometimes', 'string', Rule::in(CreateMeasureRequest::EXECUTION_TYPES)],
@@ -34,36 +36,11 @@ class PatchMeasureRequest extends FormRequest
 
     public function withValidator($validator): void
     {
-        $validator->sometimes('endsAt', 'after_or_equal:startsAt', function (): bool {
+        // Syntactic payload validation only. Effective date validation against
+        // persisted measure values runs in MeasureController after the scoped
+        // measure lookup, so out-of-scope managers get 403 instead of 422.
+        $validator->sometimes('endsAt', 'after:startsAt', function (): bool {
             return $this->filled('startsAt') && $this->filled('endsAt');
-        });
-
-        $validator->after(function ($validator): void {
-            if ($validator->errors()->has('startsAt') || $validator->errors()->has('endsAt')) {
-                return;
-            }
-
-            $measure = Measure::where('id', $this->route('id'))
-                ->where('company_id', $this->user()->company_id)
-                ->first();
-
-            if (! $measure) {
-                return;
-            }
-
-            $startsAt = $this->has('startsAt')
-                ? ($this->filled('startsAt') ? $this->date('startsAt') : null)
-                : $measure->starts_at;
-            $endsAt = $this->has('endsAt')
-                ? ($this->filled('endsAt') ? $this->date('endsAt') : null)
-                : $measure->ends_at;
-
-            if ($startsAt && $endsAt && $endsAt->lt($startsAt)) {
-                $validator->errors()->add('endsAt', __('validation.after_or_equal', [
-                    'attribute' => 'ends at',
-                    'date' => 'starts at',
-                ]));
-            }
         });
     }
 }

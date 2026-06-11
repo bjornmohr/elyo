@@ -68,6 +68,21 @@ class AuthTest extends TestCase
         $response->assertStatus(422);
     }
 
+    public function test_login_requires_email_and_password(): void
+    {
+        $this->postJson('/api/auth/login', [])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['email', 'password']);
+
+        $this->postJson('/api/auth/login', ['password' => 'password'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['email']);
+
+        $this->postJson('/api/auth/login', ['email' => 'employee@example.test'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['password']);
+    }
+
     public function test_login_does_not_reveal_email_existence()
     {
         $response = $this->postJson('/api/auth/login', [

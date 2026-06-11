@@ -33,8 +33,13 @@ import { AuthLayoutComponent } from '../components/auth-layout.component';
               type="email"
               formControlName="email"
               placeholder="name&#64;unternehmen.de"
-              class="w-full px-4 py-2.5 rounded-xl border bg-stone-50 text-sm text-gray-900 outline-none transition-colors focus:border-teal-500 border-gray-200"
+              class="w-full px-4 py-2.5 rounded-xl border bg-stone-50 text-sm text-gray-900 outline-none transition-colors focus:border-teal-500"
+              [class.border-red-300]="fieldInvalid('email')"
+              [class.border-gray-200]="!fieldInvalid('email')"
             />
+            @if (fieldMessage('email'); as message) {
+              <p class="text-xs text-red-600">{{ message }}</p>
+            }
           </div>
 
           <div class="space-y-1.5">
@@ -43,13 +48,18 @@ import { AuthLayoutComponent } from '../components/auth-layout.component';
               type="password"
               formControlName="password"
               placeholder="••••••••"
-              class="w-full px-4 py-2.5 rounded-xl border bg-stone-50 text-sm text-gray-900 outline-none transition-colors focus:border-teal-500 border-gray-200"
+              class="w-full px-4 py-2.5 rounded-xl border bg-stone-50 text-sm text-gray-900 outline-none transition-colors focus:border-teal-500"
+              [class.border-red-300]="fieldInvalid('password')"
+              [class.border-gray-200]="!fieldInvalid('password')"
             />
+            @if (fieldMessage('password'); as message) {
+              <p class="text-xs text-red-600">{{ message }}</p>
+            }
           </div>
 
           <button
             type="submit"
-            [disabled]="loginForm.invalid || loading()"
+            [disabled]="loading()"
             class="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold text-white transition-all duration-200 mt-2"
             [style.background]="loading() ? '#9ca3af' : 'linear-gradient(135deg, #14b8a6, #0d9488)'"
             [style.cursor]="loading() ? 'not-allowed' : 'pointer'"
@@ -88,6 +98,7 @@ export class LoginComponent implements OnInit {
 
   loading = signal(false);
   error = signal<string | null>(null);
+  fieldErrors = signal<Record<string, string>>({});
 
   ngOnInit() {
     if (this.authStore.isAuthenticated()) {
@@ -111,7 +122,13 @@ export class LoginComponent implements OnInit {
   }
 
   onSubmit() {
-    if (this.loginForm.invalid) return;
+    this.error.set(null);
+    this.fieldErrors.set({});
+
+    if (this.loginForm.invalid) {
+      this.loginForm.markAllAsTouched();
+      return;
+    }
 
     this.submitLogin(this.authService.detectPortalFromHostname());
   }
@@ -135,11 +152,49 @@ export class LoginComponent implements OnInit {
           this.error.set('Sie haben keinen Zugang zu diesem Portal.');
           this.loading.set(false);
         } else {
-          this.error.set('E-Mail oder Passwort falsch.');
+          this.applyLoginError(err);
           this.loading.set(false);
         }
       }
     });
+  }
+
+  fieldInvalid(control: string) {
+    const field = this.loginForm.get(control);
+    return !!this.fieldErrors()[control] || (!!field && field.invalid && (field.dirty || field.touched));
+  }
+
+  fieldMessage(control: string) {
+    const backendMessage = this.fieldErrors()[control];
+    if (backendMessage) return backendMessage;
+
+    const field = this.loginForm.get(control);
+    if (!field || !(field.dirty || field.touched) || !field.errors) return null;
+
+    if (field.errors['required']) return control === 'email' ? 'E-Mail ist erforderlich.' : 'Passwort ist erforderlich.';
+    if (field.errors['email']) return 'Bitte eine gültige E-Mail-Adresse eingeben.';
+
+    return 'Eingabe ist ungültig.';
+  }
+
+  private applyLoginError(err: any) {
+    const errors = err.error?.errors as Record<string, string[]> | undefined;
+    const emailMessage = errors?.['email']?.[0] ?? '';
+
+    if (err.status === 422 && emailMessage.includes('Anmeldedaten')) {
+      this.error.set('E-Mail oder Passwort ist ungültig.');
+      return;
+    }
+
+    if (errors) {
+      this.fieldErrors.set(Object.fromEntries(
+        Object.entries(errors).map(([key, messages]) => [key, messages[0]])
+      ));
+      this.error.set('Bitte prüfe die markierten Felder.');
+      return;
+    }
+
+    this.error.set('E-Mail oder Passwort ist ungültig.');
   }
 
   private redirectAfterAuth(portal = this.authStore.activePortal()) {

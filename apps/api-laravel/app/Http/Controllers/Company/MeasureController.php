@@ -14,7 +14,9 @@ use App\Services\AnonymityService;
 use App\Services\Company\TeamLayerGuard;
 use App\Services\MeasureCheckinTokenService;
 use App\Services\MeasureParticipationSummaryService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class MeasureController extends Controller
@@ -126,7 +128,25 @@ class MeasureController extends Controller
             abort(403);
         }
 
-        $updateData = $this->measureDomainData($request->validated());
+        $this->validateEffectiveDateRange($request, $measure);
+
+        $updateData = $this->measureDomainData($request->validated(), $measure);
+
+        if (in_array($measure->status, ['COMPLETED', 'DISMISSED'], true) && $updateData !== []) {
+            throw ValidationException::withMessages([
+                'status' => ['Completed or dismissed measures cannot be edited.'],
+            ]);
+        }
+
+        if (
+            array_key_exists('verification_requirement', $updateData)
+            && $updateData['verification_requirement'] !== $measure->verification_requirement
+            && $measure->participations()->exists()
+        ) {
+            throw ValidationException::withMessages([
+                'verificationRequirement' => ['Verification requirement cannot be changed after participation exists.'],
+            ]);
+        }
 
         if ($request->has('status')) {
             $validTransitions = [
@@ -201,9 +221,31 @@ class MeasureController extends Controller
         ], 201);
     }
 
-    private function measureDomainData(array $validated): array
+    private function validateEffectiveDateRange(PatchMeasureRequest $request, Measure $measure): void
+    {
+        $startsAt = $request->has('startsAt')
+            ? ($request->filled('startsAt') ? $request->date('startsAt') : null)
+            : $measure->starts_at;
+        $endsAt = $request->has('endsAt')
+            ? ($request->filled('endsAt') ? $request->date('endsAt') : null)
+            : $measure->ends_at;
+
+        if ($startsAt && $endsAt && $endsAt->lte($startsAt)) {
+            throw ValidationException::withMessages([
+                'endsAt' => [__('validation.after', [
+                    'attribute' => 'ends at',
+                    'date' => 'starts at',
+                ])],
+            ]);
+        }
+    }
+
+    private function measureDomainData(array $validated, ?Measure $measure = null): array
     {
         $map = [
+            'title' => 'title',
+            'category' => 'category',
+            'description' => 'description',
             'deliveryType' => 'delivery_type',
             'executionType' => 'execution_type',
             'verificationRequirement' => 'verification_requirement',
@@ -224,7 +266,60 @@ class MeasureController extends Controller
             }
         }
 
+        // Normalize explicit timezone offsets to UTC; Eloquent would otherwise
+        // store the wall time of the submitted offset as if it were UTC.
+        foreach (['starts_at', 'ends_at'] as $column) {
+            if (isset($data[$column])) {
+                $data[$column] = CarbonImmutable::parse($data[$column])->utc();
+            }
+        }
+
+        $this->deriveScheduledDuration($data, $validated, $measure);
+
         return $data;
+    }
+
+    private function deriveScheduledDuration(array &$data, array $validated, ?Measure $measure): void
+    {
+        $touchesSchedule = array_intersect(
+            ['startsAt', 'endsAt', 'durationMinutes', 'executionType'],
+            array_keys($validated)
+        ) !== [];
+
+        if ($measure !== null && ! $touchesSchedule) {
+            return;
+        }
+
+        $executionType = $validated['executionType'] ?? $measure?->execution_type ?? 'EVENT_PARTICIPATION';
+        if (! in_array($executionType, ['EVENT_PARTICIPATION', 'GUIDED_SESSION'], true)) {
+            return;
+        }
+
+        $startsAt = array_key_exists('startsAt', $validated)
+            ? ($validated['startsAt'] !== null ? CarbonImmutable::parse($validated['startsAt']) : null)
+            : ($measure?->starts_at ? CarbonImmutable::parse($measure->starts_at) : null);
+
+        $endsAt = array_key_exists('endsAt', $validated)
+            ? ($validated['endsAt'] !== null ? CarbonImmutable::parse($validated['endsAt']) : null)
+            : ($measure?->ends_at ? CarbonImmutable::parse($measure->ends_at) : null);
+
+        if ($startsAt && $endsAt) {
+            $data['duration_minutes'] = (int) $startsAt->diffInMinutes($endsAt);
+
+            return;
+        }
+
+        // Incomplete schedule window: an explicitly provided durationMinutes
+        // stays as manual duration (measureDomainData already copied it).
+        if (array_key_exists('durationMinutes', $validated)) {
+            return;
+        }
+
+        // Only clear a previously derived value when a boundary update leaves
+        // the window incomplete, never on unrelated schedule-field updates.
+        if ($measure !== null && (array_key_exists('startsAt', $validated) || array_key_exists('endsAt', $validated))) {
+            $data['duration_minutes'] = null;
+        }
     }
 
     private function findCompanyManageableMeasure(Request $request, int|string $id): Measure

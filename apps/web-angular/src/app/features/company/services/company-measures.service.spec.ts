@@ -4,12 +4,14 @@ import { ApiClient } from '../../../core/services/api-client.service';
 import { CompanyMeasuresService } from './company-measures.service';
 
 describe('CompanyMeasuresService', () => {
-  let api: { post: ReturnType<typeof vi.fn> };
+  let api: { get: ReturnType<typeof vi.fn>; post: ReturnType<typeof vi.fn>; patch: ReturnType<typeof vi.fn> };
   let service: CompanyMeasuresService;
 
   beforeEach(() => {
     api = {
+      get: vi.fn(() => of({ data: [] })),
       post: vi.fn(() => of({ data: { measureId: 3 } })),
+      patch: vi.fn(() => of({ data: { id: 3 } })),
     };
 
     TestBed.configureTestingModule({
@@ -37,5 +39,33 @@ describe('CompanyMeasuresService', () => {
     expect(body).not.toHaveProperty('companyId');
     expect(body).not.toHaveProperty('participated_at');
     expect(body).not.toHaveProperty('participatedAt');
+  });
+
+  it('lists company measures through the company measure endpoint', () => {
+    service.listMeasures().subscribe();
+
+    expect(api.get).toHaveBeenCalledWith('/company/measures');
+  });
+
+  it('loads the participation summary for a measure', () => {
+    service.getParticipationSummary(3).subscribe();
+
+    expect(api.get).toHaveBeenCalledWith('/company/measures/3/participation-summary');
+  });
+
+  it('creates a company measure through the company measure endpoint', () => {
+    const payload = { title: 'Measure' };
+
+    service.createMeasure(payload).subscribe();
+
+    expect(api.post).toHaveBeenCalledWith('/company/measures', payload);
+  });
+
+  it('updates a company measure through the existing patch endpoint', () => {
+    const payload = { title: 'Updated measure' };
+
+    service.updateMeasure(3, payload).subscribe();
+
+    expect(api.patch).toHaveBeenCalledWith('/company/measures/3', payload);
   });
 });
