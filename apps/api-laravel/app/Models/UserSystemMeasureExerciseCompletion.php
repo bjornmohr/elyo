@@ -11,8 +11,7 @@ class UserSystemMeasureExerciseCompletion extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_system_measure_id', 'user_system_measure_exercise_id',
-        'user_id', 'company_id',
+        'user_system_measure_exercise_id',
         'completed_at', 'period_key',
         'feedback_text', 'effort_rating', 'difficulty_rating',
         'pain_before_rating', 'pain_after_rating',
@@ -31,24 +30,9 @@ class UserSystemMeasureExerciseCompletion extends Model
         'points_awarded' => 'integer',
     ];
 
-    public function userSystemMeasure(): BelongsTo
-    {
-        return $this->belongsTo(UserSystemMeasure::class);
-    }
-
     public function exercise(): BelongsTo
     {
         return $this->belongsTo(UserSystemMeasureExercise::class, 'user_system_measure_exercise_id');
-    }
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function company(): BelongsTo
-    {
-        return $this->belongsTo(Company::class);
     }
 
     public function pointsTransaction(): BelongsTo

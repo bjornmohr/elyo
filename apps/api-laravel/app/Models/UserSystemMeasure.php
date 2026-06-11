@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class UserSystemMeasure extends Model
 {
@@ -18,7 +19,7 @@ class UserSystemMeasure extends Model
     public const STATUS_ARCHIVED = 'ARCHIVED';
 
     protected $fillable = [
-        'user_id', 'company_id',
+        'user_id',
         'source_system_measure_template_id', 'assigned_by_user_id',
         'title', 'description', 'assignment_reason', 'recommendation_context',
         'status', 'starts_at', 'ends_at', 'assigned_at', 'completed_at',
@@ -51,11 +52,6 @@ class UserSystemMeasure extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function company(): BelongsTo
-    {
-        return $this->belongsTo(Company::class);
-    }
-
     public function sourceTemplate(): BelongsTo
     {
         return $this->belongsTo(SystemMeasureTemplate::class, 'source_system_measure_template_id');
@@ -71,8 +67,11 @@ class UserSystemMeasure extends Model
         return $this->hasMany(UserSystemMeasureExercise::class)->orderBy('position');
     }
 
-    public function completions(): HasMany
+    public function completions(): HasManyThrough
     {
-        return $this->hasMany(UserSystemMeasureExerciseCompletion::class);
+        return $this->hasManyThrough(
+            UserSystemMeasureExerciseCompletion::class,
+            UserSystemMeasureExercise::class,
+        );
     }
 }

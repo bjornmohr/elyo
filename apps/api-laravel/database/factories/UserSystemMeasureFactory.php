@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Company;
 use App\Models\User;
 use App\Models\UserSystemMeasure;
 use App\Models\UserSystemMeasureExercise;
@@ -16,9 +15,6 @@ class UserSystemMeasureFactory extends Factory
     {
         return [
             'user_id' => User::factory(),
-            'company_id' => fn (array $attributes): int => is_numeric($attributes['user_id'])
-                ? (int) (User::find($attributes['user_id'])?->company_id ?? Company::factory()->create()->id)
-                : Company::factory()->create()->id,
             'source_system_measure_template_id' => null,
             'assigned_by_user_id' => null,
             'title' => fake()->sentence(4),

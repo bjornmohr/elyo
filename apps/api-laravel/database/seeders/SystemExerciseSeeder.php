@@ -148,7 +148,7 @@ class SystemExerciseSeeder extends Seeder
                 'slug' => '4-7-8-atemuebung',
                 'title' => '4-7-8 Atemübung',
                 'short_description' => 'Beruhigende Atemtechnik zur Stressreduktion.',
-                'description' => 'Die 4-7-8 Atemtechnik senkt nachweislich den Stresslevel und kann bei Unruhe, Einschlafproblemen und akutem Stress helfen.',
+                'description' => 'Die 4-7-8 Atemtechnik ist als kurze Orientierung für bewusste Stressregulation gedacht und kann zur kurzen Entlastung beitragen.',
                 'exercise_type' => 'BREATHING',
                 'difficulty' => 'BEGINNER',
                 'default_duration_minutes' => 5,
@@ -211,7 +211,7 @@ class SystemExerciseSeeder extends Seeder
                         $tagIds[] = $tag->id;
                     }
                 }
-                $exercise->tags()->syncWithoutDetaching($tagIds);
+                $exercise->tags()->sync($tagIds);
             }
         }
     }
@@ -256,7 +256,7 @@ class SystemExerciseSeeder extends Seeder
                 'slug' => '5-minuten-stress-reset',
                 'title' => '5-Minuten Stress Reset',
                 'short_description' => 'Schnelle Stressreduktion in 5 Minuten.',
-                'description' => 'Ein kompaktes Programm aus Atemübung und Achtsamkeit, das in jede Pause passt und nachweislich den Stresslevel senkt.',
+                'description' => 'Ein kompaktes Programm aus Atemübung und Achtsamkeit, das in jede Pause passt und eine bewusste Unterbrechung unterstützt.',
                 'goal_summary' => 'Akuten Stress schnell reduzieren',
                 'difficulty' => 'BEGINNER',
                 'estimated_duration_minutes' => 7,

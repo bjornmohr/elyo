@@ -105,7 +105,6 @@ return new class extends Migration
         Schema::create('user_system_measures', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('user_id');
-            $table->unsignedBigInteger('company_id');
             $table->unsignedBigInteger('source_system_measure_template_id')->nullable();
             $table->unsignedBigInteger('assigned_by_user_id')->nullable();
             $table->string('title');
@@ -124,10 +123,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['user_id', 'status']);
-            $table->index('company_id');
 
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
             $table->foreign('source_system_measure_template_id')->references('id')->on('system_measure_templates')->onDelete('set null');
             $table->foreign('assigned_by_user_id')->references('id')->on('users')->onDelete('set null');
         });
@@ -163,12 +160,12 @@ return new class extends Migration
             $table->foreign('source_system_exercise_id')->references('id')->on('system_exercises')->onDelete('set null');
         });
 
+        // Completion feedback and pain/stress ratings are user-level health-adjacent data.
+        // No company reporting endpoint exists in this slice. Future company aggregation
+        // must use thresholds/suppression and must not expose feedback text or individual ratings.
         Schema::create('user_system_measure_exercise_completions', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('user_system_measure_id');
             $table->unsignedBigInteger('user_system_measure_exercise_id');
-            $table->unsignedBigInteger('user_id');
-            $table->unsignedBigInteger('company_id');
             $table->timestamp('completed_at');
             $table->string('period_key')->nullable();
             $table->text('feedback_text')->nullable();
@@ -182,14 +179,9 @@ return new class extends Migration
             $table->unsignedBigInteger('points_transaction_id')->nullable();
             $table->timestamps();
 
-            $table->index('user_system_measure_id');
             $table->index('user_system_measure_exercise_id');
-            $table->index('user_id');
 
-            $table->foreign('user_system_measure_id')->references('id')->on('user_system_measures')->onDelete('cascade');
             $table->foreign('user_system_measure_exercise_id')->references('id')->on('user_system_measure_exercises')->onDelete('cascade');
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
             $table->foreign('points_transaction_id')->references('id')->on('point_transactions')->onDelete('set null');
         });
     }

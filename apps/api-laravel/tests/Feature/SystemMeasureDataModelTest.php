@@ -242,31 +242,27 @@ class SystemMeasureDataModelTest extends TestCase
 
     // ── UserSystemMeasure ──
 
-    public function test_user_system_measure_belongs_to_user_and_company(): void
+    public function test_user_system_measure_belongs_to_user(): void
     {
-        $company = Company::factory()->create();
-        $user = User::factory()->create(['company_id' => $company->id]);
+        $user = User::factory()->create();
 
         $userMeasure = UserSystemMeasure::factory()->create([
             'user_id' => $user->id,
-            'company_id' => $company->id,
         ]);
 
         $this->assertSame($user->id, $userMeasure->user->id);
-        $this->assertSame($company->id, $userMeasure->company->id);
     }
 
-    public function test_user_system_measure_stores_company_id_matching_user(): void
+    public function test_company_is_derived_through_user(): void
     {
         $company = Company::factory()->create();
         $user = User::factory()->create(['company_id' => $company->id]);
 
         $userMeasure = UserSystemMeasure::factory()->create([
             'user_id' => $user->id,
-            'company_id' => $company->id,
         ]);
 
-        $this->assertSame((int) $user->company_id, (int) $userMeasure->company_id);
+        $this->assertSame($company->id, $userMeasure->user->company->id);
     }
 
     public function test_user_system_measure_defaults_to_assigned_status(): void
@@ -283,7 +279,6 @@ class SystemMeasureDataModelTest extends TestCase
 
         UserSystemMeasure::factory()->count(3)->create([
             'user_id' => $user->id,
-            'company_id' => $user->company_id,
         ]);
 
         $this->assertCount(3, $user->fresh()->userSystemMeasures);
@@ -296,7 +291,6 @@ class SystemMeasureDataModelTest extends TestCase
         $user = User::factory()->create();
         UserSystemMeasure::factory()->create([
             'user_id' => $user->id,
-            'company_id' => $user->company_id,
         ]);
 
         $user->delete();
@@ -322,9 +316,6 @@ class SystemMeasureDataModelTest extends TestCase
         ]);
         UserSystemMeasureExerciseCompletion::factory()->create([
             'user_system_measure_exercise_id' => $exercise->id,
-            'user_system_measure_id' => $userMeasure->id,
-            'user_id' => $userMeasure->user_id,
-            'company_id' => $userMeasure->company_id,
         ]);
 
         $exercise->delete();
@@ -355,18 +346,48 @@ class SystemMeasureDataModelTest extends TestCase
 
     // ── Completion ──
 
-    public function test_exercise_completion_can_store_feedback_without_points(): void
+    public function test_completion_belongs_to_assigned_exercise(): void
     {
         $userMeasure = UserSystemMeasure::factory()->create();
         $exercise = UserSystemMeasureExercise::factory()->create([
             'user_system_measure_id' => $userMeasure->id,
         ]);
 
+        $completion = UserSystemMeasureExerciseCompletion::factory()->create([
+            'user_system_measure_exercise_id' => $exercise->id,
+        ]);
+
+        $this->assertSame($exercise->id, $completion->exercise->id);
+    }
+
+    public function test_completion_user_derived_through_exercise_chain(): void
+    {
+        $company = Company::factory()->create();
+        $user = User::factory()->create(['company_id' => $company->id]);
+        $userMeasure = UserSystemMeasure::factory()->create(['user_id' => $user->id]);
+        $exercise = UserSystemMeasureExercise::factory()->create([
+            'user_system_measure_id' => $userMeasure->id,
+        ]);
+
+        $completion = UserSystemMeasureExerciseCompletion::factory()->create([
+            'user_system_measure_exercise_id' => $exercise->id,
+        ]);
+
+        // Derive user through: completion -> exercise -> userSystemMeasure -> user
+        $derivedUser = $completion->exercise->userSystemMeasure->user;
+        $this->assertSame($user->id, $derivedUser->id);
+
+        // Derive company through: ... -> user -> company
+        $derivedCompany = $derivedUser->company;
+        $this->assertSame($company->id, $derivedCompany->id);
+    }
+
+    public function test_exercise_completion_can_store_feedback_without_points(): void
+    {
+        $exercise = UserSystemMeasureExercise::factory()->create();
+
         $completion = UserSystemMeasureExerciseCompletion::create([
             'user_system_measure_exercise_id' => $exercise->id,
-            'user_system_measure_id' => $userMeasure->id,
-            'user_id' => $userMeasure->user_id,
-            'company_id' => $userMeasure->company_id,
             'completed_at' => now(),
             'feedback_text' => 'Felt great after this exercise.',
             'effort_rating' => 3,
@@ -388,16 +409,10 @@ class SystemMeasureDataModelTest extends TestCase
 
     public function test_exercise_can_have_multiple_completions(): void
     {
-        $userMeasure = UserSystemMeasure::factory()->create();
-        $exercise = UserSystemMeasureExercise::factory()->create([
-            'user_system_measure_id' => $userMeasure->id,
-        ]);
+        $exercise = UserSystemMeasureExercise::factory()->create();
 
         UserSystemMeasureExerciseCompletion::factory()->count(3)->create([
             'user_system_measure_exercise_id' => $exercise->id,
-            'user_system_measure_id' => $userMeasure->id,
-            'user_id' => $userMeasure->user_id,
-            'company_id' => $userMeasure->company_id,
         ]);
 
         $this->assertCount(3, $exercise->fresh()->completions);
@@ -417,15 +432,27 @@ class SystemMeasureDataModelTest extends TestCase
 
         $completion = UserSystemMeasureExerciseCompletion::create([
             'user_system_measure_exercise_id' => $exercise->id,
-            'user_system_measure_id' => $userMeasure->id,
-            'user_id' => $userMeasure->user_id,
-            'company_id' => $userMeasure->company_id,
             'completed_at' => now(),
             'points_awarded' => 10,
             'points_transaction_id' => $transaction->id,
         ]);
 
         $this->assertSame($transaction->id, $completion->fresh()->pointsTransaction->id);
+    }
+
+    public function test_default_completion_factory_creates_consistent_data(): void
+    {
+        $completion = UserSystemMeasureExerciseCompletion::factory()->create();
+
+        $exercise = $completion->exercise;
+        $this->assertNotNull($exercise);
+
+        $userMeasure = $exercise->userSystemMeasure;
+        $this->assertNotNull($userMeasure);
+
+        $user = $userMeasure->user;
+        $this->assertNotNull($user);
+        $this->assertNotNull($user->company);
     }
 
     // ── Seeder ──
