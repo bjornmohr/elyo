@@ -1474,6 +1474,15 @@ class CompanyTest extends TestCase
             ->assertStatus(200)
             ->assertJsonPath('data.endsAt', '2026-06-20T11:00:00.000000Z')
             ->assertJsonPath('data.durationMinutes', 120);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/company/measures/{$response->json('data.id')}", [
+                'startsAt' => '2026-06-20T10:00:00+02:00',
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('data.startsAt', '2026-06-20T08:00:00.000000Z')
+            ->assertJsonPath('data.endsAt', '2026-06-20T11:00:00.000000Z')
+            ->assertJsonPath('data.durationMinutes', 180);
     }
 
     public function test_measure_domain_field_validation_rejects_invalid_values(): void

@@ -402,6 +402,7 @@ export class CompanyMeasuresComponent implements OnInit {
   formError = signal<string | null>(null);
   fieldErrors = signal<Record<string, string>>({});
   editingMeasureId = signal<number | null>(null);
+  editingHadCompleteScheduledWindow = signal(false);
   participationSummaries = signal<Record<number, MeasureParticipationSummary | null>>({});
   checkinLinks = signal<Record<number, MeasureCheckinLink>>({});
   rotatingCheckinIds = signal<Set<number>>(new Set());
@@ -598,6 +599,12 @@ export class CompanyMeasuresComponent implements OnInit {
     }
 
     this.editingMeasureId.set(measure.id);
+    this.editingHadCompleteScheduledWindow.set(
+      !!measure.startsAt
+      && !!measure.endsAt
+      && !!measure.executionType
+      && SCHEDULED_EXECUTION_TYPES.includes(measure.executionType)
+    );
     this.fieldErrors.set({});
     this.formError.set(null);
     this.measureForm.reset({
@@ -716,6 +723,13 @@ export class CompanyMeasuresComponent implements OnInit {
     const durationPreview = this.durationPreviewMinutes();
     if (durationPreview !== null) {
       payload['durationMinutes'] = durationPreview;
+    } else if (
+      this.editingMeasureId()
+      && this.editingHadCompleteScheduledWindow()
+      && SCHEDULED_EXECUTION_TYPES.includes(String(rawPayload.executionType))
+      && (!rawPayload.startsAt || !rawPayload.endsAt)
+    ) {
+      payload['durationMinutes'] = null;
     }
 
     const editingId = this.editingMeasureId();
@@ -729,6 +743,7 @@ export class CompanyMeasuresComponent implements OnInit {
 
   resetForm() {
     this.editingMeasureId.set(null);
+    this.editingHadCompleteScheduledWindow.set(false);
     this.fieldErrors.set({});
     this.formError.set(null);
     this.measureForm.reset({

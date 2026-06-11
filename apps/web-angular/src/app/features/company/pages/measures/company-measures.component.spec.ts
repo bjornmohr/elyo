@@ -379,6 +379,37 @@ describe('CompanyMeasuresComponent', () => {
     }));
   });
 
+  it('clears stale derived duration when an edited scheduled measure loses a schedule boundary', () => {
+    companyMeasuresService.listMeasures.mockReturnValue(of({
+      data: [{
+        id: 12,
+        title: 'Derived duration measure',
+        category: 'sport',
+        description: 'A scheduled measure with derived duration.',
+        status: 'ACTIVE',
+        executionType: 'EVENT_PARTICIPATION',
+        startsAt: '2026-06-20T09:00:00.000000Z',
+        endsAt: '2026-06-20T10:00:00.000000Z',
+        durationMinutes: 60,
+        team: null,
+      }],
+    }));
+    companyMeasuresService.updateMeasure.mockReturnValue(of({ data: { id: 12, title: 'Derived duration measure' } }));
+
+    const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.editMeasure(fixture.componentInstance.measures()[0]);
+    fixture.componentInstance.measureForm.patchValue({ endsAt: null });
+    fixture.componentInstance.submit();
+
+    expect(companyMeasuresService.updateMeasure).toHaveBeenCalledWith(12, expect.objectContaining({
+      startsAt: new Date('2026-06-20T09:00:00Z').toISOString(),
+      endsAt: null,
+      durationMinutes: null,
+    }));
+  });
+
   it('calls the update service when saving a valid edit', () => {
     const fixture = TestBed.createComponent(CompanyMeasuresComponent);
     fixture.detectChanges();
