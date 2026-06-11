@@ -22,6 +22,7 @@ class SystemMeasureTemplateFactory extends Factory
             'short_description' => fake()->sentence(),
             'description' => fake()->paragraph(),
             'goal_summary' => null,
+            'category' => SystemMeasureTemplate::CATEGORY_MIXED,
             'difficulty' => SystemMeasureTemplate::DIFFICULTY_BEGINNER,
             'estimated_duration_minutes' => fake()->randomElement([15, 30, 45, 60]),
             'recommended_frequency' => SystemMeasureTemplate::FREQUENCY_DAILY,
@@ -29,6 +30,7 @@ class SystemMeasureTemplateFactory extends Factory
             'streak_enabled' => true,
             'requires_feedback' => true,
             'status' => SystemMeasureTemplate::STATUS_ACTIVE,
+            'is_featured' => false,
             'created_by_user_id' => null,
         ];
     }

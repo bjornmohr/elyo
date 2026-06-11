@@ -273,6 +273,167 @@ components:
             to: { type: integer, nullable: true }
             total: { type: integer }
 
+    SystemMeasureTemplateStatus:
+      type: string
+      enum: [DRAFT, ACTIVE, ARCHIVED]
+
+    SystemMeasureTemplateCategory:
+      type: string
+      enum: [MOBILITY, STRENGTH, BREATHING, MINDFULNESS, EDUCATION, REFLECTION, MIXED]
+
+    SystemMeasureTemplateDifficulty:
+      type: string
+      enum: [BEGINNER, INTERMEDIATE, ADVANCED]
+
+    AdminSystemMeasureTemplateExercise:
+      type: object
+      properties:
+        id: { type: integer }
+        systemExerciseId: { type: integer }
+        sortOrder:
+          type: integer
+          description: API name for the persisted template exercise position.
+        customTitle: { type: string, nullable: true }
+        customInstructions: { type: string, nullable: true }
+        customDurationMinutes: { type: integer, nullable: true }
+        customSets: { type: integer, nullable: true }
+        customRepetitions: { type: integer, nullable: true }
+        customHoldSeconds: { type: integer, nullable: true }
+        customFeedbackPrompt: { type: string, nullable: true }
+        isRequired: { type: boolean }
+        exercise: { $ref: '#/components/schemas/AdminSystemExercise' }
+
+    AdminSystemMeasureTemplate:
+      type: object
+      properties:
+        id: { type: integer }
+        slug:
+          type: string
+          description: Generated server-side from the title on create; never changed on update.
+        title: { type: string }
+        shortDescription: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        category: { $ref: '#/components/schemas/SystemMeasureTemplateCategory' }
+        difficulty: { $ref: '#/components/schemas/SystemMeasureTemplateDifficulty' }
+        estimatedDurationMinutes: { type: integer, nullable: true }
+        status: { $ref: '#/components/schemas/SystemMeasureTemplateStatus' }
+        isFeatured: { type: boolean }
+        exerciseCount:
+          type: integer
+          description: Included on list and detail responses.
+        exercises:
+          type: array
+          description: Included on detail responses.
+          items: { $ref: '#/components/schemas/AdminSystemMeasureTemplateExercise' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    AdminSystemMeasureTemplateCreatePayload:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, maxLength: 255 }
+        shortDescription: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        category:
+          allOf:
+            - $ref: '#/components/schemas/SystemMeasureTemplateCategory'
+          description: Defaults to MIXED when omitted.
+        difficulty:
+          allOf:
+            - $ref: '#/components/schemas/SystemMeasureTemplateDifficulty'
+          description: Defaults to BEGINNER when omitted.
+        estimatedDurationMinutes: { type: integer, minimum: 1, maximum: 100000, nullable: true }
+        status:
+          allOf:
+            - $ref: '#/components/schemas/SystemMeasureTemplateStatus'
+          description: Defaults to DRAFT when omitted.
+        isFeatured:
+          type: boolean
+          description: Defaults to false when omitted.
+
+    AdminSystemMeasureTemplateUpdatePayload:
+      type: object
+      description: PATCH semantics. Only provided fields are updated. The slug is never regenerated.
+      properties:
+        title: { type: string, maxLength: 255 }
+        shortDescription: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        category: { $ref: '#/components/schemas/SystemMeasureTemplateCategory' }
+        difficulty: { $ref: '#/components/schemas/SystemMeasureTemplateDifficulty' }
+        estimatedDurationMinutes: { type: integer, minimum: 1, maximum: 100000, nullable: true }
+        status: { $ref: '#/components/schemas/SystemMeasureTemplateStatus' }
+        isFeatured: { type: boolean }
+
+    AdminSystemMeasureTemplateExerciseCreatePayload:
+      type: object
+      required: [systemExerciseId]
+      properties:
+        systemExerciseId:
+          type: integer
+          description: Existing active system exercise ID. Archived exercises and duplicate exercises in the same template are rejected.
+        sortOrder: { type: integer, minimum: 1, maximum: 100000 }
+        customTitle: { type: string, maxLength: 255, nullable: true }
+        customInstructions: { type: string, nullable: true }
+        customDurationMinutes: { type: integer, minimum: 1, maximum: 100000, nullable: true }
+        customSets: { type: integer, minimum: 1, maximum: 100000, nullable: true }
+        customRepetitions: { type: integer, minimum: 1, maximum: 100000, nullable: true }
+        customHoldSeconds: { type: integer, minimum: 1, maximum: 100000, nullable: true }
+        customFeedbackPrompt: { type: string, nullable: true }
+        isRequired:
+          type: boolean
+          description: Defaults to true when omitted.
+
+    AdminSystemMeasureTemplateExerciseUpdatePayload:
+      type: object
+      properties:
+        sortOrder: { type: integer, minimum: 1, maximum: 100000 }
+        customTitle: { type: string, maxLength: 255, nullable: true }
+        customInstructions: { type: string, nullable: true }
+        customDurationMinutes: { type: integer, minimum: 1, maximum: 100000, nullable: true }
+        customSets: { type: integer, minimum: 1, maximum: 100000, nullable: true }
+        customRepetitions: { type: integer, minimum: 1, maximum: 100000, nullable: true }
+        customHoldSeconds: { type: integer, minimum: 1, maximum: 100000, nullable: true }
+        customFeedbackPrompt: { type: string, nullable: true }
+        isRequired: { type: boolean }
+
+    AdminSystemMeasureTemplateExercisesReorderPayload:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [id, sortOrder]
+            properties:
+              id: { type: integer }
+              sortOrder: { type: integer, minimum: 1, maximum: 100000 }
+
+    AdminSystemMeasureTemplateListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AdminSystemMeasureTemplate' }
+        links:
+          type: object
+          properties:
+            first: { type: string, nullable: true }
+            last: { type: string, nullable: true }
+            prev: { type: string, nullable: true }
+            next: { type: string, nullable: true }
+        meta:
+          type: object
+          properties:
+            current_page: { type: integer }
+            from: { type: integer, nullable: true }
+            last_page: { type: integer }
+            per_page: { type: integer }
+            to: { type: integer, nullable: true }
+            total: { type: integer }
+
     WellbeingEntry:
       type: object
       properties:
@@ -2216,6 +2377,290 @@ paths:
           description: Forbidden (not a platform admin role)
         404:
           description: Not found
+
+  /admin/system-measure-templates:
+    get:
+      tags: [Admin]
+      summary: List system measure templates
+      description: Platform admin only (ELYO_ADMIN, ELYO_SUPPORT). Returns newest templates first.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: search
+          in: query
+          description: Matches title, short description, description and slug (case-insensitive).
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/SystemMeasureTemplateStatus' }
+        - name: category
+          in: query
+          schema: { $ref: '#/components/schemas/SystemMeasureTemplateCategory' }
+        - name: difficulty
+          in: query
+          schema: { $ref: '#/components/schemas/SystemMeasureTemplateDifficulty' }
+        - name: isFeatured
+          in: query
+          schema: { type: boolean }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: perPage
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+      responses:
+        200:
+          description: Paginated system measure templates
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminSystemMeasureTemplateListResponse' }
+        401:
+          description: Unauthenticated
+        403:
+          description: Forbidden (not a platform admin role)
+        422:
+          description: Invalid filter value
+    post:
+      tags: [Admin]
+      summary: Create system measure template
+      description: Platform admin only. The slug is generated server-side from the title and remains stable on update.
+      security: [{ Sanctum: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminSystemMeasureTemplateCreatePayload' }
+      responses:
+        201:
+          description: Created system measure template
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AdminSystemMeasureTemplate' }
+        401:
+          description: Unauthenticated
+        403:
+          description: Forbidden (not a platform admin role)
+        422:
+          description: Validation error
+
+  /admin/system-measure-templates/{systemMeasureTemplate}:
+    get:
+      tags: [Admin]
+      summary: Show system measure template
+      description: Returns editable template detail with ordered template exercises.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: systemMeasureTemplate
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: System measure template detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AdminSystemMeasureTemplate' }
+        401:
+          description: Unauthenticated
+        403:
+          description: Forbidden (not a platform admin role)
+        404:
+          description: Not found
+    patch:
+      tags: [Admin]
+      summary: Update system measure template
+      description: Platform admin only. The slug is never regenerated on update. There is no hard delete; use archive.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: systemMeasureTemplate
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminSystemMeasureTemplateUpdatePayload' }
+      responses:
+        200:
+          description: Updated system measure template
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AdminSystemMeasureTemplate' }
+        401:
+          description: Unauthenticated
+        403:
+          description: Forbidden (not a platform admin role)
+        404:
+          description: Not found
+        422:
+          description: Validation error
+
+  /admin/system-measure-templates/{systemMeasureTemplate}/archive:
+    post:
+      tags: [Admin]
+      summary: Archive system measure template
+      description: Sets status to ARCHIVED. Idempotent. Template exercises and user snapshots are kept.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: systemMeasureTemplate
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Archived system measure template
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AdminSystemMeasureTemplate' }
+        401:
+          description: Unauthenticated
+        403:
+          description: Forbidden (not a platform admin role)
+        404:
+          description: Not found
+
+  /admin/system-measure-templates/{systemMeasureTemplate}/exercises:
+    post:
+      tags: [Admin]
+      summary: Add exercise to system measure template
+      description: Adds an existing active System Exercise to the template. Does not create or mutate the underlying System Exercise.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: systemMeasureTemplate
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminSystemMeasureTemplateExerciseCreatePayload' }
+      responses:
+        201:
+          description: Created template exercise relationship
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AdminSystemMeasureTemplateExercise' }
+        401:
+          description: Unauthenticated
+        403:
+          description: Forbidden (not a platform admin role)
+        404:
+          description: Template or exercise not found
+        422:
+          description: Validation error, archived exercise, duplicate exercise, or occupied sort order
+
+  /admin/system-measure-templates/{systemMeasureTemplate}/exercises/{templateExercise}:
+    patch:
+      tags: [Admin]
+      summary: Update template exercise overrides
+      description: Updates only template-specific override fields and sort order. The underlying System Exercise is not modified. Child rows outside the template return 404.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: systemMeasureTemplate
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: templateExercise
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminSystemMeasureTemplateExerciseUpdatePayload' }
+      responses:
+        200:
+          description: Updated template exercise relationship
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AdminSystemMeasureTemplateExercise' }
+        401:
+          description: Unauthenticated
+        403:
+          description: Forbidden (not a platform admin role)
+        404:
+          description: Template exercise not found for this template
+        422:
+          description: Validation error or occupied sort order
+    delete:
+      tags: [Admin]
+      summary: Remove exercise from system measure template
+      description: Deletes only the template-exercise relationship. The template and underlying System Exercise are kept.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: systemMeasureTemplate
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: templateExercise
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        204:
+          description: Template exercise relationship removed
+        401:
+          description: Unauthenticated
+        403:
+          description: Forbidden (not a platform admin role)
+        404:
+          description: Template exercise not found for this template
+
+  /admin/system-measure-templates/{systemMeasureTemplate}/exercises/reorder:
+    post:
+      tags: [Admin]
+      summary: Reorder template exercises
+      description: Updates template exercise sortOrder values in a transaction. Child rows outside the template return 404 and no positions are changed.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: systemMeasureTemplate
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminSystemMeasureTemplateExercisesReorderPayload' }
+      responses:
+        200:
+          description: Updated ordered template exercises
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/AdminSystemMeasureTemplateExercise' }
+        401:
+          description: Unauthenticated
+        403:
+          description: Forbidden (not a platform admin role)
+        404:
+          description: One or more template exercises do not belong to this template
+        422:
+          description: Validation error
 
   /admin/system-exercise-tags:
     get:
