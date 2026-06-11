@@ -410,6 +410,41 @@ describe('CompanyMeasuresComponent', () => {
     }));
   });
 
+  it('keeps a manual duration the user typed after clearing a schedule boundary', () => {
+    companyMeasuresService.listMeasures.mockReturnValue(of({
+      data: [{
+        id: 13,
+        title: 'Rescheduled measure',
+        category: 'sport',
+        description: 'A scheduled measure being rescheduled.',
+        status: 'ACTIVE',
+        executionType: 'EVENT_PARTICIPATION',
+        startsAt: '2026-06-20T09:00:00.000000Z',
+        endsAt: '2026-06-20T10:00:00.000000Z',
+        durationMinutes: 60,
+        team: null,
+      }],
+    }));
+    companyMeasuresService.updateMeasure.mockReturnValue(of({ data: { id: 13, title: 'Rescheduled measure' } }));
+
+    const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.editMeasure(fixture.componentInstance.measures()[0]);
+    fixture.componentInstance.measureForm.patchValue({ endsAt: null });
+
+    const durationControl = fixture.componentInstance.measureForm.get('durationMinutes')!;
+    durationControl.setValue(45);
+    durationControl.markAsDirty();
+
+    fixture.componentInstance.submit();
+
+    expect(companyMeasuresService.updateMeasure).toHaveBeenCalledWith(13, expect.objectContaining({
+      endsAt: null,
+      durationMinutes: 45,
+    }));
+  });
+
   it('calls the update service when saving a valid edit', () => {
     const fixture = TestBed.createComponent(CompanyMeasuresComponent);
     fixture.detectChanges();

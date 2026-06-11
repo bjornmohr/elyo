@@ -726,8 +726,12 @@ export class CompanyMeasuresComponent implements OnInit {
     } else if (
       this.editingMeasureId()
       && this.editingHadCompleteScheduledWindow()
-      && SCHEDULED_EXECUTION_TYPES.includes(String(rawPayload.executionType))
+      && !!rawPayload.executionType
+      && SCHEDULED_EXECUTION_TYPES.includes(rawPayload.executionType)
       && (!rawPayload.startsAt || !rawPayload.endsAt)
+      // Only clear the stale derived value; a duration the user typed after
+      // breaking the schedule window is an intentional manual duration.
+      && !this.measureForm.get('durationMinutes')?.dirty
     ) {
       payload['durationMinutes'] = null;
     }
