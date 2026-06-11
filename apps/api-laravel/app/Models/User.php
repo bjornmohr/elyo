@@ -105,6 +105,11 @@ class User extends Authenticatable
         return $this->hasMany(PushSubscription::class);
     }
 
+    public function userSystemMeasures(): HasMany
+    {
+        return $this->hasMany(UserSystemMeasure::class);
+    }
+
     public function notificationPreference(): HasOne
     {
         return $this->hasOne(NotificationPreference::class);
