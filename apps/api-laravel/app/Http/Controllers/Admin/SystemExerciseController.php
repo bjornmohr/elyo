@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\CreateSystemExerciseRequest;
 use App\Http\Requests\Admin\UpdateSystemExerciseRequest;
 use App\Http\Resources\Admin\SystemExerciseResource;
 use App\Models\SystemExercise;
+use App\Models\SystemExerciseTag;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -53,7 +54,15 @@ class SystemExerciseController extends Controller
                 SystemExercise::DIFFICULTY_INTERMEDIATE,
                 SystemExercise::DIFFICULTY_ADVANCED,
             ])],
-            'tagCategory' => ['sometimes', 'string'],
+            'tagCategory' => ['sometimes', Rule::in([
+                SystemExerciseTag::CATEGORY_BODY_REGION,
+                SystemExerciseTag::CATEGORY_GOAL,
+                SystemExerciseTag::CATEGORY_SETTING,
+                SystemExerciseTag::CATEGORY_EQUIPMENT,
+                SystemExerciseTag::CATEGORY_CONTRAINDICATION,
+                SystemExerciseTag::CATEGORY_PERSONA_HINT,
+                SystemExerciseTag::CATEGORY_HEALTH_FOCUS,
+            ])],
             'tagKey' => ['sometimes', 'string'],
             'perPage' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'page' => ['sometimes', 'integer', 'min:1'],

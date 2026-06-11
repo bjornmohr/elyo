@@ -248,6 +248,14 @@ class AdminSystemExerciseTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_list_rejects_invalid_tag_category_filter(): void
+    {
+        $this->actingAs($this->platformAdmin)
+            ->getJson('/api/admin/system-exercises?tagCategory=BOGUS')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['tagCategory']);
+    }
+
     public function test_list_paginates(): void
     {
         SystemExercise::factory()->count(3)->create();
