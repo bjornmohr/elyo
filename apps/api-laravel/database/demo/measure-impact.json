@@ -1,0 +1,8 @@
+{
+  "windowWeeks": 4,
+  "participants": { "n": 45, "scoreBefore": 47, "scoreAfter": 58 },
+  "control": { "n": 165, "scoreBefore": 47, "scoreAfter": 49 },
+  "netEffect": 9,
+  "rating": 3,
+  "isAboveThreshold": true
+}

@@ -1,0 +1,64 @@
+{
+  "fields": [
+    {
+      "field": "SLEEP",
+      "fieldLabel": "Schlaf",
+      "measureCount": 0,
+      "avgParticipationRate": null,
+      "isAboveThreshold": true,
+      "avgImpactRating": null,
+      "impactIsPreliminary": false,
+      "fieldTrend30d": 12
+    },
+    {
+      "field": "BACK",
+      "fieldLabel": "Rücken",
+      "measureCount": 1,
+      "avgParticipationRate": 78,
+      "isAboveThreshold": true,
+      "avgImpactRating": null,
+      "impactIsPreliminary": false,
+      "fieldTrend30d": 15
+    },
+    {
+      "field": "STRESS_MENTAL",
+      "fieldLabel": "Stress / Mentale Belastung",
+      "measureCount": 1,
+      "avgParticipationRate": null,
+      "isAboveThreshold": false,
+      "avgImpactRating": 3,
+      "impactIsPreliminary": true,
+      "fieldTrend30d": 7
+    },
+    {
+      "field": "MOVEMENT",
+      "fieldLabel": "Bewegung / Sport",
+      "measureCount": 2,
+      "avgParticipationRate": 58,
+      "isAboveThreshold": true,
+      "avgImpactRating": 4,
+      "impactIsPreliminary": true,
+      "fieldTrend30d": 0
+    },
+    {
+      "field": "NUTRITION",
+      "fieldLabel": "Ernährung",
+      "measureCount": 2,
+      "avgParticipationRate": 56,
+      "isAboveThreshold": true,
+      "avgImpactRating": 3,
+      "impactIsPreliminary": true,
+      "fieldTrend30d": 2
+    },
+    {
+      "field": "KNOWLEDGE",
+      "fieldLabel": "Orientierung / Wissen",
+      "measureCount": 0,
+      "avgParticipationRate": null,
+      "isAboveThreshold": true,
+      "avgImpactRating": null,
+      "impactIsPreliminary": false,
+      "fieldTrend30d": 9
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, portalGuard } from './core/guards/auth.guards';
+import { authGuard, featureFlagGuard, portalGuard } from './core/guards/auth.guards';
 
 export const routes: Routes = [
   // Auth (public)
@@ -41,7 +41,11 @@ export const routes: Routes = [
       { path: 'invitations', loadComponent: () => import('./features/company/pages/invitations/company-invitations.component').then(m => m.CompanyInvitationsComponent) },
       { path: 'teams', loadComponent: () => import('./features/company/pages/teams/company-teams.component').then(m => m.CompanyTeamsComponent) },
       { path: 'surveys', loadComponent: () => import('./features/company/pages/surveys/company-surveys.component').then(m => m.CompanySurveysComponent) },
+      { path: 'measures/statistics', loadComponent: () => import('./features/company/pages/measure-statistics/company-measure-statistics.component').then(m => m.CompanyMeasureStatisticsComponent) },
       { path: 'measures', loadComponent: () => import('./features/company/pages/measures/company-measures.component').then(m => m.CompanyMeasuresComponent) },
+      { path: 'risk-landscape', canActivate: [featureFlagGuard('riskLandscapeEnabled')], loadComponent: () => import('./features/company/pages/risk-landscape/company-risk-landscape.component').then(m => m.CompanyRiskLandscapeComponent) },
+      { path: 'usage-funnel', canActivate: [featureFlagGuard('usageFunnelEnabled')], loadComponent: () => import('./features/company/pages/usage-funnel/company-usage-funnel.component').then(m => m.CompanyUsageFunnelComponent) },
+      { path: 'infection-radar', canActivate: [featureFlagGuard('infectionRadarEnabled')], loadComponent: () => import('./features/company/pages/infection-radar/company-infection-radar.component').then(m => m.CompanyInfectionRadarComponent) },
       { path: 'reports', loadComponent: () => import('./features/company/pages/reports/company-reports.component').then(m => m.CompanyReportsComponent) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     ]

@@ -180,6 +180,8 @@ class DemoDataSeeder extends Seeder
             ]
         );
 
+        $this->seedMockupMeasures($companyId, $adminId, $employeeIds, $now);
+
         DB::table('invite_tokens')->updateOrInsert(
             ['email' => 'new.employee@demo.de', 'company_id' => $companyId],
             [
@@ -470,11 +472,11 @@ class DemoDataSeeder extends Seeder
         return $surveyId;
     }
 
-    private function upsertMeasure(int $companyId, ?int $teamId, string $title, string $category, string $description, int $createdBy, mixed $now): void
+    private function upsertMeasure(int $companyId, ?int $teamId, string $title, string $category, string $description, int $createdBy, mixed $now, array $attributes = []): int
     {
         DB::table('measures')->updateOrInsert(
             ['company_id' => $companyId, 'title' => $title],
-            [
+            array_merge([
                 'team_id' => $teamId,
                 'category' => $category,
                 'description' => $description,
@@ -485,8 +487,160 @@ class DemoDataSeeder extends Seeder
                 'created_by' => $createdBy,
                 'created_at' => $now,
                 'updated_at' => $now,
+            ], $attributes)
+        );
+
+        return DB::table('measures')
+            ->where('company_id', $companyId)
+            ->where('title', $title)
+            ->value('id');
+    }
+
+    /**
+     * Measures for demo-gmbh matching the HR-dashboard mockups, so the live
+     * measures page (cards, execution details, check-in) lines up with the
+     * demo statistics served from database/demo/*.json.
+     *
+     * @param  array<int, int>  $employeeIds
+     */
+    private function seedMockupMeasures(int $companyId, int $adminId, array $employeeIds, mixed $now): void
+    {
+        $workshopId = $this->upsertMeasure(
+            $companyId,
+            null,
+            'Rückenfit Bürostuhl-Workshop',
+            'flexibility',
+            'Praktischer Workshop für rückenschonendes Arbeiten am Schreibtisch.',
+            $adminId,
+            $now,
+            [
+                'delivery_type' => 'ONSITE',
+                'execution_type' => 'EVENT_PARTICIPATION',
+                'verification_requirement' => 'QR_CODE',
+                'starts_at' => $now->copy()->addDays(4)->setTime(14, 0),
+                'ends_at' => $now->copy()->addDays(4)->setTime(15, 30),
+                'location_name' => 'Kantine EG',
+                'capacity' => 80,
             ]
         );
+        DB::table('measure_checkin_tokens')->updateOrInsert(
+            ['measure_id' => $workshopId],
+            [
+                'company_id' => $companyId,
+                'token_hash' => hash('sha256', 'demo-rueckenfit-checkin'),
+                'created_by_user_id' => $adminId,
+                'valid_from' => $now->copy()->subDays(6),
+                'valid_until' => $now->copy()->addDays(5),
+                'revoked_at' => null,
+                'created_at' => $now->copy()->subDays(6),
+                'updated_at' => $now,
+            ]
+        );
+
+        $this->upsertMeasure(
+            $companyId,
+            null,
+            'Achtsamkeits-Session',
+            'mental',
+            'Angeleitete Achtsamkeitsübung für einen ruhigen Start in die Woche.',
+            $adminId,
+            $now,
+            [
+                'delivery_type' => 'REMOTE',
+                'execution_type' => 'GUIDED_SESSION',
+                'starts_at' => $now->copy()->addDays(6)->setTime(9, 0),
+                'ends_at' => $now->copy()->addDays(6)->setTime(9, 45),
+            ]
+        );
+
+        $runningId = $this->upsertMeasure(
+            $companyId,
+            null,
+            'Lauftreff Mittwochs',
+            'sport',
+            'Gemeinsamer Lauftreff jeden Mittwoch nach Feierabend.',
+            $adminId,
+            $now,
+            [
+                'delivery_type' => 'ONSITE',
+                'execution_type' => 'CHALLENGE',
+                'starts_at' => $now->copy()->subWeeks(3),
+            ]
+        );
+
+        $yogaId = $this->upsertMeasure(
+            $companyId,
+            null,
+            'Yoga am Morgen',
+            'sport',
+            'Sanfte Yoga-Einheit vor Arbeitsbeginn, offen für alle Level.',
+            $adminId,
+            $now,
+            [
+                'delivery_type' => 'HYBRID',
+                'execution_type' => 'GUIDED_SESSION',
+                'starts_at' => $now->copy()->subWeeks(2),
+            ]
+        );
+
+        $vitaminId = $this->upsertMeasure(
+            $companyId,
+            null,
+            'Vitamin-Info-Stand',
+            'nutrition',
+            'Info-Stand mit Verkostung und Tipps für ausgewogene Ernährung.',
+            $adminId,
+            $now,
+            [
+                'status' => 'COMPLETED',
+                'delivery_type' => 'ONSITE',
+                'execution_type' => 'EVENT_PARTICIPATION',
+                'starts_at' => $now->copy()->subDays(14)->setTime(11, 0),
+                'ends_at' => $now->copy()->subDays(14)->setTime(15, 0),
+                'completed_at' => $now->copy()->subDays(14),
+                'location_name' => 'Foyer Haupteingang',
+            ]
+        );
+
+        $this->upsertMeasure(
+            $companyId,
+            null,
+            'Ernährungs-Webinar',
+            'nutrition',
+            'Interaktives Webinar zu gesunder Ernährung im Arbeitsalltag.',
+            $adminId,
+            $now,
+            [
+                'status' => 'SUGGESTED',
+                'started_at' => null,
+                'delivery_type' => 'REMOTE',
+                'execution_type' => 'INFORMATION_ONLY',
+            ]
+        );
+
+        // Participation approximating the mockup quotas (6 employees, threshold 3).
+        foreach ([
+            $workshopId => 5,
+            $runningId => 4,
+            $yogaId => 3,
+            $vitaminId => 4,
+        ] as $measureId => $participantCount) {
+            foreach (array_slice($employeeIds, 0, $participantCount) as $offset => $userId) {
+                DB::table('measure_participations')->updateOrInsert(
+                    ['measure_id' => $measureId, 'user_id' => $userId],
+                    [
+                        'company_id' => $companyId,
+                        'team_id' => null,
+                        'participated_at' => $now->copy()->subDays(2 + $offset),
+                        'verification_type' => 'SELF_REPORTED',
+                        'verified_at' => $now->copy()->subDays(2 + $offset),
+                        'verified_by_user_id' => null,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]
+                );
+            }
+        }
     }
 
     private function upsertUser(string $email, string $name, string $password, int $companyId, ?int $teamId, string $role, mixed $lastLoginAt): int

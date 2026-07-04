@@ -4,12 +4,17 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\FeatureFlagService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function __construct(private readonly FeatureFlagService $featureFlags)
+    {
+    }
+
     public function login(Request $request)
     {
         $request->validate([
@@ -67,6 +72,7 @@ class AuthController extends Controller
                 'companyId' => $user->company_id,
                 'companyName' => $user->company?->name,
                 'teamLayerEnabled' => (bool) ($user->company?->team_layer_enabled ?? false),
+                ...$this->featureFlags->flagsForCompany($user->company),
             ],
             'activePortal' => $activePortal,
             'allowedPortals' => $allowedPortals,
@@ -93,6 +99,7 @@ class AuthController extends Controller
             'companyId' => $user->company_id,
             'companyName' => $user->company?->name,
             'teamLayerEnabled' => (bool) ($user->company?->team_layer_enabled ?? false),
+            ...$this->featureFlags->flagsForCompany($user->company),
             'teamId' => $user->team_id,
             'teamName' => $user->team?->name,
             'activePortal' => $allowedPortals[0] ?? null,

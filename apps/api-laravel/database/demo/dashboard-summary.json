@@ -1,0 +1,47 @@
+{
+  "period": "01.06 – 30.06.2026",
+  "kpis": {
+    "healthIndex": { "value": 71, "deltaPercent": 8 },
+    "riskTrend30d": { "value": 8, "label": "steigende Belastung" },
+    "activeUserRate": { "value": 65, "deltaPercent": 7 },
+    "measureImpactScore": { "value": 2, "max": 5, "label": "Programme zeigen positive Wirkung" },
+    "topFields": [
+      { "rank": 1, "field": "SLEEP", "fieldLabel": "Schlaf" },
+      { "rank": 2, "field": "STRESS", "fieldLabel": "Stress" },
+      { "rank": 3, "field": "BACK", "fieldLabel": "Rücken" }
+    ]
+  },
+  "riskCompact": [
+    { "field": "SLEEP", "fieldLabel": "Schlaf", "relevanceLevel": 4, "trend30d": 12 },
+    { "field": "BACK", "fieldLabel": "Rücken", "relevanceLevel": 4, "trend30d": 15 },
+    { "field": "STRESS", "fieldLabel": "Stress", "relevanceLevel": 3, "trend30d": 7 },
+    { "field": "MENTAL_LOAD", "fieldLabel": "Mentale Belastung", "relevanceLevel": 3, "trend30d": 6 },
+    { "field": "KNOWLEDGE", "fieldLabel": "Orientierung / Wissen", "relevanceLevel": 3, "trend30d": 9 },
+    { "field": "ENERGY", "fieldLabel": "Energie", "relevanceLevel": 2, "trend30d": 3 },
+    { "field": "NUTRITION", "fieldLabel": "Ernährung", "relevanceLevel": 2, "trend30d": 2 },
+    { "field": "MOVEMENT", "fieldLabel": "Bewegung", "relevanceLevel": 2, "trend30d": 0 }
+  ],
+  "funnelCompact": {
+    "rates": [100, 74, 61, 42, 28],
+    "avgDaysToFirstDecision": 3.2,
+    "returnRate14d": 38
+  },
+  "infectionWidget": {
+    "overallStatus": "ELEVATED",
+    "highlightLocation": "Standort Süd",
+    "rkiIncidence": 142,
+    "rkiDeltaPercent": 18
+  },
+  "impactReporting": [
+    { "program": "Schlaf-Coaching", "usageRate": 29, "relevanceScore": 41, "rating": 4 },
+    { "program": "Stressmanagement", "usageRate": 22, "relevanceScore": 39, "rating": 3 },
+    { "program": "Rückentraining", "usageRate": 15, "relevanceScore": 34, "rating": 4 },
+    { "program": "Ernährungsberatung", "usageRate": 11, "relevanceScore": 28, "rating": 3 },
+    { "program": "Bewegungsprogramm", "usageRate": 17, "relevanceScore": 33, "rating": 4 }
+  ],
+  "recommendations": [
+    "Schlaf als Schwerpunkt setzen — höchste Relevanz ohne aktive Maßnahme.",
+    "Präventionskommunikation vorbereiten — Infektionsaufkommen an 2 Standorten erhöht.",
+    "Bewegungsangebot überprüfen — niedrige Relevanz, aber hohe laufende Kosten."
+  ]
+}

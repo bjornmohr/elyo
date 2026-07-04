@@ -12,7 +12,10 @@ use App\Http\Controllers\Auth\InviteController;
 use App\Http\Controllers\Company\CompanyController;
 use App\Http\Controllers\Company\CompanyInvitationController;
 use App\Http\Controllers\Company\CompanySurveyController;
+use App\Http\Controllers\Company\InsightsController;
 use App\Http\Controllers\Company\MeasureController;
+use App\Http\Controllers\Company\MeasureImpactController;
+use App\Http\Controllers\Company\MeasureStatisticsController;
 use App\Http\Controllers\Company\ReportController;
 use App\Http\Controllers\Company\TeamController;
 use App\Http\Controllers\Employee\EmployeeController;
@@ -106,9 +109,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/measures', [MeasureController::class, 'index']);
         Route::post('/measures', [MeasureController::class, 'store']);
+        Route::get('/measures/statistics', [MeasureStatisticsController::class, 'index']);
         Route::post('/measures/{measure}/checkin-token', [MeasureController::class, 'rotateCheckinToken']);
         Route::get('/measures/{id}/participation-summary', [MeasureController::class, 'participationSummary']);
+        Route::get('/measures/{id}/execution', [MeasureController::class, 'execution']);
+        Route::get('/measures/{id}/impact', [MeasureImpactController::class, 'show']);
         Route::patch('/measures/{id}', [MeasureController::class, 'update']);
+
+        Route::get('/risk-landscape', [InsightsController::class, 'riskLandscape']);
+        Route::get('/usage-funnel', [InsightsController::class, 'usageFunnel']);
+        Route::get('/infection-radar', [InsightsController::class, 'infectionRadar']);
 
         Route::get('/reports', [ReportController::class, 'index']);
     });

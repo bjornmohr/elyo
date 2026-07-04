@@ -4,8 +4,9 @@ import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Va
 import { Role } from '../../../../core/models/auth.models';
 import { AuthStore } from '../../../../core/store/auth.store';
 import { NotificationService } from '../../../../shared/notifications/notification.service';
-import { CompanyMeasuresService, MeasureCheckinTokenResponse } from '../../services/company-measures.service';
+import { CompanyMeasuresService, MeasureCheckinTokenResponse, MeasureExecution } from '../../services/company-measures.service';
 import { CompanyTeamsService } from '../../services/company-teams.service';
+import { MeasureImpactDialogComponent } from './measure-impact-dialog.component';
 
 interface MeasureParticipationSummary {
   measureId: number;
@@ -23,6 +24,7 @@ interface CompanyMeasure {
   category: string;
   description: string;
   status: string;
+  completedAt?: string | null;
   deliveryType?: string | null;
   executionType?: string | null;
   verificationRequirement?: 'SELF_REPORT' | 'QR_CODE' | null;
@@ -57,7 +59,7 @@ function dateRangeValidator(control: AbstractControl): ValidationErrors | null {
 @Component({
   selector: 'app-company-measures',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, MeasureImpactDialogComponent],
   template: `
     <div class="space-y-6">
       <div class="flex items-center justify-between gap-4">
@@ -286,103 +288,145 @@ function dateRangeValidator(control: AbstractControl): ValidationErrors | null {
           <div class="bg-white rounded-xl border border-gray-200 p-12 text-center"><p class="text-gray-500 text-sm">Noch
             keine Maßnahmen vorhanden.</p></div>
         } @else {
-          <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table class="w-full text-sm">
-              <thead>
-              <tr class="bg-gray-50 border-b border-gray-100">
-                <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Titel</th>
-                <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Kategorie</th>
-                @if (teamLayerEnabled()) {
-                  <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Team</th>
-                }
-                <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Details</th>
-                <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Teilnahme</th>
-                <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Status</th>
-                <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Check-in</th>
-                <th class="text-left px-4 py-3 text-xs uppercase text-gray-500">Aktion</th>
-              </tr>
-              </thead>
-              <tbody>
-                @for (measure of measures(); track measure.id) {
-                  <tr class="border-b border-gray-50">
-                    <td class="px-4 py-3 font-medium text-gray-900">{{ measure.title }}</td>
-                    <td class="px-4 py-3 text-gray-500">{{ measure.category }}</td>
+          <div class="space-y-3">
+            @for (measure of measures(); track measure.id) {
+              <div class="bg-white overflow-hidden transition-colors" style="border-radius: 14px"
+                   [style.border]="expandedMeasureId() === measure.id ? '1px solid #0f766e' : '1px solid #ece6d8'">
+                <button type="button" (click)="toggleExpanded(measure)"
+                        class="w-full flex items-center gap-3 text-left" style="padding: 16px 22px">
+                  <div class="min-w-0 flex-1 flex items-center gap-3 flex-wrap">
+                    <span class="text-sm font-medium text-gray-900">{{ measure.title }}</span>
+                    <span class="text-[11px]" style="color: #6f7d76">{{ categoryLabel(measure.category) }}</span>
                     @if (teamLayerEnabled()) {
-                      <td class="px-4 py-3 text-gray-500">{{ measure.team?.name || 'Alle Teams' }}</td>
+                      <span class="text-[11px]" style="color: #9aa39c">{{ measure.team?.name || 'Alle Teams' }}</span>
                     }
-                    <td class="px-4 py-3 text-gray-500">
-                      <div class="space-y-1">
-                        <div>{{ label(measure.deliveryType) }} / {{ label(measure.executionType) }}</div>
-                        @if (measure.startsAt || measure.endsAt) {
-                          <div class="text-xs">{{ scheduleLabel(measure) }}</div>
-                        }
-                        @if (measure.locationName) {
-                          <div class="text-xs">{{ measure.locationName }}</div>
-                        }
-                      </div>
-                    </td>
-                    <td class="px-4 py-3 text-gray-500">
-                      @if (summaryFor(measure.id); as summary) {
-                        @if (summary.isAboveThreshold) {
-                          <div class="space-y-0.5">
-                            <div class="font-medium text-gray-900">{{ participationRateLabel(summary) }}</div>
-                            <div class="text-xs text-gray-500">
-                              {{ participationCountLabel(summary) }}
-                            </div>
-                          </div>
-                        } @else {
-                          <span class="text-xs text-gray-500">Mindestgruppengröße nicht erreicht</span>
-                        }
+                    <span class="text-[11px] font-semibold rounded-full" style="padding: 3px 9px"
+                          [style.background]="measure.status === 'ACTIVE' ? '#ecfaf7' : '#f1ede3'"
+                          [style.color]="measure.status === 'ACTIVE' ? '#0f766e' : '#6f7d76'">
+                      {{ statusLabel(measure.status) }}
+                    </span>
+                    <span class="text-[11px] font-semibold rounded-full" style="padding: 3px 9px"
+                          [style.background]="derivedStatus(measure) === 'RUNNING' ? '#ecfaf7' : '#f1ede3'"
+                          [style.color]="derivedStatus(measure) === 'RUNNING' ? '#0f766e' : '#6f7d76'">
+                      {{ derivedStatusLabel(measure) }}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-3 flex-shrink-0">
+                    @if (summaryFor(measure.id); as summary) {
+                      @if (summary.isAboveThreshold) {
+                        <span class="text-xs font-semibold" style="color: #0f766e">{{ participationRateLabel(summary) }}</span>
                       } @else {
-                        <span class="text-xs text-gray-400">Nicht verfügbar</span>
+                        <span class="text-xs italic" style="color: #6f7d76">geschützt</span>
                       }
-                    </td>
-                    <td class="px-4 py-3"><span
-                      class="px-2 py-0.5 rounded-full text-xs bg-teal-50 text-teal-700">{{ measure.status }}</span></td>
-                    <td class="px-4 py-3">
-                      @if (measure.verificationRequirement !== 'QR_CODE') {
-                        <span class="text-xs text-gray-400">Nicht erforderlich</span>
-                      } @else if (checkinLinkFor(measure.id); as link) {
-                        <div class="space-y-2">
-                          <input readonly [value]="link.checkinUrl"
-                                 class="w-72 max-w-full rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600"/>
-                          <div class="text-xs text-gray-500">Dieser Link wird nur direkt nach Erstellung oder Erneuerung angezeigt.</div>
-                          <div class="flex gap-2">
-                            <button type="button" (click)="copyCheckinLink(link.checkinUrl)"
-                                    class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">
-                              Kopieren
-                            </button>
-                            <button type="button" (click)="rotateCheckinLink(measure)"
-                                    [disabled]="isRotatingCheckin(measure.id)"
-                                    class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:text-gray-300">
-                              Erneuern
-                            </button>
-                          </div>
-                        </div>
-                      } @else {
-                        <button type="button" (click)="rotateCheckinLink(measure)"
-                                [disabled]="measure.status !== 'ACTIVE' || isRotatingCheckin(measure.id)"
-                                class="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:bg-gray-300">
-                          {{ isRotatingCheckin(measure.id) ? 'Wird erstellt…' : 'Link erstellen' }}
-                        </button>
-                      }
-                    </td>
-                    <td class="px-4 py-3">
+                    }
+                    <span class="text-gray-400 text-xs">{{ expandedMeasureId() === measure.id ? '▾' : '▸' }}</span>
+                  </div>
+                </button>
+
+                @if (expandedMeasureId() === measure.id) {
+                  <div class="pb-5 pt-4" style="border-top: 1px solid #f1ede3; padding-left: 22px; padding-right: 22px">
+                    <div class="flex justify-end mb-3">
                       @if (isEditableMeasure(measure)) {
                         <button type="button" (click)="editMeasure(measure)"
-                                class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                                class="text-[11px] font-semibold text-gray-700 hover:bg-gray-50"
+                                style="border: 1px solid #e5ded3; border-radius: 8px; padding: 5px 12px">
                           Bearbeiten
                         </button>
                       } @else {
-                        <span class="text-xs text-gray-400">Nicht bearbeitbar</span>
+                        <span class="text-[11px]" style="color: #9aa39c">Nicht bearbeitbar</span>
                       }
-                    </td>
-                  </tr>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div class="space-y-2">
+                        <div class="text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Durchführung</div>
+                        <div class="text-sm text-gray-900">{{ deliveryLabel(measure.deliveryType) }} · {{ executionLabel(measure.executionType) }}</div>
+                        @if (measure.startsAt || measure.endsAt) {
+                          <div class="text-xs" style="color: #6f7d76">{{ scheduleLabel(measure) }}</div>
+                        }
+                        @if (measure.locationName) {
+                          <div class="text-xs" style="color: #6f7d76">{{ measure.locationName }}</div>
+                        }
+                        @if (executionFor(measure.id); as execution) {
+                          @if (execution.registeredCount !== null) {
+                            <div class="text-xs" style="color: #6f7d76">
+                              {{ execution.registeredCount }} angemeldet{{ execution.capacity ? ' / ' + execution.capacity + ' Plätze' : '' }}
+                            </div>
+                          } @else if (!execution.isAboveThreshold) {
+                            <div class="text-xs italic" style="color: #6f7d76">Mindestgruppengröße nicht erreicht</div>
+                          }
+                          @if (execution.checkin.required) {
+                            @if (execution.checkin.active) {
+                              <div class="text-xs font-semibold" style="color: #0f766e">
+                                QR-Check-in aktiv{{ execution.checkin.createdAt ? ' — erstellt am ' + formatDate(execution.checkin.createdAt) : '' }}
+                              </div>
+                            } @else {
+                              <div class="text-xs" style="color: #6f7d76">Kein aktiver Check-in-Link</div>
+                            }
+                          } @else {
+                            <div class="text-xs" style="color: #9aa39c">Kein Check-in erforderlich</div>
+                          }
+                        }
+                        @if (measure.verificationRequirement === 'QR_CODE') {
+                          @if (checkinLinkFor(measure.id); as link) {
+                            <div class="space-y-2 pt-1">
+                              <input readonly [value]="link.checkinUrl"
+                                     class="w-72 max-w-full rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600"/>
+                              <div class="text-xs text-gray-500">Dieser Link wird nur direkt nach Erstellung oder Erneuerung angezeigt.</div>
+                              <div class="flex gap-2">
+                                <button type="button" (click)="copyCheckinLink(link.checkinUrl)"
+                                        class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                                  Kopieren
+                                </button>
+                                <button type="button" (click)="rotateCheckinLink(measure)"
+                                        [disabled]="isRotatingCheckin(measure.id)"
+                                        class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:text-gray-300">
+                                  Erneuern
+                                </button>
+                              </div>
+                            </div>
+                          } @else {
+                            <div class="pt-1">
+                              <button type="button" (click)="rotateCheckinLink(measure)"
+                                      [disabled]="measure.status !== 'ACTIVE' || isRotatingCheckin(measure.id)"
+                                      class="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:bg-gray-300">
+                                {{ isRotatingCheckin(measure.id) ? 'Wird erstellt…' : 'Link erstellen' }}
+                              </button>
+                            </div>
+                          }
+                        }
+                      </div>
+                      <div class="space-y-2">
+                        <div class="flex items-center gap-2">
+                          <span class="text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Wirkung</span>
+                          @if (measureImpactEnabled()) {
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase" style="background: #fdf3e3; color: #9a6b1f; letter-spacing: .04em">Konzept</span>
+                          }
+                        </div>
+                        @if (!measureImpactEnabled()) {
+                          <div class="text-xs italic" style="color: #9aa39c">Noch keine Daten</div>
+                        } @else if (derivedStatus(measure) === 'COMPLETED') {
+                          <button type="button" (click)="openImpactDialog(measure)"
+                                  class="text-[11px] font-semibold text-gray-700 hover:bg-gray-50"
+                                  style="border: 1px solid #e5ded3; border-radius: 8px; padding: 5px 12px">
+                            Wirkungsanalyse anzeigen
+                          </button>
+                        } @else if (derivedStatus(measure) === 'UPCOMING') {
+                          <div class="text-xs italic" style="color: #9aa39c">Termin steht noch bevor — Wirkung wird nach Abschluss ermittelt.</div>
+                        } @else {
+                          <div class="text-xs italic" style="color: #9aa39c">Noch keine Daten</div>
+                        }
+                      </div>
+                    </div>
+                  </div>
                 }
-              </tbody>
-            </table>
+              </div>
+            }
           </div>
         }
+      }
+
+      @if (impactDialogMeasure(); as dialogMeasure) {
+        <app-measure-impact-dialog [measure]="dialogMeasure" (close)="impactDialogMeasure.set(null)" />
       }
     </div>
   `
@@ -406,6 +450,9 @@ export class CompanyMeasuresComponent implements OnInit {
   participationSummaries = signal<Record<number, MeasureParticipationSummary | null>>({});
   checkinLinks = signal<Record<number, MeasureCheckinLink>>({});
   rotatingCheckinIds = signal<Set<number>>(new Set());
+  expandedMeasureId = signal<number | null>(null);
+  executionDetails = signal<Record<number, MeasureExecution | null>>({});
+  impactDialogMeasure = signal<CompanyMeasure | null>(null);
 
   measureForm = this.fb.group({
     title: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(100)]],
@@ -516,6 +563,11 @@ export class CompanyMeasuresComponent implements OnInit {
         }
         if (res.data?.id) {
           this.loadParticipationSummary(res.data.id);
+          this.executionDetails.update(details => {
+            const next = { ...details };
+            delete next[res.data.id];
+            return next;
+          });
         }
         this.resetForm();
         this.showForm.set(false);
@@ -591,6 +643,89 @@ export class CompanyMeasuresComponent implements OnInit {
 
   isEditableMeasure(measure: CompanyMeasure) {
     return ['SUGGESTED', 'ACTIVE'].includes(measure.status);
+  }
+
+  measureImpactEnabled() {
+    return this.authStore.measureImpactEnabled();
+  }
+
+  toggleExpanded(measure: CompanyMeasure) {
+    const next = this.expandedMeasureId() === measure.id ? null : measure.id;
+    this.expandedMeasureId.set(next);
+    if (next !== null && this.executionDetails()[measure.id] === undefined) {
+      this.companyMeasuresService.getExecution(measure.id).subscribe({
+        next: res => this.executionDetails.update(details => ({ ...details, [measure.id]: res.data ?? null })),
+        error: () => this.executionDetails.update(details => ({ ...details, [measure.id]: null })),
+      });
+    }
+  }
+
+  executionFor(measureId: number): MeasureExecution | null {
+    return this.executionDetails()[measureId] ?? null;
+  }
+
+  // Same derivation rules as the backend's MeasureExecutionService, so the
+  // collapsed rows get their chip without one request per measure.
+  derivedStatus(measure: CompanyMeasure): 'UPCOMING' | 'RUNNING' | 'COMPLETED' | 'PLANNED' {
+    const now = Date.now();
+    if (measure.status === 'COMPLETED' || (measure.status === 'ACTIVE' && !!measure.endsAt && new Date(measure.endsAt).getTime() < now)) {
+      return 'COMPLETED';
+    }
+    if (measure.status === 'SUGGESTED' || measure.status === 'DISMISSED') {
+      return 'PLANNED';
+    }
+    if (!!measure.startsAt && new Date(measure.startsAt).getTime() > now) {
+      return 'UPCOMING';
+    }
+    return 'RUNNING';
+  }
+
+  derivedStatusLabel(measure: CompanyMeasure) {
+    switch (this.derivedStatus(measure)) {
+      case 'UPCOMING': return 'Bevorstehend';
+      case 'PLANNED': return 'Geplant';
+      case 'RUNNING': return 'Läuft';
+      case 'COMPLETED': return 'Abgeschlossen';
+    }
+  }
+
+  openImpactDialog(measure: CompanyMeasure) {
+    this.impactDialogMeasure.set(measure);
+  }
+
+  categoryLabel(category: string | null | undefined) {
+    switch (category) {
+      case 'workshop': return 'Workshop';
+      case 'flexibility': return 'Flexibilität';
+      case 'sport': return 'Sport';
+      case 'mental': return 'Mental';
+      case 'nutrition': return 'Ernährung';
+      default: return category || '-';
+    }
+  }
+
+  deliveryLabel(value: string | null | undefined) {
+    switch (value) {
+      case 'ONSITE': return 'Vor Ort';
+      case 'REMOTE': return 'Remote';
+      case 'HYBRID': return 'Hybrid';
+      default: return '-';
+    }
+  }
+
+  executionLabel(value: string | null | undefined) {
+    switch (value) {
+      case 'EVENT_PARTICIPATION': return 'Event-Teilnahme';
+      case 'INFORMATION_ONLY': return 'Information';
+      case 'GUIDED_SESSION': return 'Geführte Session';
+      case 'SELF_REPORTED_ACTION': return 'Selbst gemeldet';
+      case 'CHALLENGE': return 'Challenge';
+      default: return '-';
+    }
+  }
+
+  formatDate(value: string) {
+    return new Date(value).toLocaleDateString('de-DE');
   }
 
   editMeasure(measure: CompanyMeasure) {
@@ -685,10 +820,6 @@ export class CompanyMeasuresComponent implements OnInit {
     navigator.clipboard.writeText(url)
       .then(() => this.notifications.success('Check-in-Link wurde kopiert.'))
       .catch(() => this.notifications.error('Link konnte nicht kopiert werden.'));
-  }
-
-  label(value: string | null | undefined) {
-    return value ? value.toLowerCase().replace(/_/g, ' ') : '-';
   }
 
   statusLabel(value: string | null | undefined) {

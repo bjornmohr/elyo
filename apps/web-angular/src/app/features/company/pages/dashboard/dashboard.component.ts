@@ -2,13 +2,14 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ApiClient } from '../../../../core/services/api-client.service';
 import { AuthStore } from '../../../../core/store/auth.store';
+import { DashboardExecutiveSummaryComponent } from './dashboard-executive-summary.component';
 
 @Component({
   selector: 'app-company-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, DashboardExecutiveSummaryComponent],
   template: `
-    <div class="max-w-7xl mx-auto p-6 space-y-8">
+    <div class="w-full p-6 space-y-8">
       <header>
         <h1 class="text-3xl font-bold text-gray-900" style="font-family: 'Fraunces', Georgia, serif">Unternehmensübersicht</h1>
         <p class="text-gray-500 mt-2">Aggregierte Gesundheits- und Wohlbefindensdaten für dein Unternehmen.</p>
@@ -70,6 +71,10 @@ import { AuthStore } from '../../../../core/store/auth.store';
             }
           </div>
         </div>
+
+        @if (data()?.executiveSummary; as summary) {
+          <app-dashboard-executive-summary [summary]="summary" />
+        }
       }
     </div>
   `

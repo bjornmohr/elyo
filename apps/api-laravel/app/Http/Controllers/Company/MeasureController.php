@@ -13,6 +13,7 @@ use App\Models\Team;
 use App\Services\AnonymityService;
 use App\Services\Company\TeamLayerGuard;
 use App\Services\MeasureCheckinTokenService;
+use App\Services\MeasureExecutionService;
 use App\Services\MeasureParticipationSummaryService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ class MeasureController extends Controller
         private readonly TeamLayerGuard $teamLayerGuard,
         private readonly MeasureParticipationSummaryService $measureParticipationSummaryService,
         private readonly MeasureCheckinTokenService $measureCheckinTokenService,
+        private readonly MeasureExecutionService $measureExecutionService,
     )
     {
     }
@@ -185,6 +187,15 @@ class MeasureController extends Controller
         );
     }
 
+    public function execution(Request $request, int|string $id)
+    {
+        $measure = $this->findCompanyReadableMeasure($request, $id);
+
+        return response()->json([
+            'data' => $this->measureExecutionService->executionFor($request->user(), $measure),
+        ]);
+    }
+
     public function rotateCheckinToken(Request $request, int|string $measure)
     {
         $user = $request->user();
@@ -320,6 +331,39 @@ class MeasureController extends Controller
         if ($measure !== null && (array_key_exists('startsAt', $validated) || array_key_exists('endsAt', $validated))) {
             $data['duration_minutes'] = null;
         }
+    }
+
+    /**
+     * Read access mirrors index() visibility: managers may also read
+     * company-wide measures (team_id null), unlike write access.
+     */
+    private function findCompanyReadableMeasure(Request $request, int|string $id): Measure
+    {
+        $user = $request->user();
+        $user->loadMissing('roles');
+        $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
+        $teamLayerEnabled = $this->teamLayerGuard->enabledFor($user);
+
+        if (! $teamLayerEnabled && $isManager) {
+            $this->teamLayerGuard->abortIfDisabled($user);
+        }
+
+        $measure = Measure::where('id', $id)
+            ->where('company_id', $user->company_id)
+            ->firstOrFail();
+
+        if (! $teamLayerEnabled && $measure->team_id !== null) {
+            $this->teamLayerGuard->abortIfDisabled($user);
+        }
+
+        if ($isManager && $measure->team_id !== null) {
+            $managedTeamId = Team::where('manager_id', $user->id)->where('company_id', $user->company_id)->value('id');
+            if (! $managedTeamId || (int) $measure->team_id !== (int) $managedTeamId) {
+                abort(403);
+            }
+        }
+
+        return $measure;
     }
 
     private function findCompanyManageableMeasure(Request $request, int|string $id): Measure

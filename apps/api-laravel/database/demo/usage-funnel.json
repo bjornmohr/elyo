@@ -1,0 +1,34 @@
+{
+  "cohort": "2026-06",
+  "stages": [
+    { "key": "registered", "label": "Registriert", "count": 210, "rate": 100 },
+    { "key": "context_entered", "label": "Kontext eingegeben", "count": 155, "rate": 74 },
+    { "key": "recommendation_received", "label": "Empfehlung erhalten", "count": 128, "rate": 61 },
+    { "key": "measure_started", "label": "Maßnahme gestartet", "count": 88, "rate": 42 },
+    { "key": "active_14d", "label": "Nach 14 Tagen aktiv", "count": 59, "rate": 28 }
+  ],
+  "transitions": [
+    { "from": "registered", "to": "context_entered", "avgDays": 0.4 },
+    { "from": "context_entered", "to": "recommendation_received", "avgDays": 0.9 },
+    { "from": "recommendation_received", "to": "measure_started", "avgDays": 1.9 },
+    { "from": "measure_started", "to": "active_14d", "avgDays": 14 }
+  ],
+  "returnRate14d": 38,
+  "avgDaysToFirstDecision": 3.2,
+  "previousCohort": {
+    "cohort": "2026-05",
+    "stages": [
+      { "key": "registered", "rate": 100 },
+      { "key": "recommendation_received", "rate": 55 },
+      { "key": "measure_started", "rate": 33 },
+      { "key": "active_14d", "rate": 21 }
+    ]
+  },
+  "categoryInsight": "Höchste Aktivierung bei Sport (~52 %), niedrigste bei Ernährung (~18 %).",
+  "categories": [
+    { "key": "sport", "label": "Sport", "recommendationReceived": 41, "measureStarted": 29, "active14d": 22 },
+    { "key": "workshop", "label": "Workshop", "recommendationReceived": 30, "measureStarted": 20, "active14d": 16 },
+    { "key": "mental", "label": "Mental", "recommendationReceived": 33, "measureStarted": 23, "active14d": 17 },
+    { "key": "nutrition", "label": "Ernährung", "recommendationReceived": 24, "measureStarted": 16, "active14d": 4 }
+  ]
+}
