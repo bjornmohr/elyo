@@ -3,15 +3,17 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { CheckinDemoStorageService } from '../../services/checkin-demo-storage.service';
 import {
-  COLD_SUBS,
   CheckinDraft,
   FREQUENT_SYMPTOMS,
-  GI_SUBS,
+  ILLNESS_TYPES,
+  IllnessTypeKey,
   LOCATIONS,
   MOOD_OPTIONS,
   OTHER_SYMPTOMS,
   draftComplete,
   emptyDraft,
+  illnessLabelFor,
+  illnessSubsFor,
   sleepBranchActive,
   toDemoCheckin,
 } from './checkin-state';
@@ -107,8 +109,9 @@ interface ChatEntry {
                 <button type="button" (click)="answerSick(true)" class="chat-chip">Ja</button>
               }
               @case ('illnessType') {
-                <button type="button" (click)="answerIllnessType('cold')" class="chat-chip">Erkältung</button>
-                <button type="button" (click)="answerIllnessType('gi')" class="chat-chip">Magen-Darm</button>
+                @for (type of illnessTypes; track type.key) {
+                  <button type="button" (click)="answerIllnessType(type.key)" class="chat-chip">{{ type.label }}</button>
+                }
               }
               @case ('illnessSubs') {
                 @for (sub of illnessSubOptions(); track sub) {
@@ -167,6 +170,7 @@ export class CheckinChatComponent {
   locations = LOCATIONS;
   moodOptions = MOOD_OPTIONS;
   allSymptoms = [...FREQUENT_SYMPTOMS, ...OTHER_SYMPTOMS];
+  illnessTypes = ILLNESS_TYPES;
   sleepHourOptions = [5, 5.5, 6, 6.5, 7, 7.5, 8, 9];
 
   draft: CheckinDraft = emptyDraft();
@@ -249,7 +253,7 @@ export class CheckinChatComponent {
     for (const key of this.selectedSymptoms()) {
       const symptom = this.allSymptoms.find(s => s.key === key);
       if (symptom) {
-        this.draft.symptoms[key] = { region: symptom.region, severity: 3 };
+        this.draft.symptoms[key] = { region: symptom.regions[0], severity: 3 };
         if (key === 'fatigue') this.draft.sleepWanted = true;
       }
     }
@@ -263,14 +267,14 @@ export class CheckinChatComponent {
     this.push(sick ? 'Ja' : 'Nein', sick ? 'illnessType' : 'confirm');
   }
 
-  answerIllnessType(type: 'cold' | 'gi') {
+  answerIllnessType(type: IllnessTypeKey) {
     this.draft.illnessType = type;
     this.draft.illnessSubs = [];
-    this.push(type === 'cold' ? 'Erkältung' : 'Magen-Darm', 'illnessSubs');
+    this.push(illnessLabelFor(type), 'illnessSubs');
   }
 
   illnessSubOptions(): string[] {
-    return this.draft.illnessType === 'gi' ? GI_SUBS : COLD_SUBS;
+    return illnessSubsFor(this.draft.illnessType);
   }
 
   toggleIllnessSub(sub: string) {

@@ -3,16 +3,18 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { CheckinDemoStorageService } from '../../services/checkin-demo-storage.service';
 import {
-  COLD_SUBS,
   CheckinDraft,
   FREQUENT_SYMPTOMS,
-  GI_SUBS,
+  ILLNESS_TYPES,
+  IllnessTypeKey,
   LOCATIONS,
   MOOD_OPTIONS,
   OTHER_SYMPTOMS,
-  PAIN_REGIONS,
+  SymptomDefinition,
   draftComplete,
   emptyDraft,
+  illnessLabelFor,
+  illnessSubsFor,
   sleepBranchActive,
   toDemoCheckin,
 } from './checkin-state';
@@ -179,7 +181,7 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
                 <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-3">
                   <p class="text-sm font-semibold text-slate-700">{{ pain.label }} — wo genau?</p>
                   <div class="flex flex-wrap gap-2">
-                    @for (region of painRegions; track region) {
+                    @for (region of pain.regions; track region) {
                       <button type="button" (click)="setSymptomRegion(pain.key, region)"
                               class="rounded-full border px-3 py-1 text-xs font-semibold transition-colors"
                               [class]="draft.symptoms[pain.key].region === region ? 'border-teal-500 bg-white text-teal-700' : 'border-slate-200 bg-white text-slate-600'">
@@ -212,13 +214,12 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
                 </div>
 
                 @if (draft.sick === true) {
-                  <div class="flex gap-2">
-                    <button type="button" (click)="setIllnessType('cold')"
-                            class="flex-1 rounded-xl border py-2 text-xs font-semibold transition-colors"
-                            [class]="draft.illnessType === 'cold' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-600'">Erkältung</button>
-                    <button type="button" (click)="setIllnessType('gi')"
-                            class="flex-1 rounded-xl border py-2 text-xs font-semibold transition-colors"
-                            [class]="draft.illnessType === 'gi' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-600'">Magen-Darm</button>
+                  <div class="flex flex-wrap gap-2">
+                    @for (type of illnessTypes; track type.key) {
+                      <button type="button" (click)="setIllnessType(type.key)"
+                              class="rounded-xl border px-3.5 py-2 text-xs font-semibold transition-colors"
+                              [class]="draft.illnessType === type.key ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-600'">{{ type.label }}</button>
+                    }
                   </div>
 
                   @if (draft.illnessType) {
@@ -313,7 +314,7 @@ export class CheckinStepperComponent {
   moodOptions = MOOD_OPTIONS;
   frequentSymptoms = FREQUENT_SYMPTOMS;
   otherSymptoms = OTHER_SYMPTOMS;
-  painRegions = PAIN_REGIONS;
+  illnessTypes = ILLNESS_TYPES;
 
   draft: CheckinDraft = emptyDraft();
   // A check-in saved earlier today (persisted in localStorage) reopens on the
@@ -360,23 +361,21 @@ export class CheckinStepperComponent {
     return this.draft.symptoms[key] !== undefined;
   }
 
-  toggleSymptom(symptom: { key: string; region: string; pain: boolean }) {
+  toggleSymptom(symptom: SymptomDefinition) {
     if (this.hasSymptom(symptom.key)) {
       delete this.draft.symptoms[symptom.key];
       if (this.lastPainKey() === symptom.key) this.lastPainKey.set(null);
       return;
     }
-    this.draft.symptoms[symptom.key] = { region: symptom.region, severity: 3 };
+    this.draft.symptoms[symptom.key] = { region: symptom.regions[0], severity: 3 };
     if (symptom.pain) this.lastPainKey.set(symptom.key);
     if (symptom.key === 'fatigue') this.draft.sleepWanted = true;
   }
 
-  expandedPainSymptom(): { key: string; label: string } | null {
+  expandedPainSymptom(): SymptomDefinition | null {
     const key = this.lastPainKey();
     if (!key || !this.hasSymptom(key)) return null;
-    const all = [...FREQUENT_SYMPTOMS, ...OTHER_SYMPTOMS];
-    const found = all.find(s => s.key === key);
-    return found ? { key: found.key, label: found.label } : null;
+    return [...FREQUENT_SYMPTOMS, ...OTHER_SYMPTOMS].find(s => s.key === key) ?? null;
   }
 
   setSymptomRegion(key: string, region: string) {
@@ -396,7 +395,7 @@ export class CheckinStepperComponent {
     }
   }
 
-  setIllnessType(type: 'cold' | 'gi') {
+  setIllnessType(type: IllnessTypeKey) {
     if (this.draft.illnessType !== type) {
       this.draft.illnessType = type;
       this.draft.illnessSubs = [];
@@ -404,7 +403,7 @@ export class CheckinStepperComponent {
   }
 
   illnessSubs(): string[] {
-    return this.draft.illnessType === 'gi' ? GI_SUBS : COLD_SUBS;
+    return illnessSubsFor(this.draft.illnessType);
   }
 
   toggleIllnessSub(sub: string) {
@@ -443,7 +442,7 @@ export class CheckinStepperComponent {
     rows.push({
       label: 'Krankheitsgefühl',
       value: this.draft.sick
-        ? `Ja${this.draft.illnessType ? ` (${this.draft.illnessType === 'cold' ? 'Erkältung' : 'Magen-Darm'}: ${this.draft.illnessSubs.join(', ')})` : ''}`
+        ? `Ja${this.draft.illnessType ? ` (${illnessLabelFor(this.draft.illnessType)}: ${this.draft.illnessSubs.join(', ')})` : ''}`
         : 'Nein',
     });
     return rows;

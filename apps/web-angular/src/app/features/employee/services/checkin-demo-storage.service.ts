@@ -18,6 +18,8 @@ export interface DemoCheckinIllnessDetail {
   severity: number;
 }
 
+export type IllnessType = 'cold' | 'gi' | 'flu' | 'migraine' | 'allergy';
+
 export interface DemoCheckin {
   date: string;
   location: CheckinLocation;
@@ -26,11 +28,8 @@ export interface DemoCheckin {
   stress: number;
   sleep: { hours: number; recovery: number } | null;
   symptoms: DemoCheckinSymptom[];
-  illness: {
-    sick: boolean;
-    cold?: DemoCheckinIllnessDetail;
-    gi?: DemoCheckinIllnessDetail;
-  };
+  /** sick flag plus at most one illness-type key holding the details. */
+  illness: { sick: boolean } & Partial<Record<IllnessType, DemoCheckinIllnessDetail>>;
 }
 
 @Injectable({ providedIn: 'root' })

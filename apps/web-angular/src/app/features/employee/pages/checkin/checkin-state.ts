@@ -14,7 +14,7 @@ export interface CheckinDraft {
   stress: number | null;
   symptoms: Record<string, { region: string; severity: number }>;
   sick: boolean | null;
-  illnessType: 'cold' | 'gi' | null;
+  illnessType: IllnessTypeKey | null;
   illnessSubs: string[];
   illnessSeverity: number | null;
 }
@@ -56,24 +56,45 @@ export const MOOD_OPTIONS: Array<{ value: number; label: string; emoji: string }
   { value: 5, label: 'Sehr gut', emoji: '🤩' },
 ];
 
+export interface SymptomDefinition {
+  key: string;
+  label: string;
+  pain: boolean;
+  /** Symptom-specific sub-regions for the "Wo genau?" follow-up; first entry is the default. */
+  regions: string[];
+}
+
 /** "Zuletzt häufig" first — ordering matters for the adaptive UI. */
-export const FREQUENT_SYMPTOMS: Array<{ key: string; label: string; region: string; pain: boolean }> = [
-  { key: 'neck', label: 'Nackenschmerzen', region: 'Nacken', pain: true },
-  { key: 'fatigue', label: 'Müdigkeit', region: 'Allgemein', pain: false },
-  { key: 'headache', label: 'Kopfschmerzen', region: 'Kopf', pain: true },
+export const FREQUENT_SYMPTOMS: SymptomDefinition[] = [
+  { key: 'neck', label: 'Nackenschmerzen', pain: true, regions: ['Seitlich links', 'Seitlich rechts', 'Nacken-Schulter-Übergang', 'Ansatz Hinterkopf'] },
+  { key: 'fatigue', label: 'Müdigkeit', pain: false, regions: ['Allgemein'] },
+  { key: 'headache', label: 'Kopfschmerzen', pain: true, regions: ['Stirn', 'Schläfen', 'Hinterkopf', 'Ganzer Kopf'] },
 ];
 
-export const OTHER_SYMPTOMS: Array<{ key: string; label: string; region: string; pain: boolean }> = [
-  { key: 'back', label: 'Rückenschmerzen', region: 'Rücken', pain: true },
-  { key: 'shoulder', label: 'Schulterschmerzen', region: 'Schulter', pain: true },
-  { key: 'eyes', label: 'Augenbelastung', region: 'Augen', pain: false },
-  { key: 'tension', label: 'Innere Unruhe', region: 'Allgemein', pain: false },
+export const OTHER_SYMPTOMS: SymptomDefinition[] = [
+  { key: 'back', label: 'Rückenschmerzen', pain: true, regions: ['Unterer Rücken', 'Mittlerer Rücken', 'Oberer Rücken'] },
+  { key: 'shoulder', label: 'Schulterschmerzen', pain: true, regions: ['Links', 'Rechts', 'Beidseitig', 'Schulterblatt'] },
+  { key: 'eyes', label: 'Augenbelastung', pain: false, regions: ['Augen'] },
+  { key: 'tension', label: 'Innere Unruhe', pain: false, regions: ['Allgemein'] },
 ];
 
-export const PAIN_REGIONS = ['Nacken', 'Schulter', 'Rücken', 'Kopf', 'Arme', 'Beine'];
+export type IllnessTypeKey = 'cold' | 'gi' | 'flu' | 'migraine' | 'allergy';
 
-export const COLD_SUBS = ['Halsschmerzen', 'Schnupfen', 'Husten', 'Fieber', 'Gliederschmerzen'];
-export const GI_SUBS = ['Übelkeit', 'Bauchschmerzen', 'Durchfall', 'Appetitlosigkeit'];
+export const ILLNESS_TYPES: Array<{ key: IllnessTypeKey; label: string; subs: string[] }> = [
+  { key: 'cold', label: 'Erkältung', subs: ['Halsschmerzen', 'Schnupfen', 'Husten', 'Fieber', 'Gliederschmerzen'] },
+  { key: 'gi', label: 'Magen-Darm', subs: ['Übelkeit', 'Bauchschmerzen', 'Durchfall', 'Appetitlosigkeit'] },
+  { key: 'flu', label: 'Grippeartig', subs: ['Fieber', 'Schüttelfrost', 'Gliederschmerzen', 'Abgeschlagenheit'] },
+  { key: 'migraine', label: 'Migräne / starke Kopfschmerzen', subs: ['Pochender Kopfschmerz', 'Lichtempfindlichkeit', 'Übelkeit', 'Sehstörungen'] },
+  { key: 'allergy', label: 'Allergie', subs: ['Niesen', 'Juckende Augen', 'Hautausschlag', 'Atembeschwerden'] },
+];
+
+export function illnessSubsFor(type: IllnessTypeKey | null): string[] {
+  return ILLNESS_TYPES.find(t => t.key === type)?.subs ?? [];
+}
+
+export function illnessLabelFor(type: IllnessTypeKey | null): string {
+  return ILLNESS_TYPES.find(t => t.key === type)?.label ?? '';
+}
 
 export function draftComplete(draft: CheckinDraft): boolean {
   return draft.location !== null && draft.mood !== null && draft.energy !== null && draft.stress !== null && draft.sick !== null;
