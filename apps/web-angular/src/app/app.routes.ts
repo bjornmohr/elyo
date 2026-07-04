@@ -20,7 +20,8 @@ export const routes: Routes = [
     loadComponent: () => import('./shared/shells/employee-shell.component').then(m => m.EmployeeShellComponent),
     children: [
       { path: 'dashboard', loadComponent: () => import('./features/employee/pages/dashboard/dashboard.component').then(m => m.DashboardComponent) },
-      { path: 'checkin', loadComponent: () => import('./features/employee/pages/checkin/checkin.component').then(m => m.CheckinComponent) },
+      { path: 'checkin', loadComponent: () => import('./features/employee/pages/checkin/checkin-stepper.component').then(m => m.CheckinStepperComponent) },
+      { path: 'checkin/chat', loadComponent: () => import('./features/employee/pages/checkin/checkin-chat.component').then(m => m.CheckinChatComponent) },
       { path: 'history', loadComponent: () => import('./features/employee/pages/history/history.component').then(m => m.HistoryComponent) },
       { path: 'profile', loadComponent: () => import('./features/employee/pages/profile/profile.component').then(m => m.ProfileComponent) },
       { path: 'surveys', loadComponent: () => import('./features/employee/pages/surveys/surveys.component').then(m => m.SurveysComponent) },
