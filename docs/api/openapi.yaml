@@ -169,6 +169,26 @@ components:
         sortOrder: { type: integer }
         isActive: { type: boolean }
 
+    SuitabilityLocationTag:
+      type: string
+      enum: [office, home, plant, onroad]
+
+    SuitabilityPostureTag:
+      type: string
+      enum: [standing, sitting]
+
+    ExerciseStep:
+      type: object
+      description: One "So geht's" step of an exercise, optionally illustrated by a pictogram.
+      required: [text]
+      properties:
+        text: { type: string }
+        pictogramPath:
+          type: string
+          nullable: true
+          description: Path relative to the API origin (e.g. pictograms/<measure>/<exercise>/step-1.svg).
+        alt: { type: string, nullable: true }
+
     AdminSystemExercise:
       type: object
       properties:
@@ -190,6 +210,24 @@ components:
         contraindications: { type: string, nullable: true }
         defaultFeedbackPrompt: { type: string, nullable: true }
         requiresFeedback: { type: boolean }
+        steps:
+          type: array
+          items: { $ref: '#/components/schemas/ExerciseStep' }
+        mainPictogramPath: { type: string, nullable: true }
+        mainPictogramAlt: { type: string, nullable: true }
+        locationTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor:
+          type: boolean
+          nullable: true
+          description: Null means the exercise inherits the template-level value.
+        defaultEffort: { type: integer, minimum: 1, maximum: 5, nullable: true }
         status: { $ref: '#/components/schemas/SystemExerciseStatus' }
         tags:
           type: array
@@ -221,6 +259,22 @@ components:
         requiresFeedback:
           type: boolean
           description: Defaults to true when omitted.
+        steps:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/ExerciseStep' }
+        mainPictogramPath: { type: string, maxLength: 255, nullable: true }
+        mainPictogramAlt: { type: string, maxLength: 255, nullable: true }
+        locationTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor: { type: boolean, nullable: true }
+        defaultEffort: { type: integer, minimum: 1, maximum: 5, nullable: true }
         tagIds:
           type: array
           description: IDs of existing system exercise tags; the assignment is synced exactly to this list.
@@ -245,6 +299,22 @@ components:
         contraindications: { type: string, nullable: true }
         defaultFeedbackPrompt: { type: string, nullable: true }
         requiresFeedback: { type: boolean }
+        steps:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/ExerciseStep' }
+        mainPictogramPath: { type: string, maxLength: 255, nullable: true }
+        mainPictogramAlt: { type: string, maxLength: 255, nullable: true }
+        locationTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor: { type: boolean, nullable: true }
+        defaultEffort: { type: integer, minimum: 1, maximum: 5, nullable: true }
         tagIds:
           type: array
           description: When present, tag assignment is synced exactly to this list; when absent, tags are untouched.
@@ -296,6 +366,31 @@ components:
         estimatedDurationMinutes: { type: integer, nullable: true }
         status: { $ref: '#/components/schemas/SystemMeasureTemplateStatus' }
         isFeatured: { type: boolean }
+        targetSignal:
+          type: string
+          nullable: true
+          description: The signal the measure targets (e.g. neck_pain, sleep, stress).
+        assignmentReasonTemplate:
+          type: string
+          nullable: true
+          description: Reason text template shown on assignments (e.g. "aus Check-in „Nackenschmerzen“").
+        effectMetric:
+          type: string
+          nullable: true
+          enum: [pain, stress, sleep_hours, null]
+        effectMetricUnit:
+          type: string
+          nullable: true
+          description: Unit of the effect metric (e.g. nrs_0_10, scale_1_5, hours).
+        locationTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor: { type: boolean }
         exerciseCount: { type: integer }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -363,6 +458,22 @@ components:
         isFeatured:
           type: boolean
           description: Defaults to false when omitted.
+        targetSignal: { type: string, maxLength: 255, nullable: true }
+        assignmentReasonTemplate: { type: string, nullable: true }
+        effectMetric:
+          type: string
+          nullable: true
+          enum: [pain, stress, sleep_hours, null]
+        effectMetricUnit: { type: string, maxLength: 50, nullable: true }
+        locationTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor: { type: boolean }
 
     AdminSystemMeasureTemplateUpdatePayload:
       type: object
@@ -376,6 +487,22 @@ components:
         status: { $ref: '#/components/schemas/SystemMeasureTemplateStatus' }
         estimatedDurationMinutes: { type: integer, minimum: 1, maximum: 100000, nullable: true }
         isFeatured: { type: boolean }
+        targetSignal: { type: string, maxLength: 255, nullable: true }
+        assignmentReasonTemplate: { type: string, nullable: true }
+        effectMetric:
+          type: string
+          nullable: true
+          enum: [pain, stress, sleep_hours, null]
+        effectMetricUnit: { type: string, maxLength: 50, nullable: true }
+        locationTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor: { type: boolean }
 
     AdminSystemMeasureTemplateExerciseCreatePayload:
       type: object
@@ -908,6 +1035,96 @@ components:
         recommendations:
           type: array
           items: { $ref: '#/components/schemas/InsightRecommendation' }
+
+    MeasureEffect:
+      type: object
+      nullable: true
+      description: Before/after demo effect shown as a badge (3a) and "Wirkung deiner letzten Einheit" (3c).
+      properties:
+        metric:
+          type: string
+          enum: [pain, stress, sleep_hours]
+        unit: { type: string, nullable: true }
+        before: { type: number, nullable: true }
+        after: { type: number, nullable: true }
+        direction:
+          type: string
+          enum: [up, down]
+
+    AssignedMeasure:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        category: { type: string, nullable: true }
+        assignmentReason: { type: string, nullable: true }
+        exerciseCount: { type: integer }
+        estMinutes: { type: integer, nullable: true }
+        streakDays: { type: integer, nullable: true }
+        weeklyDone: { type: integer, nullable: true }
+        weeklyTarget: { type: integer, nullable: true }
+        effect: { $ref: '#/components/schemas/MeasureEffect' }
+        locationTags:
+          type: array
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor: { type: boolean }
+
+    AssignedMeasureExercise:
+      type: object
+      properties:
+        id: { type: integer }
+        position: { type: integer }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        instructions: { type: string, nullable: true }
+        sets: { type: integer, nullable: true }
+        repetitions: { type: integer, nullable: true }
+        holdSeconds: { type: integer, nullable: true }
+        durationMinutes: { type: integer, nullable: true }
+        safetyNotes: { type: string, nullable: true }
+        status: { type: string }
+        mainPictogramPath:
+          type: string
+          nullable: true
+          description: Path relative to the API origin; resolved from the source system exercise.
+        mainPictogramAlt: { type: string, nullable: true }
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              text: { type: string }
+              pictogramPath: { type: string, nullable: true }
+              alt: { type: string, nullable: true }
+        defaultEffort: { type: integer, nullable: true }
+        locationTags:
+          type: array
+          description: Exercise-level tags; falls back to the template-level tags when the exercise defines none.
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor: { type: boolean }
+
+    AssignedMeasureDetail:
+      allOf:
+        - $ref: '#/components/schemas/AssignedMeasure'
+        - type: object
+          properties:
+            description: { type: string, nullable: true }
+            lastSession:
+              type: object
+              nullable: true
+              properties:
+                effect: { $ref: '#/components/schemas/MeasureEffect' }
+                effort: { type: integer, nullable: true }
+                points: { type: integer, nullable: true }
+            exercises:
+              type: array
+              items: { $ref: '#/components/schemas/AssignedMeasureExercise' }
 
     EmployeeMeasure:
       allOf:
@@ -1451,8 +1668,51 @@ paths:
   /employee/measures:
     get:
       tags: [Employee]
-      summary: List active measures visible to the authenticated employee
-      description: Returns active company-wide measures and active measures targeted to the authenticated employee's current team, including only that employee's participation state.
+      summary: List system measures assigned to the authenticated employee (3a)
+      description: Returns the employee's assigned/active user system measures with category, assignment reason, weekly progress, demo streak, effect badge, and suitability tags. Demo display values come from the assignment's recommendation context.
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Assigned measures
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AssignedMeasure'
+
+  /employee/measures/{userSystemMeasure}:
+    get:
+      tags: [Employee]
+      summary: Get an assigned system measure with its exercises (3c)
+      description: Returns the measure detail including exercises with sets/reps/hold/duration, pictogram paths, steps, suitability tags, and the demo "last session" effect. Scoped to the authenticated employee; foreign IDs return 404.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: userSystemMeasure
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Assigned measure detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AssignedMeasureDetail'
+        404:
+          description: Measure not found or not assigned to the authenticated employee
+
+  /employee/company-measures:
+    get:
+      tags: [Employee]
+      summary: List active company measures visible to the authenticated employee
+      description: Returns active company-wide measures and active measures targeted to the authenticated employee's current team, including only that employee's participation state. (Formerly served at /employee/measures.)
       security: [{ Sanctum: [] }]
       responses:
         200:

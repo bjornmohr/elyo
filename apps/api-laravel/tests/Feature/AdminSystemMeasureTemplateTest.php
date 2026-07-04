@@ -729,4 +729,56 @@ class AdminSystemMeasureTemplateTest extends TestCase
         $this->assertSame(2, $template->templateExercises()->find($ids[0])->position);
         $this->assertSame(1, $template->templateExercises()->find($ids[1])->position);
     }
+
+    // ── Catalog fields (target signal, effect metric, suitability) ──
+
+    public function test_create_and_update_roundtrip_for_catalog_fields(): void
+    {
+        $created = $this->actingAs($this->platformAdmin)
+            ->postJson('/api/admin/system-measure-templates', [
+                'title' => 'Nacken-Mobilität',
+                'targetSignal' => 'neck_pain',
+                'assignmentReasonTemplate' => 'aus Check-in „Nackenschmerzen“',
+                'effectMetric' => 'pain',
+                'effectMetricUnit' => 'nrs_0_10',
+                'locationTags' => ['office', 'plant'],
+                'postureTags' => ['standing'],
+                'requiresFloor' => false,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.targetSignal', 'neck_pain')
+            ->assertJsonPath('data.assignmentReasonTemplate', 'aus Check-in „Nackenschmerzen“')
+            ->assertJsonPath('data.effectMetric', 'pain')
+            ->assertJsonPath('data.effectMetricUnit', 'nrs_0_10')
+            ->assertJsonPath('data.locationTags', ['office', 'plant'])
+            ->assertJsonPath('data.postureTags', ['standing'])
+            ->assertJsonPath('data.requiresFloor', false);
+
+        $templateId = $created->json('data.id');
+
+        $this->actingAs($this->platformAdmin)
+            ->patchJson("/api/admin/system-measure-templates/{$templateId}", [
+                'effectMetric' => 'sleep_hours',
+                'effectMetricUnit' => 'hours',
+                'locationTags' => ['home'],
+                'requiresFloor' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.effectMetric', 'sleep_hours')
+            ->assertJsonPath('data.locationTags', ['home'])
+            ->assertJsonPath('data.requiresFloor', true);
+    }
+
+    public function test_create_rejects_invalid_catalog_field_values(): void
+    {
+        $this->actingAs($this->platformAdmin)
+            ->postJson('/api/admin/system-measure-templates', [
+                'title' => 'Kaputt',
+                'effectMetric' => 'happiness',
+                'locationTags' => ['spaceship'],
+                'postureTags' => ['lying'],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['effectMetric', 'locationTags.0', 'postureTags.0']);
+    }
 }

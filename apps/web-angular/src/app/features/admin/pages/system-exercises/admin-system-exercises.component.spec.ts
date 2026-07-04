@@ -40,6 +40,13 @@ describe('AdminSystemExercisesComponent', () => {
     contraindications: null,
     defaultFeedbackPrompt: null,
     requiresFeedback: true,
+    steps: [],
+    mainPictogramPath: null,
+    mainPictogramAlt: null,
+    locationTags: null,
+    postureTags: null,
+    requiresFloor: null,
+    defaultEffort: null,
     status: 'ACTIVE',
     tags: [tags[0]],
     createdAt: '2026-06-11T00:00:00Z',
@@ -204,8 +211,8 @@ describe('AdminSystemExercisesComponent', () => {
 
     const element: HTMLElement = fixture.nativeElement;
     const tagCheckboxes = element.querySelectorAll('input[type="checkbox"]');
-    // requiresFeedback checkbox + one checkbox per catalog tag
-    expect(tagCheckboxes.length).toBe(1 + tags.length);
+    // requiresFeedback + 4 location tags + 2 posture tags + one checkbox per catalog tag
+    expect(tagCheckboxes.length).toBe(7 + tags.length);
     expect(element.textContent).toContain('Nacken');
     expect(element.textContent).toContain('Entspannung');
     expect(element.textContent).not.toContain('Tag anlegen');

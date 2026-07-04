@@ -34,6 +34,8 @@ class SystemExercise extends Model
         'default_duration_minutes', 'default_sets', 'default_repetitions', 'default_hold_seconds',
         'instructions', 'safety_notes', 'contraindications',
         'default_feedback_prompt', 'requires_feedback',
+        'steps', 'main_pictogram_path', 'main_pictogram_alt',
+        'location_tags', 'posture_tags', 'requires_floor', 'default_effort',
         'status', 'created_by_user_id',
     ];
 
@@ -43,6 +45,11 @@ class SystemExercise extends Model
         'default_repetitions' => 'integer',
         'default_hold_seconds' => 'integer',
         'requires_feedback' => 'boolean',
+        'steps' => 'array',
+        'location_tags' => 'array',
+        'posture_tags' => 'array',
+        'requires_floor' => 'boolean',
+        'default_effort' => 'integer',
     ];
 
     protected static function booted(): void

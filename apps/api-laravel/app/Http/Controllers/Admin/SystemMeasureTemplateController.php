@@ -21,6 +21,13 @@ class SystemMeasureTemplateController extends Controller
         'difficulty' => 'difficulty',
         'estimatedDurationMinutes' => 'estimated_duration_minutes',
         'isFeatured' => 'is_featured',
+        'targetSignal' => 'target_signal',
+        'assignmentReasonTemplate' => 'assignment_reason_template',
+        'effectMetric' => 'effect_metric',
+        'effectMetricUnit' => 'effect_metric_unit',
+        'locationTags' => 'location_tags',
+        'postureTags' => 'posture_tags',
+        'requiresFloor' => 'requires_floor',
         'status' => 'status',
     ];
 

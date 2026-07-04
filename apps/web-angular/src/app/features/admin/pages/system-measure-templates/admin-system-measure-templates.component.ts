@@ -6,6 +6,8 @@ import { AdminSystemExerciseService } from '../../services/admin-system-exercise
 import { AdminSystemMeasureTemplateService } from '../../services/admin-system-measure-template.service';
 import {
   AdminSystemExercise,
+  ExerciseLocationTag,
+  ExercisePostureTag,
   PaginatedResponse,
 } from '../../models/admin-system-exercise.models';
 import {
@@ -13,6 +15,7 @@ import {
   AdminSystemMeasureTemplateExercise,
   CreateSystemMeasureTemplatePayload,
   ListSystemMeasureTemplatesParams,
+  MeasureEffectMetric,
   SystemMeasureTemplateCategory,
   SystemMeasureTemplateDifficulty,
   SystemMeasureTemplateStatus,
@@ -129,6 +132,54 @@ import {
             <label class="flex items-center gap-2 md:col-span-2">
               <input type="checkbox" formControlName="isFeatured" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
               <span class="text-sm font-medium text-gray-700">Empfohlenes Template</span>
+            </label>
+
+            <label class="block">
+              <span class="text-sm font-medium text-gray-700">Ziel-Signal</span>
+              <input type="text" formControlName="targetSignal" placeholder="z.B. neck_pain, sleep, stress" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500 font-mono" />
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium text-gray-700">Zuweisungsgrund-Vorlage</span>
+              <input type="text" formControlName="assignmentReasonTemplate" placeholder="aus Check-in „Nackenschmerzen“" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500" />
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium text-gray-700">Effekt-Metrik (Vorher/Nachher)</span>
+              <select formControlName="effectMetric" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500">
+                <option value="">Keine</option>
+                <option value="pain">Schmerz</option>
+                <option value="stress">Stress</option>
+                <option value="sleep_hours">Schlafstunden</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium text-gray-700">Effekt-Einheit</span>
+              <input type="text" formControlName="effectMetricUnit" placeholder="z.B. nrs_0_10, scale_1_5, hours" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500 font-mono" />
+            </label>
+            <div>
+              <span class="text-sm font-medium text-gray-700">Eignung: Ort</span>
+              <div class="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                @for (option of locationOptions; track option.value) {
+                  <label class="flex items-center gap-1.5 text-sm text-gray-700">
+                    <input type="checkbox" [checked]="selectedLocationTags().includes(option.value)" (change)="toggleLocationTag(option.value)" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                    {{ option.label }}
+                  </label>
+                }
+              </div>
+            </div>
+            <div>
+              <span class="text-sm font-medium text-gray-700">Eignung: Haltung</span>
+              <div class="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                @for (option of postureOptions; track option.value) {
+                  <label class="flex items-center gap-1.5 text-sm text-gray-700">
+                    <input type="checkbox" [checked]="selectedPostureTags().includes(option.value)" (change)="togglePostureTag(option.value)" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                    {{ option.label }}
+                  </label>
+                }
+              </div>
+            </div>
+            <label class="flex items-center gap-2 md:col-span-2">
+              <input type="checkbox" formControlName="requiresFloor" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+              <span class="text-sm font-medium text-gray-700">Bodenübungen enthalten (im Büro/Werk ausgeblendet)</span>
             </label>
           </div>
 
@@ -361,7 +412,37 @@ export class AdminSystemMeasureTemplatesComponent implements OnInit {
     status: 'ACTIVE' as SystemMeasureTemplateStatus,
     estimatedDurationMinutes: null as number | null,
     isFeatured: false,
+    targetSignal: '',
+    assignmentReasonTemplate: '',
+    effectMetric: '',
+    effectMetricUnit: '',
+    requiresFloor: false,
   });
+
+  locationOptions: Array<{ value: ExerciseLocationTag; label: string }> = [
+    { value: 'office', label: 'Büro' },
+    { value: 'home', label: 'Zuhause' },
+    { value: 'plant', label: 'Werk' },
+    { value: 'onroad', label: 'Unterwegs' },
+  ];
+  postureOptions: Array<{ value: ExercisePostureTag; label: string }> = [
+    { value: 'standing', label: 'Im Stehen' },
+    { value: 'sitting', label: 'Im Sitzen' },
+  ];
+  selectedLocationTags = signal<ExerciseLocationTag[]>([]);
+  selectedPostureTags = signal<ExercisePostureTag[]>([]);
+
+  toggleLocationTag(tag: ExerciseLocationTag) {
+    this.selectedLocationTags.update(tags =>
+      tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag]
+    );
+  }
+
+  togglePostureTag(tag: ExercisePostureTag) {
+    this.selectedPostureTags.update(tags =>
+      tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag]
+    );
+  }
 
   overridesForm = this.fb.nonNullable.group({
     customTitle: '',
@@ -416,6 +497,8 @@ export class AdminSystemMeasureTemplatesComponent implements OnInit {
   openCreate() {
     this.editing.set(null);
     this.form.reset();
+    this.selectedLocationTags.set([]);
+    this.selectedPostureTags.set([]);
     this.error.set(null);
     this.formOpen.set(true);
   }
@@ -423,6 +506,8 @@ export class AdminSystemMeasureTemplatesComponent implements OnInit {
   openEdit(template: AdminSystemMeasureTemplate) {
     this.editing.set(template);
     this.form.reset();
+    this.selectedLocationTags.set(template.locationTags ?? []);
+    this.selectedPostureTags.set(template.postureTags ?? []);
     this.form.patchValue({
       title: template.title,
       shortDescription: template.shortDescription ?? '',
@@ -432,6 +517,11 @@ export class AdminSystemMeasureTemplatesComponent implements OnInit {
       status: template.status,
       estimatedDurationMinutes: template.estimatedDurationMinutes,
       isFeatured: template.isFeatured,
+      targetSignal: template.targetSignal ?? '',
+      assignmentReasonTemplate: template.assignmentReasonTemplate ?? '',
+      effectMetric: template.effectMetric ?? '',
+      effectMetricUnit: template.effectMetricUnit ?? '',
+      requiresFloor: template.requiresFloor ?? false,
     });
     this.error.set(null);
     this.formOpen.set(true);
@@ -453,6 +543,13 @@ export class AdminSystemMeasureTemplatesComponent implements OnInit {
       status: value.status,
       estimatedDurationMinutes: value.estimatedDurationMinutes,
       isFeatured: value.isFeatured,
+      targetSignal: value.targetSignal.trim() || null,
+      assignmentReasonTemplate: value.assignmentReasonTemplate.trim() || null,
+      effectMetric: (value.effectMetric || null) as MeasureEffectMetric | null,
+      effectMetricUnit: value.effectMetricUnit.trim() || null,
+      locationTags: this.selectedLocationTags().length ? this.selectedLocationTags() : null,
+      postureTags: this.selectedPostureTags().length ? this.selectedPostureTags() : null,
+      requiresFloor: value.requiresFloor,
     };
   }
 

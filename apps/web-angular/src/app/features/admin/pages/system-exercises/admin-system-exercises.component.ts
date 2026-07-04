@@ -1,12 +1,15 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NotificationService } from '../../../../shared/notifications/notification.service';
 import { AdminSystemExerciseService } from '../../services/admin-system-exercise.service';
 import {
   AdminSystemExercise,
   AdminSystemExerciseTag,
   CreateSystemExercisePayload,
+  ExerciseLocationTag,
+  ExercisePostureTag,
+  ExerciseStep,
   ListSystemExercisesParams,
   PaginatedResponse,
   SystemExerciseDifficulty,
@@ -155,6 +158,68 @@ import {
               <input type="checkbox" formControlName="requiresFeedback" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
               <span class="text-sm font-medium text-gray-700">Feedback erforderlich</span>
             </label>
+
+            <label class="block">
+              <span class="text-sm font-medium text-gray-700">Haupt-Piktogramm (Pfad)</span>
+              <input type="text" formControlName="mainPictogramPath" placeholder="pictograms/…/main.svg" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500 font-mono" />
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium text-gray-700">Haupt-Piktogramm (Alt-Text)</span>
+              <input type="text" formControlName="mainPictogramAlt" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500" />
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium text-gray-700">Aufwand (1–5, Demo)</span>
+              <input type="number" min="1" max="5" formControlName="defaultEffort" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500" />
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium text-gray-700">Boden nötig</span>
+              <select formControlName="requiresFloor" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500">
+                <option value="">Von Vorlage erben</option>
+                <option value="true">Ja</option>
+                <option value="false">Nein</option>
+              </select>
+            </label>
+            <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <span class="text-sm font-medium text-gray-700">Eignung: Ort</span>
+                <div class="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                  @for (option of locationOptions; track option.value) {
+                    <label class="flex items-center gap-1.5 text-sm text-gray-700">
+                      <input type="checkbox" [checked]="selectedLocationTags().includes(option.value)" (change)="toggleLocationTag(option.value)" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                      {{ option.label }}
+                    </label>
+                  }
+                </div>
+              </div>
+              <div>
+                <span class="text-sm font-medium text-gray-700">Eignung: Haltung</span>
+                <div class="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                  @for (option of postureOptions; track option.value) {
+                    <label class="flex items-center gap-1.5 text-sm text-gray-700">
+                      <input type="checkbox" [checked]="selectedPostureTags().includes(option.value)" (change)="togglePostureTag(option.value)" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                      {{ option.label }}
+                    </label>
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-medium text-gray-700">Schritte („So geht's“ in der Ausführung)</span>
+              <button type="button" (click)="addStep()" class="text-sm font-semibold text-teal-600 hover:text-teal-700">+ Schritt</button>
+            </div>
+            <div formArrayName="steps" class="space-y-2 mt-2">
+              @for (step of steps.controls; track step; let i = $index) {
+                <div [formGroupName]="i" class="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-start rounded-lg border border-gray-100 p-3">
+                  <input type="text" formControlName="text" placeholder="Schritt-Text *" class="rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500" />
+                  <input type="text" formControlName="pictogramPath" placeholder="Piktogramm-Pfad (optional)" class="rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500 font-mono" />
+                  <input type="text" formControlName="alt" placeholder="Alt-Text (optional)" class="rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500" />
+                  <button type="button" (click)="removeStep(i)" class="px-2 py-2 text-sm font-semibold text-gray-400 hover:text-red-600">✕</button>
+                </div>
+              }
+            </div>
           </div>
 
           <div>
@@ -269,6 +334,16 @@ export class AdminSystemExercisesComponent implements OnInit {
   exerciseTypes: SystemExerciseType[] = ['MOBILITY', 'STRENGTH', 'BREATHING', 'MINDFULNESS', 'EDUCATION', 'REFLECTION'];
   difficulties: SystemExerciseDifficulty[] = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
   statuses: SystemExerciseStatus[] = ['DRAFT', 'ACTIVE', 'ARCHIVED'];
+  locationOptions: Array<{ value: ExerciseLocationTag; label: string }> = [
+    { value: 'office', label: 'Büro' },
+    { value: 'home', label: 'Zuhause' },
+    { value: 'plant', label: 'Werk' },
+    { value: 'onroad', label: 'Unterwegs' },
+  ];
+  postureOptions: Array<{ value: ExercisePostureTag; label: string }> = [
+    { value: 'standing', label: 'Im Stehen' },
+    { value: 'sitting', label: 'Im Sitzen' },
+  ];
 
   exercises = signal<AdminSystemExercise[]>([]);
   meta = signal<PaginatedResponse<AdminSystemExercise>['meta'] | null>(null);
@@ -279,6 +354,8 @@ export class AdminSystemExercisesComponent implements OnInit {
   formOpen = signal(false);
   editing = signal<AdminSystemExercise | null>(null);
   selectedTagIds = signal<number[]>([]);
+  selectedLocationTags = signal<ExerciseLocationTag[]>([]);
+  selectedPostureTags = signal<ExercisePostureTag[]>([]);
   page = signal(1);
 
   groupedTags = computed(() => {
@@ -315,7 +392,40 @@ export class AdminSystemExercisesComponent implements OnInit {
     contraindications: '',
     defaultFeedbackPrompt: '',
     requiresFeedback: true,
+    mainPictogramPath: '',
+    mainPictogramAlt: '',
+    defaultEffort: null as number | null,
+    requiresFloor: '',
+    steps: this.fb.array<FormGroup>([]),
   });
+
+  get steps(): FormArray<FormGroup> {
+    return this.form.get('steps') as FormArray<FormGroup>;
+  }
+
+  addStep(step?: ExerciseStep) {
+    this.steps.push(this.fb.nonNullable.group({
+      text: [step?.text ?? '', Validators.required],
+      pictogramPath: step?.pictogramPath ?? '',
+      alt: step?.alt ?? '',
+    }));
+  }
+
+  removeStep(index: number) {
+    this.steps.removeAt(index);
+  }
+
+  toggleLocationTag(tag: ExerciseLocationTag) {
+    this.selectedLocationTags.update(tags =>
+      tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag]
+    );
+  }
+
+  togglePostureTag(tag: ExercisePostureTag) {
+    this.selectedPostureTags.update(tags =>
+      tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag]
+    );
+  }
 
   ngOnInit() {
     this.service.listTags().subscribe({
@@ -366,7 +476,10 @@ export class AdminSystemExercisesComponent implements OnInit {
   openCreate() {
     this.editing.set(null);
     this.selectedTagIds.set([]);
+    this.selectedLocationTags.set([]);
+    this.selectedPostureTags.set([]);
     this.form.reset();
+    this.steps.clear();
     this.error.set(null);
     this.formOpen.set(true);
   }
@@ -374,7 +487,11 @@ export class AdminSystemExercisesComponent implements OnInit {
   openEdit(exercise: AdminSystemExercise) {
     this.editing.set(exercise);
     this.selectedTagIds.set(exercise.tags.map(tag => tag.id));
+    this.selectedLocationTags.set(exercise.locationTags ?? []);
+    this.selectedPostureTags.set(exercise.postureTags ?? []);
     this.form.reset();
+    this.steps.clear();
+    (exercise.steps ?? []).forEach(step => this.addStep(step));
     this.form.patchValue({
       title: exercise.title,
       shortDescription: exercise.shortDescription ?? '',
@@ -391,6 +508,10 @@ export class AdminSystemExercisesComponent implements OnInit {
       contraindications: exercise.contraindications ?? '',
       defaultFeedbackPrompt: exercise.defaultFeedbackPrompt ?? '',
       requiresFeedback: exercise.requiresFeedback,
+      mainPictogramPath: exercise.mainPictogramPath ?? '',
+      mainPictogramAlt: exercise.mainPictogramAlt ?? '',
+      defaultEffort: exercise.defaultEffort,
+      requiresFloor: exercise.requiresFloor === null || exercise.requiresFloor === undefined ? '' : String(exercise.requiresFloor),
     });
     this.error.set(null);
     this.formOpen.set(true);
@@ -425,6 +546,19 @@ export class AdminSystemExercisesComponent implements OnInit {
       contraindications: value.contraindications.trim() || null,
       defaultFeedbackPrompt: value.defaultFeedbackPrompt.trim() || null,
       requiresFeedback: value.requiresFeedback,
+      mainPictogramPath: value.mainPictogramPath.trim() || null,
+      mainPictogramAlt: value.mainPictogramAlt.trim() || null,
+      defaultEffort: value.defaultEffort,
+      requiresFloor: value.requiresFloor === '' ? null : value.requiresFloor === 'true',
+      locationTags: this.selectedLocationTags().length ? this.selectedLocationTags() : null,
+      postureTags: this.selectedPostureTags().length ? this.selectedPostureTags() : null,
+      steps: this.steps.length
+        ? this.steps.getRawValue().map(step => ({
+            text: (step['text'] as string).trim(),
+            pictogramPath: (step['pictogramPath'] as string).trim() || null,
+            alt: (step['alt'] as string).trim() || null,
+          }))
+        : null,
       tagIds: this.selectedTagIds(),
     };
   }

@@ -744,7 +744,7 @@ class EmployeeTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->employee, 'sanctum')
-            ->getJson('/api/employee/measures');
+            ->getJson('/api/employee/company-measures');
 
         $response->assertStatus(200);
         $this->assertEqualsCanonicalizing(
@@ -774,7 +774,7 @@ class EmployeeTest extends TestCase
         ]);
 
         $this->actingAs($this->employee, 'sanctum')
-            ->getJson('/api/employee/measures')
+            ->getJson('/api/employee/company-measures')
             ->assertStatus(200)
             ->assertJsonPath('data.0.deliveryType', 'HYBRID')
             ->assertJsonPath('data.0.executionType', 'GUIDED_SESSION')
@@ -806,7 +806,7 @@ class EmployeeTest extends TestCase
         ]);
 
         $this->actingAs($this->employee, 'sanctum')
-            ->getJson('/api/employee/measures')
+            ->getJson('/api/employee/company-measures')
             ->assertStatus(200)
             ->assertJsonPath('data.0.participation.isParticipating', true)
             ->assertJsonPath('data.0.participation.participatedAt', '2026-06-01T09:00:00+00:00')
@@ -835,7 +835,7 @@ class EmployeeTest extends TestCase
         ]);
 
         $this->actingAs($this->employee, 'sanctum')
-            ->getJson('/api/employee/measures')
+            ->getJson('/api/employee/company-measures')
             ->assertStatus(200)
             ->assertJsonPath('data.0.participation.isParticipating', false)
             ->assertJsonPath('data.0.participation.participatedAt', null)
