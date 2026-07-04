@@ -35,7 +35,7 @@ interface ChatEntry {
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <div class="max-w-2xl mx-auto p-4 space-y-6">
+    <div class="w-full p-4 space-y-6">
       <header class="flex items-center justify-between gap-4">
         <div class="flex items-center space-x-4">
           <a routerLink="/employee/dashboard" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>
@@ -132,9 +132,16 @@ interface ChatEntry {
         } @else {
           <div class="flex flex-col items-center text-center space-y-3 py-6">
             <div class="w-14 h-14 rounded-full bg-teal-50 flex items-center justify-center text-2xl">✓</div>
-            <p class="text-sm font-bold text-slate-800">Check-in gespeichert · <span class="text-teal-600">+10 Punkte</span></p>
+            @if (justSaved()) {
+              <p class="text-sm font-bold text-slate-800">Check-in gespeichert · <span class="text-teal-600">+10 Punkte</span></p>
+            } @else {
+              <p class="text-sm font-bold text-slate-800">Check-in für heute erledigt</p>
+            }
             <p class="text-xs text-slate-400 max-w-xs">Deine Angaben bleiben in dieser Demo lokal auf deinem Gerät gespeichert.</p>
-            <a routerLink="/employee/dashboard" class="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors">Zurück zur Übersicht</a>
+            <div class="flex gap-3">
+              <button type="button" (click)="restart()" class="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">Erneut ausfüllen</button>
+              <a routerLink="/employee/dashboard" class="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors">Zurück zur Übersicht</a>
+            </div>
           </div>
         }
       </div>
@@ -163,9 +170,20 @@ export class CheckinChatComponent {
   sleepHourOptions = [5, 5.5, 6, 6.5, 7, 7.5, 8, 9];
 
   draft: CheckinDraft = emptyDraft();
-  step = signal<ChatStep>('location');
+  // A check-in saved earlier today (persisted in localStorage) reopens on the
+  // done screen instead of restarting the conversation.
+  step = signal<ChatStep>(this.storage.todayCompleted() ? 'done' : 'location');
+  justSaved = signal(false);
   history = signal<ChatEntry[]>([]);
   selectedSymptoms = signal<string[]>([]);
+
+  restart() {
+    this.draft = emptyDraft();
+    this.justSaved.set(false);
+    this.history.set([]);
+    this.selectedSymptoms.set([]);
+    this.step.set('location');
+  }
 
   private readonly questions: Record<Exclude<ChatStep, 'done'>, string> = {
     location: 'Wo bist du heute?',
@@ -279,6 +297,7 @@ export class CheckinChatComponent {
     if (!draftComplete(this.draft)) return;
     // Demo-only persistence: localStorage, never the API.
     this.storage.save(toDemoCheckin(this.draft, this.storage.todayKey()));
+    this.justSaved.set(true);
     this.push('Speichern ✓', 'done');
   }
 }

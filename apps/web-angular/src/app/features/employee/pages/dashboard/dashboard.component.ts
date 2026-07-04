@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { CheckinDemoStorageService } from '../../services/checkin-demo-storage.service';
 import { DashboardData, EmployeeService, MetricAggregate } from '../../services/employee.service';
 
 /**
@@ -14,7 +15,7 @@ import { DashboardData, EmployeeService, MetricAggregate } from '../../services/
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <div class="max-w-3xl mx-auto p-4 space-y-6">
+    <div class="w-full p-4 space-y-6">
       <header class="flex items-start justify-between gap-4">
         <div>
           <h1 class="text-xl font-bold text-slate-800">Hallo!</h1>
@@ -88,10 +89,10 @@ import { DashboardData, EmployeeService, MetricAggregate } from '../../services/
       <div class="bg-white rounded-2xl border border-slate-100 p-5 flex items-center justify-between gap-4">
         <div>
           <p class="font-semibold text-slate-800 text-sm">
-            {{ data()?.todayCheckinCompleted ? 'Check-in für heute erledigt ✓' : 'Dein Check-in wartet' }}
+            {{ checkinDone() ? 'Check-in für heute erledigt ✓' : 'Dein Check-in wartet' }}
           </p>
           <p class="text-xs text-slate-400 mt-0.5">
-            {{ data()?.todayCheckinCompleted ? 'Stark — bis morgen!' : 'Wie fühlst du dich heute? Dauert unter einer Minute.' }}
+            {{ checkinDone() ? 'Stark — bis morgen!' : 'Wie fühlst du dich heute? Dauert unter einer Minute.' }}
           </p>
         </div>
         <a routerLink="/employee/checkin"
@@ -147,9 +148,15 @@ import { DashboardData, EmployeeService, MetricAggregate } from '../../services/
 })
 export class DashboardComponent implements OnInit {
   private employeeService = inject(EmployeeService);
+  private checkinStorage = inject(CheckinDemoStorageService);
 
   data = signal<DashboardData | null>(null);
   today = new Date();
+
+  /** Local demo check-in (Handoff 02) also counts as done — client-side polish only. */
+  checkinDone = computed(() =>
+    (this.data()?.todayCheckinCompleted ?? false) || this.checkinStorage.todayCompleted()
+  );
 
   ngOnInit() {
     this.employeeService.getDashboard().subscribe(data => {

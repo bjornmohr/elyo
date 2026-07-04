@@ -12,7 +12,7 @@ import { AssignedMeasureDetail, EmployeeService, MeasureExercise } from '../../s
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <div class="max-w-3xl mx-auto p-4 space-y-6">
+    <div class="w-full p-4 space-y-6">
       <header class="flex items-center space-x-4">
         <a [routerLink]="['/employee/measures', measureId]" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>
         <div>
@@ -113,7 +113,7 @@ export class EmployeeMeasureExerciseComponent implements OnInit, OnDestroy {
   private router = inject(Router);
 
   measureId = 0;
-  private position = 0;
+  private positionSignal = signal(0);
 
   measure = signal<AssignedMeasureDetail | null>(null);
   loading = signal(true);
@@ -122,17 +122,33 @@ export class EmployeeMeasureExerciseComponent implements OnInit, OnDestroy {
   timerRunning = signal(false);
   private timerHandle: ReturnType<typeof setInterval> | null = null;
 
+  private get position(): number {
+    return this.positionSignal();
+  }
+
   exercise = computed<MeasureExercise | null>(() =>
-    this.measure()?.exercises.find(e => e.position === this.position) ?? null
+    this.measure()?.exercises.find(e => e.position === this.positionSignal()) ?? null
   );
 
   ngOnInit() {
-    this.measureId = Number(this.route.snapshot.paramMap.get('id'));
-    this.position = Number(this.route.snapshot.paramMap.get('position'));
-    this.currentSet.set(this.readStoredSet());
-    this.employeeService.getAssignedMeasure(this.measureId).subscribe({
-      next: measure => { this.measure.set(measure); this.loading.set(false); },
-      error: () => this.loading.set(false),
+    // Subscribe (not snapshot): auto-advance navigates to the next exercise
+    // within the same component instance.
+    this.route.paramMap.subscribe(params => {
+      this.measureId = Number(params.get('id'));
+      this.positionSignal.set(Number(params.get('position')));
+      this.currentSet.set(this.readStoredSet());
+      this.resetTimer();
+
+      if (!this.measure()) {
+        this.employeeService.getAssignedMeasure(this.measureId).subscribe({
+          next: measure => {
+            this.measure.set(measure);
+            this.loading.set(false);
+            this.resetTimer();
+          },
+          error: () => this.loading.set(false),
+        });
+      }
     });
   }
 
@@ -165,13 +181,34 @@ export class EmployeeMeasureExerciseComponent implements OnInit, OnDestroy {
     return `${minutes}:${String(seconds).padStart(2, '0')}`;
   }
 
+  /** Countdown start value: hold time if defined, else the exercise duration. */
+  private initialTimerSeconds(): number {
+    const exercise = this.exercise();
+    if (exercise?.holdSeconds) return exercise.holdSeconds;
+    if (exercise?.durationMinutes) return exercise.durationMinutes * 60;
+    return 60;
+  }
+
+  private resetTimer() {
+    this.stopTimer();
+    this.timerSeconds.set(this.initialTimerSeconds());
+  }
+
   toggleTimer() {
     if (this.timerRunning()) {
       this.stopTimer();
       return;
     }
+    if (this.timerSeconds() <= 0) {
+      this.timerSeconds.set(this.initialTimerSeconds());
+    }
     this.timerRunning.set(true);
-    this.timerHandle = setInterval(() => this.timerSeconds.update(s => s + 1), 1000);
+    this.timerHandle = setInterval(() => {
+      this.timerSeconds.update(s => Math.max(0, s - 1));
+      if (this.timerSeconds() === 0) {
+        this.stopTimer();
+      }
+    }, 1000);
   }
 
   isLastSet(): boolean {
@@ -183,6 +220,7 @@ export class EmployeeMeasureExerciseComponent implements OnInit, OnDestroy {
     if (!this.isLastSet()) {
       this.currentSet.update(s => s + 1);
       this.persistRunState();
+      this.resetTimer();
       return;
     }
     this.finishExercise();
@@ -206,7 +244,15 @@ export class EmployeeMeasureExerciseComponent implements OnInit, OnDestroy {
     }
 
     this.writeRunState(state);
-    this.router.navigate(['/employee/measures', this.measureId]);
+
+    // Auto-advance to the next exercise; back to the detail page after the last one.
+    const next = this.measure()?.exercises.find(e => e.position > this.position);
+    if (next) {
+      this.currentSet.set(1);
+      this.router.navigate(['/employee/measures', this.measureId, 'exercise', next.position]);
+    } else {
+      this.router.navigate(['/employee/measures', this.measureId]);
+    }
   }
 
   private persistRunState() {

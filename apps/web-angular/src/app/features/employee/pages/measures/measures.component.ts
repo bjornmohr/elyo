@@ -28,7 +28,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <div class="max-w-3xl mx-auto p-4 space-y-6">
+    <div class="w-full p-4 space-y-6">
       <header class="flex items-center justify-between gap-4">
         <div class="flex items-center space-x-4">
           <a routerLink="/employee" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>

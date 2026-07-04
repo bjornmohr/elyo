@@ -30,7 +30,7 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <div class="max-w-2xl mx-auto p-4 space-y-6">
+    <div class="w-full p-4 space-y-6">
       <header class="flex items-center justify-between gap-4">
         <div class="flex items-center space-x-4">
           <a routerLink="/employee/dashboard" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>
@@ -264,12 +264,19 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
           @case ('done') {
             <div class="flex-1 flex flex-col items-center justify-center text-center space-y-4 py-8">
               <div class="w-16 h-16 rounded-full bg-teal-50 flex items-center justify-center text-3xl">✓</div>
-              <h2 class="text-lg font-bold text-slate-800">Check-in gespeichert</h2>
-              <p class="text-sm font-bold text-teal-600">+10 Punkte</p>
+              <h2 class="text-lg font-bold text-slate-800">{{ justSaved() ? 'Check-in gespeichert' : 'Check-in für heute erledigt' }}</h2>
+              @if (justSaved()) {
+                <p class="text-sm font-bold text-teal-600">+10 Punkte</p>
+              }
               <p class="text-xs text-slate-400 max-w-xs">Deine Angaben bleiben in dieser Demo lokal auf deinem Gerät gespeichert.</p>
-              <a routerLink="/employee/dashboard" class="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors">
-                Zurück zur Übersicht
-              </a>
+              <div class="flex gap-3">
+                <button type="button" (click)="restart()" class="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+                  Erneut ausfüllen
+                </button>
+                <a routerLink="/employee/dashboard" class="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors">
+                  Zurück zur Übersicht
+                </a>
+              </div>
             </div>
           }
         }
@@ -309,10 +316,20 @@ export class CheckinStepperComponent {
   painRegions = PAIN_REGIONS;
 
   draft: CheckinDraft = emptyDraft();
-  step = signal<Step>('location');
+  // A check-in saved earlier today (persisted in localStorage) reopens on the
+  // done screen instead of restarting the flow.
+  step = signal<Step>(this.storage.todayCompleted() ? 'done' : 'location');
+  justSaved = signal(false);
   private lastPainKey = signal<string | null>(null);
 
   stepIndex = computed(() => STEPS.indexOf(this.step() as (typeof STEPS)[number]));
+
+  restart() {
+    this.draft = emptyDraft();
+    this.justSaved.set(false);
+    this.lastPainKey.set(null);
+    this.step.set('location');
+  }
 
   sleepActive(): boolean {
     return sleepBranchActive(this.draft);
@@ -436,6 +453,7 @@ export class CheckinStepperComponent {
     if (!draftComplete(this.draft)) return;
     // Demo-only persistence: localStorage, never the API.
     this.storage.save(toDemoCheckin(this.draft, this.storage.todayKey()));
+    this.justSaved.set(true);
     this.step.set('done');
   }
 }
