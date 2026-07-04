@@ -10,14 +10,18 @@ use App\Http\Resources\Company\TrendPointResource;
 use App\Models\Team;
 use App\Services\AnonymityService;
 use App\Services\Company\TeamLayerGuard;
+use App\Services\Insights\Contracts\DashboardSummaryProvider;
 use Illuminate\Http\Request;
 
 class CompanyController extends Controller
 {
     protected $anonymityService;
 
-    public function __construct(AnonymityService $anonymityService, private readonly TeamLayerGuard $teamLayerGuard)
-    {
+    public function __construct(
+        AnonymityService $anonymityService,
+        private readonly TeamLayerGuard $teamLayerGuard,
+        private readonly DashboardSummaryProvider $dashboardSummaryProvider,
+    ) {
         $this->anonymityService = $anonymityService;
     }
 
@@ -77,6 +81,7 @@ class CompanyController extends Controller
             'company' => new AggregatedMetricsResource($metrics),
             'trend' => TrendPointResource::collection($trend),
             'teams' => TeamResource::collection($teams),
+            'executiveSummary' => $this->dashboardSummaryProvider->summaryFor($user),
         ]);
     }
 }

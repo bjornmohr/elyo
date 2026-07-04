@@ -21,6 +21,10 @@ export class AuthStore {
   allowedPortals = computed(() => this.state().allowedPortals);
   roles = computed(() => this.state().user?.roles ?? []);
   teamLayerEnabled = computed(() => this.state().user?.teamLayerEnabled ?? false);
+  measureImpactEnabled = computed(() => this.state().user?.measureImpactEnabled ?? false);
+  riskLandscapeEnabled = computed(() => this.state().user?.riskLandscapeEnabled ?? false);
+  usageFunnelEnabled = computed(() => this.state().user?.usageFunnelEnabled ?? false);
+  infectionRadarEnabled = computed(() => this.state().user?.infectionRadarEnabled ?? false);
 
   setUser(user: User | null) {
     this.state.update(s => ({ ...s, user }));

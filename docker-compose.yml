@@ -24,6 +24,7 @@ services:
     environment:
       - APP_ENV=local
       - APP_DEBUG=true
+      - ELYO_DATA_MODE=${ELYO_DATA_MODE:-demo}
       - DB_CONNECTION=pgsql
       - DB_HOST=postgres
       - DB_PORT=5432

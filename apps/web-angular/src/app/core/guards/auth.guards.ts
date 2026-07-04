@@ -56,6 +56,29 @@ export const roleGuard = (roles: Role[]): CanActivateFn => {
   };
 };
 
+type FeatureFlag = 'measureImpactEnabled' | 'riskLandscapeEnabled' | 'usageFunnelEnabled' | 'infectionRadarEnabled';
+
+export const featureFlagGuard = (flag: FeatureFlag): CanActivateFn => {
+  return (route, state) => {
+    const store = inject(AuthStore);
+    const router = inject(Router);
+    const authService = inject(AuthService);
+
+    if (store.user()?.[flag]) {
+      return true;
+    }
+
+    return restoreUser(store, authService).pipe(
+      map(user => {
+        if (!user) return loginUrl(router, state.url);
+        if (user[flag]) return true;
+
+        return router.createUrlTree(['/company/dashboard']);
+      })
+    );
+  };
+};
+
 export const portalGuard = (portal: Portal): CanActivateFn => {
   return (route, state) => {
     const store = inject(AuthStore);

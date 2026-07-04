@@ -11,8 +11,10 @@ use App\Http\Resources\Company\MeasureParticipationSummaryResource;
 use App\Models\Measure;
 use App\Models\Team;
 use App\Services\AnonymityService;
+use App\Services\Company\CompanyMeasureAccessService;
 use App\Services\Company\TeamLayerGuard;
 use App\Services\MeasureCheckinTokenService;
+use App\Services\MeasureExecutionService;
 use App\Services\MeasureParticipationSummaryService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -23,8 +25,10 @@ class MeasureController extends Controller
 {
     public function __construct(
         private readonly TeamLayerGuard $teamLayerGuard,
+        private readonly CompanyMeasureAccessService $measureAccessService,
         private readonly MeasureParticipationSummaryService $measureParticipationSummaryService,
         private readonly MeasureCheckinTokenService $measureCheckinTokenService,
+        private readonly MeasureExecutionService $measureExecutionService,
     )
     {
     }
@@ -32,31 +36,8 @@ class MeasureController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $user->loadMissing('roles');
-        $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
         $teamLayerEnabled = $this->teamLayerGuard->enabledFor($user);
-
-        if (! $teamLayerEnabled && $isManager) {
-            $this->teamLayerGuard->abortIfDisabled($user);
-        }
-
-        $managedTeamId = $isManager
-            ? Team::where('manager_id', $user->id)->where('company_id', $user->company_id)->value('id')
-            : null;
-
-        $query = Measure::where('company_id', $user->company_id);
-        if (! $teamLayerEnabled) {
-            $query->whereNull('team_id');
-        }
-
-        if ($isManager) {
-            if (! $managedTeamId) {
-                return MeasureResource::collection(collect());
-            }
-            $query->where(function ($q) use ($managedTeamId) {
-                $q->whereNull('team_id')->orWhere('team_id', $managedTeamId);
-            });
-        }
+        $query = $this->measureAccessService->readableMeasureQueryFor($user);
 
         $query->when($teamLayerEnabled, fn ($q) => $q->with('team:id,name'));
 
@@ -104,29 +85,7 @@ class MeasureController extends Controller
 
     public function update(PatchMeasureRequest $request, $id)
     {
-        $user = $request->user();
-        $user->loadMissing('roles');
-        $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
-        $teamLayerEnabled = $this->teamLayerGuard->enabledFor($user);
-        if (! $teamLayerEnabled && $isManager) {
-            $this->teamLayerGuard->abortIfDisabled($user);
-        }
-
-        $managedTeamId = $isManager
-            ? Team::where('manager_id', $user->id)->where('company_id', $user->company_id)->value('id')
-            : null;
-
-        $measure = Measure::where('id', $id)
-            ->where('company_id', $user->company_id)
-            ->firstOrFail();
-
-        if (! $teamLayerEnabled && $measure->team_id !== null) {
-            $this->teamLayerGuard->abortIfDisabled($user);
-        }
-
-        if ($isManager && (! $managedTeamId || (int) $measure->team_id !== (int) $managedTeamId)) {
-            abort(403);
-        }
+        $measure = $this->measureAccessService->manageableMeasureFor($request->user(), $id);
 
         $this->validateEffectiveDateRange($request, $measure);
 
@@ -185,10 +144,19 @@ class MeasureController extends Controller
         );
     }
 
+    public function execution(Request $request, int|string $id)
+    {
+        $measure = $this->measureAccessService->readableMeasureFor($request->user(), $id);
+
+        return response()->json([
+            'data' => $this->measureExecutionService->executionFor($request->user(), $measure),
+        ]);
+    }
+
     public function rotateCheckinToken(Request $request, int|string $measure)
     {
         $user = $request->user();
-        $measureModel = $this->findCompanyManageableMeasure($request, $measure);
+        $measureModel = $this->measureAccessService->manageableMeasureFor($request->user(), $measure);
 
         try {
             [$checkinToken, $rawToken] = $this->measureCheckinTokenService->rotate($measureModel, $user);
@@ -322,32 +290,4 @@ class MeasureController extends Controller
         }
     }
 
-    private function findCompanyManageableMeasure(Request $request, int|string $id): Measure
-    {
-        $user = $request->user();
-        $user->loadMissing('roles');
-        $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
-        $teamLayerEnabled = $this->teamLayerGuard->enabledFor($user);
-
-        if (! $teamLayerEnabled && $isManager) {
-            $this->teamLayerGuard->abortIfDisabled($user);
-        }
-
-        $measure = Measure::where('id', $id)
-            ->where('company_id', $user->company_id)
-            ->firstOrFail();
-
-        if (! $teamLayerEnabled && $measure->team_id !== null) {
-            $this->teamLayerGuard->abortIfDisabled($user);
-        }
-
-        if ($isManager) {
-            $managedTeamId = Team::where('manager_id', $user->id)->where('company_id', $user->company_id)->value('id');
-            if (! $managedTeamId || (int) $measure->team_id !== (int) $managedTeamId) {
-                abort(403);
-            }
-        }
-
-        return $measure;
-    }
 }

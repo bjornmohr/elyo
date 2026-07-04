@@ -11,6 +11,7 @@ describe('CompanyMeasuresComponent', () => {
   let companyMeasuresService: {
     listMeasures: ReturnType<typeof vi.fn>;
     getParticipationSummary: ReturnType<typeof vi.fn>;
+    getExecution: ReturnType<typeof vi.fn>;
     createMeasure: ReturnType<typeof vi.fn>;
     updateMeasure: ReturnType<typeof vi.fn>;
     generateMeasureCheckinToken: ReturnType<typeof vi.fn>;
@@ -62,6 +63,28 @@ describe('CompanyMeasuresComponent', () => {
 
         return of({ data: null });
       }),
+      getExecution: vi.fn((measureId: number) => {
+        const base = {
+          measureId,
+          derivedStatus: 'RUNNING',
+          deliveryType: 'ONSITE',
+          executionType: 'EVENT_PARTICIPATION',
+          startsAt: null,
+          endsAt: null,
+          locationName: null,
+          capacity: null,
+          registeredCount: null,
+          checkin: { active: false, createdAt: null, required: false },
+          isAboveThreshold: true,
+        };
+        if (measureId === 1) {
+          return of({ data: { ...base, registeredCount: 12, capacity: 20 } });
+        }
+        if (measureId === 2) {
+          return of({ data: { ...base, isAboveThreshold: false } });
+        }
+        return of({ data: base });
+      }),
       createMeasure: vi.fn(() => of({ data: { id: 9, title: 'Created measure' } })),
       updateMeasure: vi.fn(() => of({ data: { id: 1, title: 'Updated measure', category: 'mental', description: 'Updated description', status: 'ACTIVE' } })),
       generateMeasureCheckinToken: vi.fn(),
@@ -80,6 +103,7 @@ describe('CompanyMeasuresComponent', () => {
           useValue: {
             roles: () => [Role.COMPANY_ADMIN],
             teamLayerEnabled: () => false,
+            measureImpactEnabled: () => false,
           },
         },
         { provide: NotificationService, useValue: notifications },
@@ -91,16 +115,23 @@ describe('CompanyMeasuresComponent', () => {
     const fixture = TestBed.createComponent(CompanyMeasuresComponent);
     fixture.detectChanges();
 
+    fixture.componentInstance.toggleExpanded(fixture.componentInstance.measures()[0]);
+    fixture.detectChanges();
+
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('60% Teilnahmequote');
-    expect(text).toContain('12 von 20 Berechtigten');
+    expect(text).toContain('12 angemeldet / 20 Plätze');
   });
 
   it('suppresses below-threshold counts and rates', () => {
     const fixture = TestBed.createComponent(CompanyMeasuresComponent);
     fixture.detectChanges();
 
+    fixture.componentInstance.toggleExpanded(fixture.componentInstance.measures()[1]);
+    fixture.detectChanges();
+
     const text = fixture.nativeElement.textContent;
+    expect(text).toContain('geschützt');
     expect(text).toContain('Mindestgruppengröße nicht erreicht');
     expect(text).not.toContain('28% Teilnahmequote');
     expect(text).not.toContain('2 von 7 Berechtigten');
@@ -156,6 +187,7 @@ describe('CompanyMeasuresComponent', () => {
     const fixture = TestBed.createComponent(CompanyMeasuresComponent);
     fixture.detectChanges();
 
+    fixture.componentInstance.toggleExpanded(fixture.componentInstance.measures()[0]);
     fixture.componentInstance.rotateCheckinLink(fixture.componentInstance.measures()[0]);
     fixture.detectChanges();
 
@@ -482,6 +514,9 @@ describe('CompanyMeasuresComponent', () => {
       }],
     }));
     const fixture = TestBed.createComponent(CompanyMeasuresComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.toggleExpanded(fixture.componentInstance.measures()[0]);
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('Nicht bearbeitbar');

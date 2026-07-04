@@ -503,6 +503,11 @@ components:
         category: { type: string }
         description: { type: string }
         status: { type: string }
+        derivedStatus:
+          type: string
+          enum: [UPCOMING, RUNNING, COMPLETED, PLANNED]
+          readOnly: true
+          description: Server-derived execution status for list/card display. SUGGESTED and DISMISSED map to PLANNED; ACTIVE with a past endsAt maps to COMPLETED.
         suggestedAt: { type: string, format: date-time }
         startedAt: { type: string, format: date-time, nullable: true }
         completedAt: { type: string, format: date-time, nullable: true }
@@ -635,6 +640,274 @@ components:
               participationRate: { type: number, nullable: true }
               suppressionReason: { type: string, nullable: true }
             description: Always null for this measure-level aggregate endpoint.
+
+    MeasureExecution:
+      type: object
+      description: Execution details for a measure, fully derived from existing data. Independent of the demo/prod data mode.
+      required: [measureId, derivedStatus, deliveryType, executionType, startsAt, endsAt, locationName, capacity, registeredCount, checkin, isAboveThreshold]
+      additionalProperties: false
+      properties:
+        measureId: { type: integer }
+        derivedStatus:
+          type: string
+          enum: [UPCOMING, RUNNING, COMPLETED, PLANNED]
+          description: Derived from status plus startsAt/endsAt. SUGGESTED and DISMISSED map to PLANNED; ACTIVE with a past endsAt maps to COMPLETED.
+        deliveryType:
+          type: string
+          enum: [REMOTE, ONSITE, HYBRID]
+        executionType:
+          type: string
+          enum: [INFORMATION_ONLY, GUIDED_SESSION, SELF_REPORTED_ACTION, EVENT_PARTICIPATION, CHALLENGE]
+        startsAt: { type: string, format: date-time, nullable: true }
+        endsAt: { type: string, format: date-time, nullable: true }
+        locationName: { type: string, nullable: true }
+        capacity: { type: integer, nullable: true }
+        registeredCount:
+          type: integer
+          nullable: true
+          description: Distinct participants. Null when anonymity threshold suppression applies.
+        checkin:
+          type: object
+          required: [active, createdAt, required]
+          additionalProperties: false
+          properties:
+            active:
+              type: boolean
+              description: True while an unrevoked, unexpired check-in token exists.
+            createdAt: { type: string, format: date-time, nullable: true }
+            required:
+              type: boolean
+              description: True when verificationRequirement is QR_CODE.
+        isAboveThreshold: { type: boolean }
+
+    MeasureFieldStatistics:
+      type: object
+      description: Aggregated measure statistics for one risk field. In prod mode measureCount and avgParticipationRate are computed from the database; avgImpactRating and fieldTrend30d stay null until their data sources exist. In demo mode all values come from the deterministic demo dataset.
+      required: [field, fieldLabel, measureCount, avgParticipationRate, isAboveThreshold, avgImpactRating, impactIsPreliminary, fieldTrend30d]
+      additionalProperties: false
+      properties:
+        field:
+          type: string
+          enum: [SLEEP, BACK, STRESS_MENTAL, MOVEMENT, NUTRITION, KNOWLEDGE]
+        fieldLabel: { type: string }
+        measureCount:
+          type: integer
+          description: Non-dismissed measures whose category maps to this field (flexibility→BACK, mental→STRESS_MENTAL, sport→MOVEMENT, nutrition→NUTRITION, workshop→KNOWLEDGE). SLEEP has no measure category yet.
+        avgParticipationRate:
+          type: number
+          nullable: true
+          description: Average participation rate across the field's measures. Null when the field has no measures or every summary is suppressed by the anonymity threshold.
+        isAboveThreshold:
+          type: boolean
+          description: False only when the field has measures but all of them are below the anonymity threshold.
+        avgImpactRating:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 5
+          description: Null until the impact layer has a real data source (always null in prod mode).
+        impactIsPreliminary: { type: boolean }
+        fieldTrend30d:
+          type: number
+          nullable: true
+          description: Field score trend in percent points. Null until the extended check-in ships (always null in prod mode).
+
+    MeasureImpactGroup:
+      type: object
+      required: [n, scoreBefore, scoreAfter]
+      additionalProperties: false
+      properties:
+        n: { type: integer }
+        scoreBefore: { type: integer }
+        scoreAfter: { type: integer }
+
+    MeasureImpact:
+      type: object
+      description: Concept module. Wirkungsanalyse comparing participants against non-participants over a fixed window. Currently served from demo data for COMPLETED measures in demo mode only; prod mode returns data null.
+      required: [measureId, field, windowWeeks, participants, control, netEffect, rating, isAboveThreshold]
+      additionalProperties: false
+      properties:
+        measureId: { type: integer }
+        field: { type: string }
+        windowWeeks: { type: integer }
+        participants: { $ref: '#/components/schemas/MeasureImpactGroup' }
+        control: { $ref: '#/components/schemas/MeasureImpactGroup' }
+        netEffect:
+          type: integer
+          description: (participants.scoreAfter - participants.scoreBefore) - (control.scoreAfter - control.scoreBefore).
+        rating: { type: integer, minimum: 0, maximum: 5 }
+        isAboveThreshold:
+          type: boolean
+          description: Both groups must satisfy the anonymity threshold.
+
+    RiskFieldMonthlyScore:
+      type: object
+      required: [period, score]
+      additionalProperties: false
+      properties:
+        period: { type: string, description: "Month key, e.g. 2026-06." }
+        score: { type: integer, minimum: 0, maximum: 100 }
+
+    RiskField:
+      type: object
+      required: [field, fieldLabel, relevanceLevel, score, trend30d, monthlyScores, monthsAboveHighSince, linkedMeasures]
+      additionalProperties: false
+      properties:
+        field: { type: string }
+        fieldLabel: { type: string }
+        relevanceLevel: { type: integer, minimum: 1, maximum: 5 }
+        score: { type: integer, minimum: 0, maximum: 100 }
+        trend30d: { type: number, description: 30-day trend in percent points. }
+        monthlyScores:
+          type: array
+          description: Six months, oldest first; the last entry equals score.
+          items: { $ref: '#/components/schemas/RiskFieldMonthlyScore' }
+        monthsAboveHighSince:
+          type: integer
+          nullable: true
+          description: Consecutive months the field has been in the high band, null when not applicable.
+        linkedMeasures:
+          type: object
+          required: [activeCount, suggestedCount]
+          additionalProperties: false
+          properties:
+            activeCount: { type: integer }
+            suggestedCount: { type: integer }
+
+    InsightRecommendation:
+      type: object
+      required: [title, text]
+      additionalProperties: false
+      properties:
+        title: { type: string }
+        text: { type: string }
+
+    RiskLandscape:
+      type: object
+      description: Concept module behind riskLandscapeEnabled. Demo mode serves deterministic demo data; prod mode returns data as an empty array until the extended check-in ships.
+      required: [fields, recommendations]
+      additionalProperties: false
+      properties:
+        fields:
+          type: array
+          items: { $ref: '#/components/schemas/RiskField' }
+        recommendations:
+          type: array
+          items: { $ref: '#/components/schemas/InsightRecommendation' }
+
+    UsageFunnelStage:
+      type: object
+      required: [key, label, count, rate]
+      additionalProperties: false
+      properties:
+        key:
+          type: string
+          enum: [registered, context_entered, recommendation_received, measure_started, active_14d]
+        label: { type: string }
+        count: { type: integer }
+        rate: { type: number, description: Percent of the first stage. }
+
+    UsageFunnelTransition:
+      type: object
+      required: [from, to, avgDays]
+      additionalProperties: false
+      properties:
+        from: { type: string }
+        to: { type: string }
+        avgDays: { type: number, nullable: true }
+
+    UsageFunnelCategory:
+      type: object
+      description: Per-category funnel breakdown. Categories only exist from the recommendation stage onward — the registration and context stages are company-wide by definition. Rates are relative to the category's received recommendations (basis 100%).
+      required: [key, label, recommendationReceived, measureStarted, active14d]
+      additionalProperties: false
+      properties:
+        key:
+          type: string
+          enum: [workshop, sport, mental, nutrition, flexibility]
+        label: { type: string }
+        recommendationReceived: { type: integer }
+        measureStarted: { type: integer }
+        active14d: { type: integer }
+
+    UsageFunnel:
+      type: object
+      description: Concept module behind usageFunnelEnabled. Demo mode serves deterministic demo data (stages stay monotonically decreasing); prod mode returns data null until funnel event tracking ships.
+      required: [cohort, stages, transitions, returnRate14d, avgDaysToFirstDecision, previousCohort]
+      additionalProperties: false
+      properties:
+        cohort: { type: string, description: "Cohort month, e.g. 2026-06." }
+        stages:
+          type: array
+          items: { $ref: '#/components/schemas/UsageFunnelStage' }
+        transitions:
+          type: array
+          items: { $ref: '#/components/schemas/UsageFunnelTransition' }
+        returnRate14d: { type: number }
+        avgDaysToFirstDecision: { type: number }
+        previousCohort:
+          type: object
+          nullable: true
+          required: [cohort, stages]
+          additionalProperties: false
+          properties:
+            cohort: { type: string }
+            stages:
+              type: array
+              items:
+                type: object
+                required: [key, rate]
+                additionalProperties: false
+                properties:
+                  key: { type: string }
+                  rate: { type: number }
+        categoryInsight: { type: string, nullable: true }
+        categories:
+          type: array
+          description: Optional per-category breakdown; each category funnel stays monotone (recommendationReceived >= measureStarted >= active14d).
+          items: { $ref: '#/components/schemas/UsageFunnelCategory' }
+
+    InfectionRadar:
+      type: object
+      description: Concept module behind infectionRadarEnabled. Aggregate-only symptom counts, never individual data. Demo mode serves deterministic demo data with the last seven calendar days; prod mode returns data null until symptom check-in and RKI integration ship.
+      required: [overallStatus, locations, symptomReports7d, rkiIncidence]
+      additionalProperties: false
+      properties:
+        overallStatus:
+          type: string
+          enum: [NORMAL, ELEVATED, CRITICAL]
+        locations:
+          type: array
+          items:
+            type: object
+            required: [name, status]
+            additionalProperties: false
+            properties:
+              name: { type: string }
+              status:
+                type: string
+                enum: [NORMAL, ELEVATED, CRITICAL]
+        symptomReports7d:
+          type: array
+          description: Aggregate daily counts for the last seven days.
+          items:
+            type: object
+            required: [date, count]
+            additionalProperties: false
+            properties:
+              date: { type: string, format: date }
+              count: { type: integer }
+        rkiIncidence:
+          type: object
+          required: [value, deltaPercent, district]
+          additionalProperties: false
+          properties:
+            value: { type: number }
+            deltaPercent: { type: number }
+            district: { type: string }
+        recommendations:
+          type: array
+          items: { $ref: '#/components/schemas/InsightRecommendation' }
 
     EmployeeMeasure:
       allOf:
@@ -878,6 +1151,18 @@ paths:
                       teamLayerEnabled:
                         type: boolean
                         description: Whether this company uses team-level affiliation and team-scoped manager workflows.
+                      measureImpactEnabled:
+                        type: boolean
+                        description: Concept-module flag derived from the API data mode (ELYO_DATA_MODE demo=true, prod=false). Gates the Wirkung column and impact analysis.
+                      riskLandscapeEnabled:
+                        type: boolean
+                        description: Concept-module flag derived from the API data mode. Gates the risk landscape page.
+                      usageFunnelEnabled:
+                        type: boolean
+                        description: Concept-module flag derived from the API data mode. Gates the usage funnel page.
+                      infectionRadarEnabled:
+                        type: boolean
+                        description: Concept-module flag derived from the API data mode. Gates the infection radar page.
                   activePortal: { type: string, nullable: true }
                   allowedPortals:
                     type: array
@@ -911,6 +1196,18 @@ paths:
                   teamLayerEnabled:
                     type: boolean
                     description: Whether this company uses team-level affiliation and team-scoped manager workflows.
+                  measureImpactEnabled:
+                    type: boolean
+                    description: Concept-module flag derived from the API data mode (ELYO_DATA_MODE demo=true, prod=false). Gates the Wirkung column and impact analysis.
+                  riskLandscapeEnabled:
+                    type: boolean
+                    description: Concept-module flag derived from the API data mode. Gates the risk landscape page.
+                  usageFunnelEnabled:
+                    type: boolean
+                    description: Concept-module flag derived from the API data mode. Gates the usage funnel page.
+                  infectionRadarEnabled:
+                    type: boolean
+                    description: Concept-module flag derived from the API data mode. Gates the infection radar page.
                   teamId: { type: integer, nullable: true }
                   teamName: { type: string, nullable: true }
                   activePortal: { type: string, nullable: true }
@@ -1449,6 +1746,10 @@ paths:
                               type: string
                               nullable: true
                               enum: [ANONYMITY_THRESHOLD_NOT_MET]
+                  executiveSummary:
+                    type: object
+                    nullable: true
+                    description: Concept executive summary (2a) served from demo data in demo data mode; always null in prod data mode. Shape may evolve while the module is concept-only; consumers must treat it as optional.
         403:
           $ref: '#/components/responses/PortalForbidden'
 
@@ -2083,6 +2384,155 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LaravelValidationError'
+
+  /company/measures/statistics:
+    get:
+      tags: [Company]
+      summary: Get measure statistics aggregated by risk field
+      description: Returns one row per canonical risk field. In prod data mode measureCount and avgParticipationRate are computed from the database with the same visibility scoping as the measures list (team layer, manager scope) and server-side anonymity threshold enforcement; avgImpactRating and fieldTrend30d are null. In demo data mode the rows come from the deterministic per-company demo dataset.
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Statistics per risk field
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MeasureFieldStatistics'
+        403:
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
+
+  /company/measures/{id}/execution:
+    get:
+      tags: [Company]
+      summary: Get execution details for a measure
+      description: Fully derived from existing measure, participation and check-in token data; independent of the demo/prod data mode. registeredCount is suppressed (null) below the anonymity threshold.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Execution details
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/MeasureExecution'
+        403:
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
+        404:
+          description: Measure not found in the authenticated company scope
+
+  /company/measures/{id}/impact:
+    get:
+      tags: [Company]
+      summary: Get impact analysis for a measure (concept)
+      description: Concept endpoint behind the measureImpactEnabled flag. Demo data mode returns deterministic demo values for COMPLETED measures and data null otherwise; prod data mode always returns data null until the extended check-in ships. Anonymity threshold applies to both comparison groups.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Impact analysis or null when unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    nullable: true
+                    allOf:
+                      - $ref: '#/components/schemas/MeasureImpact'
+        403:
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
+        404:
+          description: Measure not found in the authenticated company scope
+
+  /company/risk-landscape:
+    get:
+      tags: [Company]
+      summary: Get risk landscape (concept)
+      description: Concept endpoint behind the riskLandscapeEnabled flag. Demo data mode returns the deterministic per-company demo landscape; prod data mode returns data as an empty array until the extended check-in ships.
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Risk landscape or empty array when unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    oneOf:
+                      - $ref: '#/components/schemas/RiskLandscape'
+                      - type: array
+                        maxItems: 0
+                        items: {}
+        403:
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
+
+  /company/usage-funnel:
+    get:
+      tags: [Company]
+      summary: Get usage funnel (concept)
+      description: Concept endpoint behind the usageFunnelEnabled flag. Demo data mode returns the deterministic per-company demo funnel; prod data mode returns data null until funnel event tracking ships.
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Usage funnel or null when unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    nullable: true
+                    allOf:
+                      - $ref: '#/components/schemas/UsageFunnel'
+        403:
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
+
+  /company/infection-radar:
+    get:
+      tags: [Company]
+      summary: Get infection radar (concept)
+      description: Concept endpoint behind the infectionRadarEnabled flag. Aggregate-only data, never individual symptom reports. Demo data mode returns the deterministic per-company demo radar; prod data mode returns data null until symptom check-in and RKI OpenData integration ship.
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Infection radar or null when unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    nullable: true
+                    allOf:
+                      - $ref: '#/components/schemas/InfectionRadar'
+        403:
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
 
   /company/reports:
     get:

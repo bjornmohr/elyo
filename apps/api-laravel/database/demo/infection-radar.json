@@ -1,0 +1,28 @@
+{
+  "overallStatus": "ELEVATED",
+  "locations": [
+    { "name": "Standort Süd", "status": "CRITICAL" },
+    { "name": "Standort Nord", "status": "ELEVATED" },
+    { "name": "Standort West", "status": "NORMAL" }
+  ],
+  "symptomReports7d": [7, 8, 11, 12, 16, 18, 20],
+  "rkiIncidence": {
+    "value": 142,
+    "deltaPercent": 18,
+    "district": "Landkreis Musterstadt"
+  },
+  "recommendations": [
+    {
+      "title": "Hygiene-Hinweise verstärken",
+      "text": "Aushänge und Erinnerungen an Standorten mit erhöhtem Aufkommen."
+    },
+    {
+      "title": "Homeoffice-Option kommunizieren",
+      "text": "Für Standort Süd bis zur Normalisierung der Symptommeldungen."
+    },
+    {
+      "title": "Masken bereitstellen",
+      "text": "FFP2-Masken in Gemeinschaftsbereichen anbieten."
+    }
+  ]
+}

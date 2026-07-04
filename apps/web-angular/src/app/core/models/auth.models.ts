@@ -18,6 +18,10 @@ export interface User {
   companyId?: number | null;
   companyName?: string | null;
   teamLayerEnabled?: boolean;
+  measureImpactEnabled?: boolean;
+  riskLandscapeEnabled?: boolean;
+  usageFunnelEnabled?: boolean;
+  infectionRadarEnabled?: boolean;
 }
 
 export interface LoginResponse {
