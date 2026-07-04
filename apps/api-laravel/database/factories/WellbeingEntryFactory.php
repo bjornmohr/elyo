@@ -12,15 +12,15 @@ class WellbeingEntryFactory extends Factory
 
     public function definition(): array
     {
-        $mood = $this->faker->numberBetween(1, 10);
-        $stress = $this->faker->numberBetween(1, 10);
-        $energy = $this->faker->numberBetween(1, 10);
+        $mood = $this->faker->numberBetween(1, 5);
+        $stress = $this->faker->numberBetween(1, 5);
+        $energy = $this->faker->numberBetween(1, 5);
 
         return [
             'mood' => $mood,
             'stress' => $stress,
             'energy' => $energy,
-            'score' => ($mood + (11 - $stress) + $energy) / 3,
+            'score' => ($mood + (6 - $stress) + $energy) / 3,
             'note' => $this->faker->sentence(),
             'period_key' => now()->format('Y-W'),
             'user_id' => User::factory(),

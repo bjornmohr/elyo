@@ -28,7 +28,7 @@ import { EmployeeService, WellbeingEntry } from '../../services/employee.service
                     {{ getMoodEmoji(entry.mood) }}
                   </div>
                   <div>
-                    <div class="font-bold text-slate-800">Mood {{ entry.mood ?? '-' }}/10</div>
+                    <div class="font-bold text-slate-800">Mood {{ entry.mood ?? '-' }}/5</div>
                     <div class="text-sm text-slate-400">{{ entry.createdAt | date:'EEEE, d. MMMM' }}</div>
                   </div>
                 </div>
@@ -43,15 +43,15 @@ import { EmployeeService, WellbeingEntry } from '../../services/employee.service
               <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-50">
                  <div class="text-center p-2 rounded-xl bg-slate-50">
                    <div class="text-xs text-slate-400">Stress</div>
-                   <div class="font-bold text-slate-700">{{ entry.stress ?? '-' }}/10</div>
+                   <div class="font-bold text-slate-700">{{ entry.stress ?? '-' }}/5</div>
                  </div>
                  <div class="text-center p-2 rounded-xl bg-slate-50">
                    <div class="text-xs text-slate-400">Energy</div>
-                   <div class="font-bold text-slate-700">{{ entry.energy ?? '-' }}/10</div>
+                   <div class="font-bold text-slate-700">{{ entry.energy ?? '-' }}/5</div>
                  </div>
                  <div class="text-center p-2 rounded-xl bg-slate-50">
                    <div class="text-xs text-slate-400">Mood</div>
-                   <div class="font-bold text-slate-700">{{ entry.mood ?? '-' }}/10</div>
+                   <div class="font-bold text-slate-700">{{ entry.mood ?? '-' }}/5</div>
                  </div>
               </div>
 
@@ -87,18 +87,18 @@ export class HistoryComponent implements OnInit {
   }
 
   getScoreColor(score: number) {
-    if (score >= 7.5) return "#14b8a6";
-    if (score >= 6) return "#4c8448";
-    if (score >= 4.5) return "#d97706";
+    if (score >= 4) return "#14b8a6";
+    if (score >= 3) return "#4c8448";
+    if (score >= 2.5) return "#d97706";
     return "#ef4444";
   }
 
   getMoodEmoji(mood: number | null) {
     if (mood === null) return '✨';
-    if (mood >= 9) return '🤩';
-    if (mood >= 7) return '😊';
-    if (mood >= 5) return '😐';
-    if (mood >= 3) return '😟';
+    if (mood >= 5) return '🤩';
+    if (mood >= 4) return '😊';
+    if (mood >= 3) return '😐';
+    if (mood >= 2) return '😟';
     return '😫';
   }
 }

@@ -51,7 +51,7 @@ class EmployeeTest extends TestCase
             'user_id' => $this->employee->id,
             'company_id' => $this->company->id,
             'period_key' => '2024-W01',
-            'score' => 7.5,
+            'score' => 4.0,
         ]);
 
         $response = $this->actingAs($this->employee, 'sanctum')
@@ -65,15 +65,27 @@ class EmployeeTest extends TestCase
             ]);
     }
 
+    public function test_checkin_rejects_values_above_the_1_5_scale()
+    {
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson('/api/employee/checkin', [
+                'mood' => 6,
+                'stress' => 2,
+                'energy' => 4,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['mood']);
+    }
+
     public function test_employee_can_submit_checkin()
     {
         $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
 
         $response = $this->actingAs($this->employee, 'sanctum')
             ->postJson('/api/employee/checkin', [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 4,
                 'note' => 'Feeling good',
             ]);
 
@@ -86,9 +98,9 @@ class EmployeeTest extends TestCase
         $this->assertDatabaseHas('wellbeing_entries', [
             'user_id' => $this->employee->id,
             'period_key' => '2026-05-25',
-            'mood' => 8,
-            'stress' => 3,
-            'energy' => 7,
+            'mood' => 4,
+            'stress' => 2,
+            'energy' => 4,
         ]);
     }
 
@@ -97,9 +109,9 @@ class EmployeeTest extends TestCase
         $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
 
         $payload = [
-            'mood' => 8,
-            'stress' => 3,
-            'energy' => 7,
+            'mood' => 4,
+            'stress' => 2,
+            'energy' => 4,
         ];
 
         $this->actingAs($this->employee, 'sanctum')
@@ -124,9 +136,9 @@ class EmployeeTest extends TestCase
 
         $this->actingAs($this->employee, 'sanctum')
             ->postJson('/api/employee/checkin', [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 4,
             ])
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'CHECKIN_ALREADY_DONE');
@@ -149,9 +161,9 @@ class EmployeeTest extends TestCase
 
         $this->actingAs($this->employee, 'sanctum')
             ->postJson('/api/employee/checkin', [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 4,
             ])
             ->assertStatus(409);
 
@@ -183,9 +195,9 @@ class EmployeeTest extends TestCase
 
         try {
             $result = $service->submitCheckin($this->employee, [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 4,
             ]);
         } finally {
             DB::rollBack();
@@ -322,9 +334,9 @@ class EmployeeTest extends TestCase
 
         $this->actingAs($this->employee, 'sanctum')
             ->postJson('/api/employee/checkin', [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 4,
             ])
             ->assertStatus(200);
 
@@ -357,9 +369,9 @@ class EmployeeTest extends TestCase
 
         $this->actingAs($this->employee, 'sanctum')
             ->postJson('/api/employee/checkin', [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 4,
             ])
             ->assertStatus(200);
 
@@ -385,9 +397,9 @@ class EmployeeTest extends TestCase
 
         $this->actingAs($this->employee, 'sanctum')
             ->postJson('/api/employee/checkin', [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 4,
             ])
             ->assertStatus(200);
 
@@ -417,9 +429,9 @@ class EmployeeTest extends TestCase
 
         $this->actingAs($this->employee, 'sanctum')
             ->postJson('/api/employee/checkin', [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 4,
             ])
             ->assertStatus(200);
 

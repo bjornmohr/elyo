@@ -96,6 +96,36 @@ class DemoDataSeederTest extends TestCase
         $this->assertSame(3, DB::table('user_system_measures')->where('user_id', $employeeId)->count());
     }
 
+    public function test_seeder_creates_daily_wellbeing_entries_on_1_5_scale(): void
+    {
+        $this->seed(DemoDataSeeder::class);
+
+        $employeeIds = DB::table('users')->where('email', 'like', 'employee%@demo.de')->pluck('id');
+
+        foreach ($employeeIds as $employeeId) {
+            $daily = DB::table('wellbeing_entries')
+                ->where('user_id', $employeeId)
+                ->where('period_key', 'like', '____-__-__')
+                ->get();
+
+            $this->assertCount(14, $daily, "employee {$employeeId} should have 14 daily entries");
+
+            foreach ($daily as $entry) {
+                $this->assertGreaterThanOrEqual(1, $entry->mood);
+                $this->assertLessThanOrEqual(5, $entry->mood);
+                $this->assertLessThanOrEqual(5, $entry->stress);
+                $this->assertLessThanOrEqual(5, $entry->energy);
+            }
+
+            // Today stays open so the check-in CTA shows as pending.
+            $this->assertFalse($daily->contains('period_key', now()->toDateString()));
+
+            // No duplicate period keys per user (weekly + daily combined).
+            $all = DB::table('wellbeing_entries')->where('user_id', $employeeId)->pluck('period_key');
+            $this->assertSame($all->count(), $all->unique()->count());
+        }
+    }
+
     public function test_seeded_pictogram_assets_exist_in_public_directory(): void
     {
         $this->seed(SystemExerciseSeeder::class);

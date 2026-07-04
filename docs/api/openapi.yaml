@@ -1036,6 +1036,14 @@ components:
           type: array
           items: { $ref: '#/components/schemas/InsightRecommendation' }
 
+    EmployeeMetricAggregate:
+      type: object
+      description: Week vs. previous-week average of one wellbeing metric on the 1-5 scale.
+      properties:
+        current: { type: number, nullable: true }
+        previous: { type: number, nullable: true }
+        delta: { type: number, nullable: true }
+
     MeasureEffect:
       type: object
       nullable: true
@@ -1515,7 +1523,8 @@ paths:
   /employee/dashboard:
     get:
       tags: [Employee]
-      summary: Get employee dashboard data
+      summary: Get employee dashboard data (1a)
+      description: Weekly wellbeing aggregates (canonical 1-5 scale) are computed from the employee's daily entries and always present when data exists. sleep/bodySignals/healthFlag/levers are demo-provider blocks and null in prod mode. Lever measureIds reference the employee's own assigned system measures.
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -1532,6 +1541,61 @@ paths:
                   streakCount: { type: integer }
                   points: { type: integer }
                   todayCheckinCompleted: { type: boolean }
+                  wellbeing:
+                    type: object
+                    nullable: true
+                    description: Derived weekly score (mean of mood, inverted stress, energy) vs. previous week.
+                    properties:
+                      current: { type: number, nullable: true }
+                      previous: { type: number, nullable: true }
+                      delta: { type: number, nullable: true }
+                      scale: { type: integer, enum: [5] }
+                      sparkline:
+                        type: array
+                        description: Up to 14 daily scores, oldest first.
+                        items: { type: number }
+                  metrics:
+                    type: object
+                    nullable: true
+                    properties:
+                      mood: { $ref: '#/components/schemas/EmployeeMetricAggregate' }
+                      energy: { $ref: '#/components/schemas/EmployeeMetricAggregate' }
+                      stress: { $ref: '#/components/schemas/EmployeeMetricAggregate' }
+                  sleep:
+                    type: object
+                    nullable: true
+                    properties:
+                      currentH: { type: number }
+                      previousH: { type: number }
+                  bodySignals:
+                    type: array
+                    nullable: true
+                    items:
+                      type: object
+                      properties:
+                        label: { type: string }
+                        thisWeekDays: { type: integer }
+                        lastWeekDays: { type: integer }
+                        trend: { type: string, enum: [up, down, flat] }
+                  healthFlag:
+                    type: object
+                    nullable: true
+                    properties:
+                      state: { type: string, enum: [caution, ok] }
+                      label: { type: string }
+                      badge: { type: string }
+                      note: { type: string }
+                  levers:
+                    type: array
+                    nullable: true
+                    items:
+                      type: object
+                      properties:
+                        title: { type: string }
+                        badge: { type: string }
+                        reason: { type: string }
+                        expected: { type: string }
+                        measureId: { type: integer }
         401:
           description: Unauthorized
 
@@ -1547,9 +1611,9 @@ paths:
             schema:
               type: object
               properties:
-                mood: { type: integer, minimum: 1, maximum: 10 }
-                stress: { type: integer, minimum: 1, maximum: 10 }
-                energy: { type: integer, minimum: 1, maximum: 10 }
+                mood: { type: integer, minimum: 1, maximum: 5 }
+                stress: { type: integer, minimum: 1, maximum: 5 }
+                energy: { type: integer, minimum: 1, maximum: 5 }
                 note: { type: string, nullable: true }
       responses:
         200:

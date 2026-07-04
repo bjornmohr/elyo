@@ -47,7 +47,7 @@ import { NotificationService } from '../../../../shared/notifications/notificati
             <div class="space-y-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
               <h2 class="text-2xl font-bold text-slate-800">Wie fühlst du dich?</h2>
               <div class="text-6xl my-8">{{ getMoodEmoji(mood()) }}</div>
-              <input type="range" min="1" max="10" [(ngModel)]="mood" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
+              <input type="range" min="1" max="5" [(ngModel)]="mood" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
               <div class="flex justify-between text-xs text-slate-400 font-medium uppercase tracking-wider">
                 <span>Schlecht</span>
                 <span>Sehr gut</span>
@@ -60,7 +60,7 @@ import { NotificationService } from '../../../../shared/notifications/notificati
             <div class="space-y-6 text-center animate-in fade-in slide-in-from-right-4 duration-500">
               <h2 class="text-2xl font-bold text-slate-800">Stresslevel</h2>
               <div class="text-6xl my-8">{{ getStressEmoji(stress()) }}</div>
-              <input type="range" min="1" max="10" [(ngModel)]="stress" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
+              <input type="range" min="1" max="5" [(ngModel)]="stress" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
               <div class="flex justify-between text-xs text-slate-400 font-medium uppercase tracking-wider">
                 <span>Entspannt</span>
                 <span>Gestresst</span>
@@ -73,7 +73,7 @@ import { NotificationService } from '../../../../shared/notifications/notificati
             <div class="space-y-6 text-center animate-in fade-in slide-in-from-right-4 duration-500">
               <h2 class="text-2xl font-bold text-slate-800">Energieniveau</h2>
               <div class="text-6xl my-8">⚡</div>
-              <input type="range" min="1" max="10" [(ngModel)]="energy" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
+              <input type="range" min="1" max="5" [(ngModel)]="energy" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
               <div class="flex justify-between text-xs text-slate-400 font-medium uppercase tracking-wider">
                 <span>Niedrig</span>
                 <span>Hoch</span>

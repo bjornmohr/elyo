@@ -14,12 +14,51 @@ export interface WellbeingEntry {
   createdAt: string;
 }
 
+export interface MetricAggregate {
+  current: number | null;
+  previous: number | null;
+  delta: number | null;
+}
+
+export interface WellbeingAggregate extends MetricAggregate {
+  scale: number;
+  sparkline: number[];
+}
+
+export interface BodySignal {
+  label: string;
+  thisWeekDays: number;
+  lastWeekDays: number;
+  trend: 'up' | 'down' | 'flat';
+}
+
+export interface HealthFlag {
+  state: 'caution' | 'ok';
+  label: string;
+  badge: string;
+  note: string;
+}
+
+export interface DashboardLever {
+  title: string;
+  badge: string;
+  reason: string;
+  expected: string;
+  measureId: number;
+}
+
 export interface DashboardData {
   recentEntries: WellbeingEntry[];
   streak: number;
   points: number;
   lastCheckin: string | null;
   todayCheckinCompleted: boolean;
+  wellbeing: WellbeingAggregate | null;
+  metrics: { mood: MetricAggregate; energy: MetricAggregate; stress: MetricAggregate } | null;
+  sleep: { currentH: number; previousH: number } | null;
+  bodySignals: BodySignal[] | null;
+  healthFlag: HealthFlag | null;
+  levers: DashboardLever[] | null;
 }
 
 export interface SurveyListItem {
@@ -164,6 +203,12 @@ export class EmployeeService {
       points: res.points ?? 0,
       lastCheckin: res.latest?.createdAt ?? null,
       todayCheckinCompleted: res.todayCheckinCompleted ?? false,
+      wellbeing: res.wellbeing ?? null,
+      metrics: res.metrics ?? null,
+      sleep: res.sleep ?? null,
+      bodySignals: res.bodySignals ?? null,
+      healthFlag: res.healthFlag ?? null,
+      levers: res.levers ?? null,
     })));
   }
 

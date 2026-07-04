@@ -1,0 +1,37 @@
+{
+  "sleep": { "currentH": 6.8, "previousH": 6.2 },
+  "healthFlag": {
+    "state": "caution",
+    "label": "Erkältungssymptome erfasst",
+    "badge": "Schonmodus aktiv",
+    "note": "Aus deinem heutigen Check-in. Intensive Übungen sind pausiert — wir schlagen dir vorerst Erholung und sanfte Einheiten vor."
+  },
+  "bodySignals": [
+    { "label": "Nackenschmerzen", "thisWeekDays": 1, "lastWeekDays": 3, "trend": "down" },
+    { "label": "Müdigkeit", "thisWeekDays": 2, "lastWeekDays": 4, "trend": "down" },
+    { "label": "Kopfschmerzen", "thisWeekDays": 1, "lastWeekDays": 1, "trend": "flat" }
+  ],
+  "levers": [
+    {
+      "title": "Schlaf stabilisieren",
+      "badge": "Größter Hebel",
+      "reason": "Deine Energie hängt diese Woche klar an kurzen Nächten (Ø 6,5 h). 30 Minuten früher ins Bett bringt am meisten.",
+      "expected": "Erwartet: Energie ↑",
+      "measureSlug": "abend-routine-schlaf"
+    },
+    {
+      "title": "Nacken lockern",
+      "badge": "Läuft gut",
+      "reason": "3× Nackenschmerzen gemeldet. Deine Mobilitäts-Übung zeigt Wirkung — dranbleiben.",
+      "expected": "Schmerz 6 → 3 ↓",
+      "measureSlug": "nacken-mobilitaet"
+    },
+    {
+      "title": "Mikro-Pausen",
+      "badge": "Neu für dich",
+      "reason": "Stress ist diese Woche dein schwächster Wert. An angespannten Tagen hilft eine kurze Atem-Balance.",
+      "expected": "Erwartet: Stress ↓",
+      "measureSlug": "atem-balance"
+    }
+  ]
+}

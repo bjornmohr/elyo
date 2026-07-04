@@ -89,10 +89,10 @@ class DemoDataSeeder extends Seeder
 
         foreach ($employeeIds as $idx => $userId) {
             foreach ($periods as $weekIdx => $periodKey) {
-                $mood = max(1, min(10, 7 + (($idx + $weekIdx) % 3) - 1));
-                $stress = max(1, min(10, 4 + (($idx + $weekIdx) % 4) - 1));
-                $energy = max(1, min(10, 7 + (($idx + $weekIdx + 1) % 3) - 1));
-                $score = round(($mood + (11 - $stress) + $energy) / 3, 1);
+                $mood = max(1, min(5, 4 + (($idx + $weekIdx) % 3) - 1));
+                $stress = max(1, min(5, 2 + (($idx + $weekIdx) % 4) - 1));
+                $energy = max(1, min(5, 4 + (($idx + $weekIdx + 1) % 3) - 1));
+                $score = round(($mood + (6 - $stress) + $energy) / 3, 1);
 
                 DB::table('wellbeing_entries')->insert([
                     'mood' => $mood,
@@ -109,6 +109,7 @@ class DemoDataSeeder extends Seeder
             }
         }
 
+        $this->seedDailyWellbeingEntries($companyId, $employeeIds, $now);
         $this->seedAssignedSystemMeasures($employeeIds, $adminId, $now);
 
         $surveyId = DB::table('surveys')->where('company_id', $companyId)->where('title', 'Quarterly Pulse Check')->value('id');
@@ -372,10 +373,10 @@ class DemoDataSeeder extends Seeder
         $periods = collect(range(0, $weeks - 1))->map(fn ($week) => $now->copy()->subWeeks($week)->format('Y-\WW'))->values();
         foreach ($userIds as $idx => $userId) {
             foreach ($periods as $weekIdx => $periodKey) {
-                $mood = max(1, min(10, 7 + (($idx + $weekIdx) % 3) - 1));
-                $stress = max(1, min(10, 4 + (($idx + $weekIdx) % 4) - 1));
-                $energy = max(1, min(10, 7 + (($idx + $weekIdx + 1) % 3) - 1));
-                $score = round(($mood + (11 - $stress) + $energy) / 3, 1);
+                $mood = max(1, min(5, 4 + (($idx + $weekIdx) % 3) - 1));
+                $stress = max(1, min(5, 2 + (($idx + $weekIdx) % 4) - 1));
+                $energy = max(1, min(5, 4 + (($idx + $weekIdx + 1) % 3) - 1));
+                $score = round(($mood + (6 - $stress) + $energy) / 3, 1);
 
                 DB::table('wellbeing_entries')->insert([
                     'mood' => $mood,
@@ -641,6 +642,43 @@ class DemoDataSeeder extends Seeder
                         'updated_at' => $now,
                     ]
                 );
+            }
+        }
+    }
+
+    /**
+     * Daily entries for the employee dashboard (1a): 14 days ending yesterday
+     * (today stays open so the check-in CTA shows as pending), ascending from
+     * a weaker previous week (~3.2) to a better current week (~3.8). Daily
+     * period keys (Y-m-d) never collide with the weekly keys (Y-Www).
+     */
+    private function seedDailyWellbeingEntries(int $companyId, array $userIds, mixed $now): void
+    {
+        foreach ($userIds as $idx => $userId) {
+            for ($daysAgo = 14; $daysAgo >= 1; $daysAgo--) {
+                $date = $now->copy()->subDays($daysAgo);
+                $isCurrentWeek = $daysAgo <= 7;
+
+                $wave = ($idx + $daysAgo) % 2;
+                $mood = $isCurrentWeek ? 4 + $wave : 3 + $wave;      // 3-4 -> 4-5
+                $stress = $isCurrentWeek ? 2 : 3;                     // 3   -> 2
+                $energy = $isCurrentWeek ? 3 + $wave : 3;             // 3   -> 3-4
+                $mood = max(1, min(5, $mood));
+                $energy = max(1, min(5, $energy));
+                $score = round(($mood + (6 - $stress) + $energy) / 3, 1);
+
+                DB::table('wellbeing_entries')->insert([
+                    'mood' => $mood,
+                    'stress' => $stress,
+                    'energy' => $energy,
+                    'score' => $score,
+                    'note' => null,
+                    'period_key' => $date->toDateString(),
+                    'company_id' => $companyId,
+                    'user_id' => $userId,
+                    'created_at' => $date->copy()->setTime(8, 30)->addMinutes($idx * 7),
+                    'updated_at' => $now,
+                ]);
             }
         }
     }

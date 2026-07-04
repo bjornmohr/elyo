@@ -16,7 +16,8 @@ class WellbeingService
 
     public function calculateScore(int $mood, int $stress, int $energy): float
     {
-        return round((($mood + (11 - $stress) + $energy) / 3), 1);
+        // Canonical 1-5 scale; stress is inverted (lower is better).
+        return round((($mood + (6 - $stress) + $energy) / 3), 1);
     }
 
     public function hasDailyCheckin(User $user, ?string $periodKey = null): bool
