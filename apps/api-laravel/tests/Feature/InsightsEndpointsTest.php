@@ -21,10 +21,11 @@ class InsightsEndpointsTest extends TestCase
         $admin = $this->companyUser($company, Role::COMPANY_ADMIN);
 
         $landscape = $this->actingAs($admin)->getJson('/api/company/risk-landscape')->assertOk();
-        $this->assertCount(8, $landscape->json('data.fields'));
+        $this->assertCount(6, $landscape->json('data.fields'));
         $this->assertSame('SLEEP', $landscape->json('data.fields.0.field'));
         $this->assertSame(82, $landscape->json('data.fields.0.score'));
         $this->assertCount(6, $landscape->json('data.fields.0.monthlyScores'));
+        $this->assertSame('STRESS_MENTAL', $landscape->json('data.fields.2.field'));
         $this->assertNotEmpty($landscape->json('data.recommendations'));
 
         $funnel = $this->actingAs($admin)->getJson('/api/company/usage-funnel')->assertOk();

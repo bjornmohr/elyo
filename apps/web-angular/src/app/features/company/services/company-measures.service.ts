@@ -11,9 +11,11 @@ export interface MeasureCheckinTokenResponse {
   revokedAt: string | null;
 }
 
+export type MeasureDerivedStatus = 'UPCOMING' | 'RUNNING' | 'COMPLETED' | 'PLANNED';
+
 export interface MeasureExecution {
   measureId: number;
-  derivedStatus: 'UPCOMING' | 'RUNNING' | 'COMPLETED' | 'PLANNED';
+  derivedStatus: MeasureDerivedStatus;
   deliveryType: 'ONSITE' | 'REMOTE' | 'HYBRID';
   executionType: string;
   startsAt: string | null;

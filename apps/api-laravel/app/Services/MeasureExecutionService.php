@@ -32,7 +32,7 @@ class MeasureExecutionService
 
         return [
             'measureId' => $measure->id,
-            'derivedStatus' => $this->deriveStatus($measure),
+            'derivedStatus' => $this->derivedStatusFor($measure),
             'deliveryType' => $measure->delivery_type,
             'executionType' => $measure->execution_type,
             'startsAt' => $measure->starts_at?->toIso8601String(),
@@ -49,7 +49,7 @@ class MeasureExecutionService
         ];
     }
 
-    private function deriveStatus(Measure $measure): string
+    public function derivedStatusFor(Measure $measure): string
     {
         if ($measure->status === 'COMPLETED' || ($measure->status === 'ACTIVE' && $measure->ends_at?->isPast())) {
             return 'COMPLETED';

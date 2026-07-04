@@ -2,12 +2,9 @@
 
 namespace App\Services\Insights\Db;
 
-use App\Enums\Role;
-use App\Models\Measure;
-use App\Models\Team;
 use App\Models\User;
 use App\Services\AnonymityService;
-use App\Services\Company\TeamLayerGuard;
+use App\Services\Company\CompanyMeasureAccessService;
 use App\Services\Insights\Contracts\MeasureStatisticsProvider;
 use App\Services\Insights\RiskFields;
 use App\Services\MeasureParticipationSummaryService;
@@ -20,7 +17,7 @@ use App\Services\MeasureParticipationSummaryService;
 class DbMeasureStatisticsProvider implements MeasureStatisticsProvider
 {
     public function __construct(
-        private readonly TeamLayerGuard $teamLayerGuard,
+        private readonly CompanyMeasureAccessService $measureAccessService,
         private readonly MeasureParticipationSummaryService $summaryService,
     ) {
     }
@@ -30,7 +27,11 @@ class DbMeasureStatisticsProvider implements MeasureStatisticsProvider
         $threshold = $user->company?->anonymity_threshold ?? AnonymityService::DEFAULT_THRESHOLD;
 
         $byField = array_fill_keys(array_keys(RiskFields::FIELDS), []);
-        foreach ($this->scopedMeasures($user) as $measure) {
+        $measures = $this->measureAccessService->readableMeasureQueryFor($user)
+            ->where('status', '!=', 'DISMISSED')
+            ->get();
+
+        foreach ($measures as $measure) {
             $field = RiskFields::categoryToField($measure->category);
             if ($field !== null) {
                 $byField[$field][] = $measure;
@@ -63,43 +64,5 @@ class DbMeasureStatisticsProvider implements MeasureStatisticsProvider
         }
 
         return $rows;
-    }
-
-    /**
-     * Same visibility rules as MeasureController::index, minus dismissed
-     * measures (the statistics view counts suggested + active + completed).
-     *
-     * @return \Illuminate\Support\Collection<int, Measure>
-     */
-    private function scopedMeasures(User $user)
-    {
-        $user->loadMissing('roles');
-        $isManager = $user->hasRole('COMPANY_MANAGER') && ! $user->hasAnyRole([Role::COMPANY_ADMIN, Role::COMPANY_OWNER]);
-        $teamLayerEnabled = $this->teamLayerGuard->enabledFor($user);
-
-        if (! $teamLayerEnabled && $isManager) {
-            $this->teamLayerGuard->abortIfDisabled($user);
-        }
-
-        $query = Measure::where('company_id', $user->company_id)
-            ->where('status', '!=', 'DISMISSED');
-
-        if (! $teamLayerEnabled) {
-            $query->whereNull('team_id');
-        }
-
-        if ($isManager) {
-            $managedTeamId = Team::where('manager_id', $user->id)
-                ->where('company_id', $user->company_id)
-                ->value('id');
-            if (! $managedTeamId) {
-                return collect();
-            }
-            $query->where(function ($q) use ($managedTeamId) {
-                $q->whereNull('team_id')->orWhere('team_id', $managedTeamId);
-            });
-        }
-
-        return $query->get();
     }
 }

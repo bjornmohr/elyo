@@ -7,17 +7,15 @@
     "measureImpactScore": { "value": 2, "max": 5, "label": "Programme zeigen positive Wirkung" },
     "topFields": [
       { "rank": 1, "field": "SLEEP", "fieldLabel": "Schlaf" },
-      { "rank": 2, "field": "STRESS", "fieldLabel": "Stress" },
+      { "rank": 2, "field": "STRESS_MENTAL", "fieldLabel": "Stress / Mentale Belastung" },
       { "rank": 3, "field": "BACK", "fieldLabel": "Rücken" }
     ]
   },
   "riskCompact": [
     { "field": "SLEEP", "fieldLabel": "Schlaf", "relevanceLevel": 4, "trend30d": 12 },
     { "field": "BACK", "fieldLabel": "Rücken", "relevanceLevel": 4, "trend30d": 15 },
-    { "field": "STRESS", "fieldLabel": "Stress", "relevanceLevel": 3, "trend30d": 7 },
-    { "field": "MENTAL_LOAD", "fieldLabel": "Mentale Belastung", "relevanceLevel": 3, "trend30d": 6 },
+    { "field": "STRESS_MENTAL", "fieldLabel": "Stress / Mentale Belastung", "relevanceLevel": 3, "trend30d": 7 },
     { "field": "KNOWLEDGE", "fieldLabel": "Orientierung / Wissen", "relevanceLevel": 3, "trend30d": 9 },
-    { "field": "ENERGY", "fieldLabel": "Energie", "relevanceLevel": 2, "trend30d": 3 },
     { "field": "NUTRITION", "fieldLabel": "Ernährung", "relevanceLevel": 2, "trend30d": 2 },
     { "field": "MOVEMENT", "fieldLabel": "Bewegung", "relevanceLevel": 2, "trend30d": 0 }
   ],

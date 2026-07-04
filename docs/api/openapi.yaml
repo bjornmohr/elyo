@@ -503,6 +503,11 @@ components:
         category: { type: string }
         description: { type: string }
         status: { type: string }
+        derivedStatus:
+          type: string
+          enum: [UPCOMING, RUNNING, COMPLETED, PLANNED]
+          readOnly: true
+          description: Server-derived execution status for list/card display. SUGGESTED and DISMISSED map to PLANNED; ACTIVE with a past endsAt maps to COMPLETED.
         suggestedAt: { type: string, format: date-time }
         startedAt: { type: string, format: date-time, nullable: true }
         completedAt: { type: string, format: date-time, nullable: true }

@@ -35,8 +35,8 @@
       "linkedMeasures": { "activeCount": 1, "suggestedCount": 0 }
     },
     {
-      "field": "STRESS",
-      "fieldLabel": "Stress",
+      "field": "STRESS_MENTAL",
+      "fieldLabel": "Stress / Mentale Belastung",
       "relevanceLevel": 3,
       "score": 64,
       "trend30d": 7,
@@ -47,23 +47,6 @@
         { "period": "2026-04", "score": 59 },
         { "period": "2026-05", "score": 60 },
         { "period": "2026-06", "score": 64 }
-      ],
-      "monthsAboveHighSince": null,
-      "linkedMeasures": { "activeCount": 1, "suggestedCount": 0 }
-    },
-    {
-      "field": "MENTAL_LOAD",
-      "fieldLabel": "Mentale Belastung",
-      "relevanceLevel": 3,
-      "score": 58,
-      "trend30d": 6,
-      "monthlyScores": [
-        { "period": "2026-01", "score": 48 },
-        { "period": "2026-02", "score": 50 },
-        { "period": "2026-03", "score": 52 },
-        { "period": "2026-04", "score": 53 },
-        { "period": "2026-05", "score": 55 },
-        { "period": "2026-06", "score": 58 }
       ],
       "monthsAboveHighSince": null,
       "linkedMeasures": { "activeCount": 1, "suggestedCount": 0 }
@@ -81,23 +64,6 @@
         { "period": "2026-04", "score": 49 },
         { "period": "2026-05", "score": 51 },
         { "period": "2026-06", "score": 55 }
-      ],
-      "monthsAboveHighSince": null,
-      "linkedMeasures": { "activeCount": 0, "suggestedCount": 0 }
-    },
-    {
-      "field": "ENERGY",
-      "fieldLabel": "Energie",
-      "relevanceLevel": 2,
-      "score": 47,
-      "trend30d": 3,
-      "monthlyScores": [
-        { "period": "2026-01", "score": 44 },
-        { "period": "2026-02", "score": 45 },
-        { "period": "2026-03", "score": 44 },
-        { "period": "2026-04", "score": 46 },
-        { "period": "2026-05", "score": 45 },
-        { "period": "2026-06", "score": 47 }
       ],
       "monthsAboveHighSince": null,
       "linkedMeasures": { "activeCount": 0, "suggestedCount": 0 }

@@ -28,7 +28,7 @@ import { CompanyMeasuresService, MeasureFieldStatistics } from '../../services/c
               <tr style="background: #faf8f3; border-bottom: 1px solid #f1ede3">
                 <th class="text-left px-4 py-3 text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Risikofeld</th>
                 <th class="text-left px-4 py-3 text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Maßnahmen</th>
-                <th class="text-left px-4 py-3 text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Ø Resonanz</th>
+                <th class="text-left px-4 py-3 text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Ø Teilnahmequote</th>
                 <th class="text-left px-4 py-3 text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">
                   Ø Wirkung
                   <span class="ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full normal-case" style="background: #fdf3e3; color: #9a6b1f">KONZEPT</span>
@@ -79,7 +79,7 @@ import { CompanyMeasuresService, MeasureFieldStatistics } from '../../services/c
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div class="bg-white p-5 space-y-3" style="border: 1px solid #ece6d8; border-radius: 14px">
-            <h2 class="text-sm font-semibold text-gray-900">Resonanz nach Feld</h2>
+            <h2 class="text-sm font-semibold text-gray-900">Teilnahmequote nach Feld</h2>
             @for (row of fieldsWithRate(); track row.field) {
               <div class="space-y-1">
                 <div class="flex justify-between text-xs">
@@ -91,7 +91,7 @@ import { CompanyMeasuresService, MeasureFieldStatistics } from '../../services/c
                 </div>
               </div>
             } @empty {
-              <p class="text-xs italic" style="color: #9aa39c">Noch keine Resonanzdaten vorhanden.</p>
+              <p class="text-xs italic" style="color: #9aa39c">Noch keine Teilnahmedaten vorhanden.</p>
             }
           </div>
 

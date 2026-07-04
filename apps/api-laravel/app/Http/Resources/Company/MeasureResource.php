@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Company;
 
+use App\Services\MeasureExecutionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -15,6 +16,7 @@ class MeasureResource extends JsonResource
             'category' => $this->category,
             'description' => $this->description,
             'status' => $this->status,
+            'derivedStatus' => app(MeasureExecutionService::class)->derivedStatusFor($this->resource),
             'suggestedAt' => $this->suggested_at,
             'startedAt' => $this->started_at,
             'completedAt' => $this->completed_at,

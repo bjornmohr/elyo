@@ -45,6 +45,26 @@ class MeasureExecutionTest extends TestCase
         }
     }
 
+    public function test_measure_list_exposes_backend_derived_status(): void
+    {
+        $company = Company::factory()->create(['anonymity_threshold' => 3]);
+        $admin = $this->companyUser($company, Role::COMPANY_ADMIN);
+        $measure = Measure::factory()->create([
+            'company_id' => $company->id,
+            'team_id' => null,
+            'created_by' => $admin->id,
+            'status' => 'ACTIVE',
+            'starts_at' => now()->addDays(2),
+            'ends_at' => now()->addDays(3),
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson('/api/company/measures')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $measure->id)
+            ->assertJsonPath('data.0.derivedStatus', 'UPCOMING');
+    }
+
     public function test_execution_exposes_checkin_state_for_active_token(): void
     {
         $company = Company::factory()->create(['anonymity_threshold' => 3]);

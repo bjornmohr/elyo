@@ -24,6 +24,7 @@ interface CompanyMeasure {
   category: string;
   description: string;
   status: string;
+  derivedStatus: 'UPCOMING' | 'RUNNING' | 'COMPLETED' | 'PLANNED';
   completedAt?: string | null;
   deliveryType?: string | null;
   executionType?: string | null;
@@ -664,20 +665,8 @@ export class CompanyMeasuresComponent implements OnInit {
     return this.executionDetails()[measureId] ?? null;
   }
 
-  // Same derivation rules as the backend's MeasureExecutionService, so the
-  // collapsed rows get their chip without one request per measure.
   derivedStatus(measure: CompanyMeasure): 'UPCOMING' | 'RUNNING' | 'COMPLETED' | 'PLANNED' {
-    const now = Date.now();
-    if (measure.status === 'COMPLETED' || (measure.status === 'ACTIVE' && !!measure.endsAt && new Date(measure.endsAt).getTime() < now)) {
-      return 'COMPLETED';
-    }
-    if (measure.status === 'SUGGESTED' || measure.status === 'DISMISSED') {
-      return 'PLANNED';
-    }
-    if (!!measure.startsAt && new Date(measure.startsAt).getTime() > now) {
-      return 'UPCOMING';
-    }
-    return 'RUNNING';
+    return measure.derivedStatus;
   }
 
   derivedStatusLabel(measure: CompanyMeasure) {
