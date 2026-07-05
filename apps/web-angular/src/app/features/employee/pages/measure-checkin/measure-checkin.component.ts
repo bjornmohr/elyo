@@ -11,17 +11,17 @@ import { NotificationService } from '../../../../shared/notifications/notificati
   template: `
     <div class="mx-auto max-w-xl p-4">
       <div class="rounded-xl border border-slate-100 bg-white p-6">
-        <h1 class="text-xl font-bold text-slate-800">Maßnahme Check-in</h1>
+        <h1 class="text-2xl font-bold text-slate-800">Maßnahme Check-in</h1>
         @if (loading()) {
           <p class="mt-3 text-sm text-slate-500">Check-in wird gespeichert…</p>
         } @else if (success()) {
           <p class="mt-3 text-sm text-emerald-700">Teilnahme wurde gespeichert.</p>
-          <a routerLink="/employee/measures" class="mt-5 inline-flex rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white">
+          <a routerLink="/employee/measures" class="mt-5 inline-flex min-h-11 items-center rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white">
             Zu den Maßnahmen
           </a>
         } @else {
           <p class="mt-3 text-sm text-red-700">{{ errorMessage() }}</p>
-          <a routerLink="/employee/measures" class="mt-5 inline-flex rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
+          <a routerLink="/employee/measures" class="mt-5 inline-flex min-h-11 items-center rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
             Zu den Maßnahmen
           </a>
         }

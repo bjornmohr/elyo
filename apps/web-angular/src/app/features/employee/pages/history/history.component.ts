@@ -10,10 +10,10 @@ import { EmployeeService, WellbeingEntry } from '../../services/employee.service
   template: `
     <div class="max-w-2xl mx-auto p-4 space-y-6">
       <header class="flex items-center space-x-4">
-        <a routerLink="/employee" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
+        <a routerLink="/employee" class="inline-flex min-h-11 min-w-11 items-center justify-center p-2.5 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
            ←
         </a>
-        <h1 class="text-xl font-bold text-slate-800">Check-in Verlauf</h1>
+        <h1 class="text-2xl font-bold text-slate-800">Check-in Verlauf</h1>
       </header>
 
       @if (entries().length) {
@@ -29,28 +29,28 @@ import { EmployeeService, WellbeingEntry } from '../../services/employee.service
                   </div>
                   <div>
                     <div class="font-bold text-slate-800">Mood {{ entry.mood ?? '-' }}/5</div>
-                    <div class="text-sm text-slate-400">{{ entry.createdAt | date:'EEEE, d. MMMM' }}</div>
+                    <div class="text-sm text-slate-500">{{ entry.createdAt | date:'EEEE, d. MMMM' }}</div>
                   </div>
                 </div>
                 <div class="text-right">
                   <div class="text-2xl font-black" [style.color]="getScoreColor(entry.score)">
                     {{ entry.score.toFixed(1) }}
                   </div>
-                  <div class="text-[10px] font-bold uppercase tracking-widest text-slate-300">Score</div>
+                  <div class="text-xs font-bold uppercase tracking-widest text-slate-500">Score</div>
                 </div>
               </div>
 
               <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-50">
                  <div class="text-center p-2 rounded-xl bg-slate-50">
-                   <div class="text-xs text-slate-400">Stress</div>
+                   <div class="text-sm text-slate-500">Stress</div>
                    <div class="font-bold text-slate-700">{{ entry.stress ?? '-' }}/5</div>
                  </div>
                  <div class="text-center p-2 rounded-xl bg-slate-50">
-                   <div class="text-xs text-slate-400">Energy</div>
+                   <div class="text-sm text-slate-500">Energy</div>
                    <div class="font-bold text-slate-700">{{ entry.energy ?? '-' }}/5</div>
                  </div>
                  <div class="text-center p-2 rounded-xl bg-slate-50">
-                   <div class="text-xs text-slate-400">Mood</div>
+                   <div class="text-sm text-slate-500">Mood</div>
                    <div class="font-bold text-slate-700">{{ entry.mood ?? '-' }}/5</div>
                  </div>
               </div>

@@ -31,8 +31,8 @@ const CATEGORY_LABELS: Record<string, string> = {
     <div class="w-full p-4 space-y-6">
       <header class="flex items-center justify-between gap-4">
         <div class="flex items-center space-x-4">
-          <a routerLink="/employee" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>
-          <h1 class="text-xl font-bold text-slate-800">Deine Maßnahmen</h1>
+          <a routerLink="/employee" class="inline-flex min-h-11 min-w-11 items-center justify-center p-2.5 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>
+          <h1 class="text-2xl font-bold text-slate-800">Deine Maßnahmen</h1>
         </div>
         <span class="inline-flex items-center gap-1.5 rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
@@ -41,7 +41,7 @@ const CATEGORY_LABELS: Record<string, string> = {
       </header>
 
       @if (hiddenCount() > 0) {
-        <p class="rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5 text-xs text-amber-700">
+        <p class="rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5 text-sm text-amber-700">
           {{ hiddenCount() }} Maßnahme{{ hiddenCount() === 1 ? '' : 'n' }} mit Bodenübungen ausgeblendet — an deinem heutigen Ort ({{ locationLabel() }}) nicht machbar.
         </p>
       }
@@ -51,7 +51,7 @@ const CATEGORY_LABELS: Record<string, string> = {
           <div class="w-8 h-8 border-4 border-teal-500/30 border-t-teal-500 rounded-full animate-spin"></div>
         </div>
       } @else if (visibleMeasures().length === 0) {
-        <div class="bg-white rounded-3xl border border-slate-100 p-10 text-center text-slate-400">
+        <div class="bg-white rounded-3xl border border-slate-100 p-10 text-center text-slate-500">
           Dir sind aktuell keine Maßnahmen zugewiesen.
         </div>
       } @else {
@@ -68,17 +68,17 @@ const CATEGORY_LABELS: Record<string, string> = {
                               stroke-linecap="round"
                               [attr.stroke-dasharray]="progressDash(measure)"/>
                     </svg>
-                    <span class="absolute inset-0 flex items-center justify-center text-xs font-bold text-slate-700">
+                    <span class="absolute inset-0 flex items-center justify-center text-sm font-bold text-slate-700">
                       {{ measure.weeklyDone ?? 0 }}/{{ measure.weeklyTarget ?? 0 }}
                     </span>
                   </div>
                   <div>
-                    <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-teal-50 text-teal-700">
+                    <span class="inline-block px-2 py-0.5 rounded-full text-xs font-bold tracking-wide uppercase bg-teal-50 text-teal-700">
                       {{ categoryLabel(measure.category) }}
                     </span>
                     <h2 class="font-bold text-slate-800 mt-1.5">{{ measure.title }}</h2>
                     @if (measure.assignmentReason) {
-                      <p class="text-xs text-slate-500 mt-0.5">{{ measure.assignmentReason }}</p>
+                      <p class="text-sm text-slate-500 mt-0.5">{{ measure.assignmentReason }}</p>
                     }
                   </div>
                 </div>
@@ -89,7 +89,7 @@ const CATEGORY_LABELS: Record<string, string> = {
                 }
               </div>
 
-              <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <div class="flex flex-wrap items-center gap-2 text-sm text-slate-500">
                 <span>{{ measure.exerciseCount }} Übung{{ measure.exerciseCount === 1 ? '' : 'en' }}</span>
                 @if (measure.estMinutes) {
                   <span>· ~{{ measure.estMinutes }} Min</span>

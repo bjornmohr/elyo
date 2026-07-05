@@ -12,8 +12,8 @@ import { NotificationService } from '../../../../shared/notifications/notificati
   template: `
     <div class="max-w-3xl mx-auto p-4 space-y-6">
       <header class="flex items-center space-x-4">
-        <a routerLink="/employee" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>
-        <h1 class="text-xl font-bold text-slate-800">Gesundheitsprofil</h1>
+        <a routerLink="/employee" class="inline-flex min-h-11 min-w-11 items-center justify-center p-2.5 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>
+        <h1 class="text-2xl font-bold text-slate-800">Gesundheitsprofil</h1>
       </header>
 
       @if (profile()?.anamnesisDue) {
@@ -80,7 +80,7 @@ import { NotificationService } from '../../../../shared/notifications/notificati
           </label>
           <div class="md:col-span-2 flex items-center justify-between pt-2">
             <span class="text-sm text-slate-500">Vollständigkeit: {{ profile()?.anamnesis?.completionPct ?? 0 }}%</span>
-            <button type="submit" class="px-5 py-3 bg-teal-600 text-white font-bold rounded-2xl shadow-lg shadow-teal-100">Anamnese speichern</button>
+            <button type="submit" class="min-h-11 px-5 py-3 bg-teal-600 text-white font-bold rounded-2xl shadow-lg shadow-teal-100">Anamnese speichern</button>
           </div>
         </form>
       </div>
@@ -98,7 +98,7 @@ import { NotificationService } from '../../../../shared/notifications/notificati
           @for (document of documents(); track document.id) {
             <div class="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
               <span class="font-medium text-slate-700">{{ document.fileName }}</span>
-              <span class="text-xs text-slate-400">{{ document.uploadedAt | date:'mediumDate' }}</span>
+              <span class="text-sm text-slate-500">{{ document.uploadedAt | date:'mediumDate' }}</span>
             </div>
           }
         </div>

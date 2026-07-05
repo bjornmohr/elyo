@@ -35,16 +35,16 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
     <div class="w-full p-4 space-y-6">
       <header class="flex items-center justify-between gap-4">
         <div class="flex items-center space-x-4">
-          <a routerLink="/employee/dashboard" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>
-          <h1 class="text-xl font-bold text-slate-800">Dein Check-in</h1>
+          <a routerLink="/employee/dashboard" class="inline-flex min-h-11 min-w-11 items-center justify-center p-2.5 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>
+          <h1 class="text-2xl font-bold text-slate-800">Dein Check-in</h1>
         </div>
-        <a routerLink="/employee/checkin/chat" class="text-xs font-semibold text-teal-600 hover:text-teal-700">Als Chat beantworten →</a>
+        <a routerLink="/employee/checkin/chat" class="inline-flex min-h-11 items-center text-sm font-semibold text-teal-600 hover:text-teal-700">Als Chat beantworten →</a>
       </header>
 
       @if (step() !== 'done') {
         <div class="flex items-center gap-1.5">
           @for (s of steps; track s; let i = $index) {
-            <div class="h-1.5 flex-1 rounded-full transition-colors"
+            <div class="h-2 flex-1 rounded-full transition-colors"
                  [class]="i <= stepIndex() ? 'bg-teal-500' : 'bg-slate-100'"></div>
           }
         </div>
@@ -55,7 +55,7 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
           @case ('location') {
             <div class="flex-1 space-y-5">
               <h2 class="text-lg font-bold text-slate-800">Wo bist du heute?</h2>
-              <p class="text-xs text-slate-400">Wir schlagen dir nur Übungen vor, die an deinem heutigen Ort machbar sind.</p>
+              <p class="text-sm text-slate-500">Wir schlagen dir nur Übungen vor, die an deinem heutigen Ort machbar sind.</p>
               <div class="grid grid-cols-2 gap-3">
                 @for (location of locations; track location.value) {
                   <button type="button" (click)="draft.location = location.value"
@@ -77,7 +77,7 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
                           class="rounded-2xl border px-2 py-4 text-center transition-colors"
                           [class]="draft.mood === option.value ? 'border-teal-500 bg-teal-50' : 'border-slate-100 hover:border-teal-200'">
                     <div class="text-2xl">{{ option.emoji }}</div>
-                    <div class="text-[10px] text-slate-500 mt-1 leading-tight">{{ option.label }}</div>
+                    <div class="text-xs text-slate-500 mt-1 leading-tight">{{ option.label }}</div>
                   </button>
                 }
               </div>
@@ -96,7 +96,7 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
                     </button>
                   }
                 </div>
-                <div class="flex justify-between text-[11px] text-slate-400"><span>Erschöpft</span><span>Voller Energie</span></div>
+                <div class="flex justify-between text-sm text-slate-500"><span>Erschöpft</span><span>Voller Energie</span></div>
               </div>
 
               @if (sleepActive()) {
@@ -105,9 +105,9 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
                   <div class="flex items-center justify-between gap-4">
                     <span class="text-sm text-slate-600">Wie lange hast du geschlafen?</span>
                     <div class="flex items-center gap-2">
-                      <button type="button" (click)="adjustSleep(-0.5)" class="w-8 h-8 rounded-full border border-slate-200 text-slate-600 font-bold hover:bg-white">−</button>
+                      <button type="button" (click)="adjustSleep(-0.5)" class="w-11 h-11 rounded-full border border-slate-200 text-slate-600 font-bold hover:bg-white">−</button>
                       <span class="text-sm font-bold text-slate-800 w-14 text-center">{{ formatHours(draft.sleepHours) }} h</span>
-                      <button type="button" (click)="adjustSleep(0.5)" class="w-8 h-8 rounded-full border border-slate-200 text-slate-600 font-bold hover:bg-white">＋</button>
+                      <button type="button" (click)="adjustSleep(0.5)" class="w-11 h-11 rounded-full border border-slate-200 text-slate-600 font-bold hover:bg-white">＋</button>
                     </div>
                   </div>
                   <div>
@@ -124,7 +124,7 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
                   </div>
                 </div>
               } @else {
-                <button type="button" (click)="draft.sleepWanted = true" class="text-xs font-semibold text-teal-600 hover:text-teal-700">
+                <button type="button" (click)="draft.sleepWanted = true" class="min-h-11 text-sm font-semibold text-teal-600 hover:text-teal-700">
                   ＋ Ich habe schlecht geschlafen
                 </button>
               }
@@ -143,7 +143,7 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
                     </button>
                   }
                 </div>
-                <div class="flex justify-between text-[11px] text-slate-400"><span>Entspannt</span><span>Sehr gestresst</span></div>
+                <div class="flex justify-between text-sm text-slate-500"><span>Entspannt</span><span>Sehr gestresst</span></div>
               </div>
             </div>
           }
@@ -152,11 +152,11 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
               <h2 class="text-lg font-bold text-slate-800">Körpersignale &amp; Befinden</h2>
 
               <div>
-                <p class="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Zuletzt häufig</p>
+                <p class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Zuletzt häufig</p>
                 <div class="flex flex-wrap gap-2">
                   @for (symptom of frequentSymptoms; track symptom.key) {
                     <button type="button" (click)="toggleSymptom(symptom)"
-                            class="rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors"
+                            class="min-h-11 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors"
                             [class]="hasSymptom(symptom.key) ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-slate-200 text-slate-600 hover:border-teal-200'">
                       {{ symptom.label }}
                     </button>
@@ -165,11 +165,11 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
               </div>
 
               <div>
-                <p class="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Weitere Signale</p>
+                <p class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Weitere Signale</p>
                 <div class="flex flex-wrap gap-2">
                   @for (symptom of otherSymptoms; track symptom.key) {
                     <button type="button" (click)="toggleSymptom(symptom)"
-                            class="rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors"
+                            class="min-h-11 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors"
                             [class]="hasSymptom(symptom.key) ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-slate-200 text-slate-600 hover:border-teal-200'">
                       {{ symptom.label }}
                     </button>
@@ -183,13 +183,13 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
                   <div class="flex flex-wrap gap-2">
                     @for (region of pain.regions; track region) {
                       <button type="button" (click)="setSymptomRegion(pain.key, region)"
-                              class="rounded-full border px-3 py-1 text-xs font-semibold transition-colors"
+                              class="min-h-11 rounded-full border px-3 py-1 text-sm font-semibold transition-colors"
                               [class]="draft.symptoms[pain.key].region === region ? 'border-teal-500 bg-white text-teal-700' : 'border-slate-200 bg-white text-slate-600'">
                         {{ region }}
                       </button>
                     }
                   </div>
-                  <p class="text-sm text-slate-600">Wie stark? <span class="text-slate-400">(1 = leicht, 5 = stark)</span></p>
+                  <p class="text-sm text-slate-600">Wie stark? <span class="text-slate-500">(1 = leicht, 5 = stark)</span></p>
                   <div class="grid grid-cols-5 gap-2">
                     @for (value of scale; track value) {
                       <button type="button" (click)="setSymptomSeverity(pain.key, value)"
@@ -217,7 +217,7 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
                   <div class="flex flex-wrap gap-2">
                     @for (type of illnessTypes; track type.key) {
                       <button type="button" (click)="setIllnessType(type.key)"
-                              class="rounded-xl border px-3.5 py-2 text-xs font-semibold transition-colors"
+                              class="min-h-11 rounded-xl border px-3.5 py-2 text-sm font-semibold transition-colors"
                               [class]="draft.illnessType === type.key ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-600'">{{ type.label }}</button>
                     }
                   </div>
@@ -226,7 +226,7 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
                     <div class="flex flex-wrap gap-2">
                       @for (sub of illnessSubs(); track sub) {
                         <button type="button" (click)="toggleIllnessSub(sub)"
-                                class="rounded-full border px-3 py-1 text-xs font-semibold transition-colors"
+                                class="min-h-11 rounded-full border px-3 py-1 text-sm font-semibold transition-colors"
                                 [class]="draft.illnessSubs.includes(sub) ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-600'">
                           {{ sub }}
                         </button>
@@ -242,7 +242,7 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
                         </button>
                       }
                     </div>
-                    <p class="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-3 py-2">Intensive Übungen werden pausiert — wir schlagen dir Erholung und sanfte Einheiten vor.</p>
+                    <p class="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">Intensive Übungen werden pausiert — wir schlagen dir Erholung und sanfte Einheiten vor.</p>
                   }
                 }
               </div>
@@ -254,12 +254,12 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
               <dl class="space-y-2 text-sm">
                 @for (row of summaryRows(); track row.label) {
                   <div class="flex justify-between gap-4 border-b border-slate-50 pb-2">
-                    <dt class="text-slate-400">{{ row.label }}</dt>
+                    <dt class="text-slate-500">{{ row.label }}</dt>
                     <dd class="font-semibold text-slate-700 text-right">{{ row.value }}</dd>
                   </div>
                 }
               </dl>
-              <p class="rounded-xl bg-teal-50 px-4 py-2.5 text-xs font-semibold text-teal-700">Du erhältst 10 Punkte für deinen Check-in.</p>
+              <p class="rounded-xl bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-700">Du erhältst 10 Punkte für deinen Check-in.</p>
             </div>
           }
           @case ('done') {
@@ -269,12 +269,12 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
               @if (justSaved()) {
                 <p class="text-sm font-bold text-teal-600">+10 Punkte</p>
               }
-              <p class="text-xs text-slate-400 max-w-xs">Deine Angaben bleiben in dieser Demo lokal auf deinem Gerät gespeichert.</p>
+              <p class="text-sm text-slate-500 max-w-xs">Deine Angaben bleiben in dieser Demo lokal auf deinem Gerät gespeichert.</p>
               <div class="flex gap-3">
-                <button type="button" (click)="restart()" class="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+                <button type="button" (click)="restart()" class="min-h-11 rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
                   Erneut ausfüllen
                 </button>
-                <a routerLink="/employee/dashboard" class="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors">
+                <a routerLink="/employee/dashboard" class="inline-flex min-h-11 items-center rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors">
                   Zurück zur Übersicht
                 </a>
               </div>
@@ -285,17 +285,17 @@ const STEPS: Step[] = ['location', 'mood', 'energy', 'stress', 'signals', 'summa
         @if (step() !== 'done') {
           <div class="flex justify-between gap-3 pt-6 mt-auto">
             <button type="button" (click)="back()" [disabled]="stepIndex() === 0"
-                    class="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                    class="min-h-11 rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
               Zurück
             </button>
             @if (step() === 'summary') {
               <button type="button" (click)="save()"
-                      class="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors">
+                      class="min-h-11 rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors">
                 Speichern
               </button>
             } @else {
               <button type="button" (click)="next()" [disabled]="!stepValid()"
-                      class="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 disabled:bg-slate-300 transition-colors">
+                      class="min-h-11 rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 disabled:bg-slate-300 transition-colors">
                 Weiter
               </button>
             }

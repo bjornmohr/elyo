@@ -14,11 +14,11 @@ import { AssignedMeasureDetail, EmployeeService, MeasureExercise } from '../../s
   template: `
     <div class="w-full p-4 space-y-6">
       <header class="flex items-center space-x-4">
-        <a [routerLink]="['/employee/measures', measureId]" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>
+        <a [routerLink]="['/employee/measures', measureId]" class="inline-flex min-h-11 min-w-11 items-center justify-center p-2.5 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>
         <div>
-          <h1 class="text-xl font-bold text-slate-800">{{ exercise()?.title ?? 'Übung' }}</h1>
+          <h1 class="text-2xl font-bold text-slate-800">{{ exercise()?.title ?? 'Übung' }}</h1>
           @if (measure(); as m) {
-            <p class="text-xs text-slate-400">{{ m.title }} · Übung {{ exercise()?.position }} von {{ m.exercises.length }}</p>
+            <p class="text-sm text-slate-500">{{ m.title }} · Übung {{ exercise()?.position }} von {{ m.exercises.length }}</p>
           }
         </div>
       </header>
@@ -47,7 +47,7 @@ import { AssignedMeasureDetail, EmployeeService, MeasureExercise } from '../../s
 
           @if (ex.steps.length > 0) {
             <div class="rounded-2xl border border-slate-100 p-5">
-              <h3 class="text-[11px] font-bold tracking-wide uppercase text-teal-700 mb-4">So geht's</h3>
+              <h3 class="text-xs font-bold tracking-wide uppercase text-teal-700 mb-4">So geht's</h3>
               <div class="grid gap-3" [class.sm:grid-cols-3]="stepsWithPictograms(ex)">
                 @for (step of ex.steps; track $index) {
                   <div class="flex gap-3 items-start" [class.flex-col]="stepsWithPictograms(ex)" [class.items-center]="stepsWithPictograms(ex)">
@@ -56,7 +56,7 @@ import { AssignedMeasureDetail, EmployeeService, MeasureExercise } from '../../s
                     } @else {
                       <span class="w-6 h-6 rounded-full bg-teal-50 text-teal-700 text-xs font-bold flex items-center justify-center flex-shrink-0">{{ $index + 1 }}</span>
                     }
-                    <p class="text-xs text-slate-600 leading-relaxed" [class.text-center]="stepsWithPictograms(ex)">
+                    <p class="text-sm text-slate-600 leading-relaxed" [class.text-center]="stepsWithPictograms(ex)">
                       @if (stepsWithPictograms(ex)) { {{ $index + 1 }} · }{{ step.text }}
                     </p>
                   </div>
@@ -68,39 +68,39 @@ import { AssignedMeasureDetail, EmployeeService, MeasureExercise } from '../../s
           <div class="grid grid-cols-3 gap-3 text-center">
             <div class="rounded-xl border border-slate-100 px-3 py-3">
               <p class="text-lg font-bold text-slate-800">{{ currentSet() }}</p>
-              <p class="text-[11px] text-slate-500 mt-0.5">Satz von {{ ex.sets ?? 1 }}</p>
+              <p class="text-xs text-slate-500 mt-0.5">Satz von {{ ex.sets ?? 1 }}</p>
             </div>
             <div class="rounded-xl border border-slate-100 px-3 py-3">
               <p class="text-lg font-bold text-slate-800">{{ ex.repetitions ?? (ex.holdSeconds ? ex.holdSeconds + ' s' : '–') }}</p>
-              <p class="text-[11px] text-slate-500 mt-0.5">{{ ex.repetitions ? 'Wiederholungen' : (ex.holdSeconds ? 'Halten' : '') }}</p>
+              <p class="text-xs text-slate-500 mt-0.5">{{ ex.repetitions ? 'Wiederholungen' : (ex.holdSeconds ? 'Halten' : '') }}</p>
             </div>
             <div class="rounded-xl border border-slate-100 px-3 py-3">
               <p class="text-lg font-bold text-slate-800">{{ timerLabel() }}</p>
-              <p class="text-[11px] text-slate-500 mt-0.5">Timer</p>
+              <p class="text-xs text-slate-500 mt-0.5">Timer</p>
             </div>
           </div>
 
           @if (ex.safetyNotes) {
-            <p class="rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5 text-xs text-amber-700">{{ ex.safetyNotes }}</p>
+            <p class="rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5 text-sm text-amber-700">{{ ex.safetyNotes }}</p>
           }
 
           <div class="flex flex-col gap-3 sm:flex-row">
             <button type="button" (click)="toggleTimer()"
-                    class="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+                    class="flex-1 min-h-11 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
               {{ timerRunning() ? 'Pause' : 'Timer starten' }}
             </button>
             <button type="button" (click)="skip()"
-                    class="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+                    class="flex-1 min-h-11 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
               Überspringen
             </button>
             <button type="button" (click)="completeSet()"
-                    class="flex-1 rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors">
+                    class="flex-1 min-h-11 rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors">
               {{ isLastSet() ? 'Übung abschließen ✓' : 'Satz abgeschlossen ✓' }}
             </button>
           </div>
         </div>
       } @else {
-        <div class="bg-white rounded-3xl border border-slate-100 p-10 text-center text-slate-400">
+        <div class="bg-white rounded-3xl border border-slate-100 p-10 text-center text-slate-500">
           Übung nicht gefunden.
         </div>
       }

@@ -69,6 +69,23 @@ Important validation command:
 
     docker compose exec web npm run build
 
+## Frontend Style Guideline
+
+Alle UI-Arbeit am Angular-Frontend **muss** der Typografie- & Lesbarkeits-Guideline
+folgen: `docs/ai-context/frontend-typography-guideline.md`.
+
+Kernregeln (nicht verhandelbar):
+
+- **Kein tragender Text unter 12 px.** `text-[10px]` und `text-[11px]` sind verboten.
+- Fließtext und Werte ≥ 14 px (`text-sm`), Seitentitel `text-2xl`.
+- Sekundärtext nicht heller als `text-slate-500`; Text auf farbigem Grund ≥ 13 px, Deckkraft ≥ 90 %.
+- KPI-/Metrik-Zahlen groß (`text-3xl`), Kacheln mit ≥ `p-5` Padding, max. 3–4 Spalten.
+- Interaktive Flächen ≥ 44 × 44 px.
+- Fonts unverändert: Body `DM Sans`, Headings `Fraunces`.
+
+Vor Abschluss jeder Frontend-Aufgabe prüfen:
+`grep -rn "text-\[1[01]px\]" apps/web-angular/src` muss **0 Treffer** liefern.
+
 ## Docker Rules
 
 The local stack must remain valid.

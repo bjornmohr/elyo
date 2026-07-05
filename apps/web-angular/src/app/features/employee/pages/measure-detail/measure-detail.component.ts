@@ -25,8 +25,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   template: `
     <div class="w-full p-4 space-y-6">
       <header class="flex items-center space-x-4">
-        <a routerLink="/employee/measures" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>
-        <h1 class="text-xl font-bold text-slate-800">Programm-Detail</h1>
+        <a routerLink="/employee/measures" class="inline-flex min-h-11 min-w-11 items-center justify-center p-2.5 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>
+        <h1 class="text-2xl font-bold text-slate-800">Programm-Detail</h1>
       </header>
 
       @if (loading()) {
@@ -35,7 +35,7 @@ const CATEGORY_LABELS: Record<string, string> = {
         </div>
       } @else if (measure(); as m) {
         <div class="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
-          <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-teal-50 text-teal-700">
+          <span class="inline-block px-2 py-0.5 rounded-full text-xs font-bold tracking-wide uppercase bg-teal-50 text-teal-700">
             {{ categoryLabel(m.category) }}
           </span>
           <div>
@@ -46,7 +46,7 @@ const CATEGORY_LABELS: Record<string, string> = {
           </div>
 
           @if (m.assignmentReason) {
-            <div class="rounded-xl bg-teal-50/60 border border-teal-100 px-4 py-3 text-xs text-teal-800">
+            <div class="rounded-xl bg-teal-50/60 border border-teal-100 px-4 py-3 text-sm text-teal-800">
               <span class="font-semibold">Warum dieses Programm?</span> Empfohlen {{ m.assignmentReason }}.
             </div>
           }
@@ -69,10 +69,10 @@ const CATEGORY_LABELS: Record<string, string> = {
               </div>
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-semibold text-slate-800" [class.line-through]="isDone(exercise.position)">{{ exercise.title }}</p>
-                <p class="text-xs text-slate-500">{{ exerciseMeta(exercise) }}</p>
+                <p class="text-sm text-slate-500">{{ exerciseMeta(exercise) }}</p>
               </div>
               <a [routerLink]="['/employee/measures', m.id, 'exercise', exercise.position]"
-                 class="rounded-lg bg-teal-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 transition-colors whitespace-nowrap">
+                 class="inline-flex min-h-11 items-center rounded-lg bg-teal-600 px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors whitespace-nowrap">
                 {{ isDone(exercise.position) ? 'Wiederholen' : 'Starten' }}
               </a>
             </div>
@@ -85,22 +85,22 @@ const CATEGORY_LABELS: Record<string, string> = {
             <div class="grid grid-cols-3 gap-3 text-center">
               <div class="rounded-xl bg-slate-50 px-3 py-3">
                 <p class="text-lg font-bold text-slate-800">{{ effectValue(session.effect) }}</p>
-                <p class="text-[11px] text-slate-500 mt-0.5">{{ effectCaption(session.effect) }}</p>
+                <p class="text-xs text-slate-500 mt-0.5">{{ effectCaption(session.effect) }}</p>
               </div>
               <div class="rounded-xl bg-slate-50 px-3 py-3">
                 <p class="text-lg font-bold text-slate-800">{{ session.effort ?? '–' }}/5</p>
-                <p class="text-[11px] text-slate-500 mt-0.5">Aufwand</p>
+                <p class="text-xs text-slate-500 mt-0.5">Aufwand</p>
               </div>
               <div class="rounded-xl bg-slate-50 px-3 py-3">
                 <p class="text-lg font-bold text-teal-700">+{{ session.points ?? 0 }}</p>
-                <p class="text-[11px] text-slate-500 mt-0.5">Punkte</p>
+                <p class="text-xs text-slate-500 mt-0.5">Punkte</p>
               </div>
             </div>
-            <p class="text-[11px] text-slate-400">Demo-Werte — Vorher/Nachher wird lokal erfasst und nicht gespeichert.</p>
+            <p class="text-xs text-slate-500">Demo-Werte — Vorher/Nachher wird lokal erfasst und nicht gespeichert.</p>
           </div>
         }
       } @else {
-        <div class="bg-white rounded-3xl border border-slate-100 p-10 text-center text-slate-400">
+        <div class="bg-white rounded-3xl border border-slate-100 p-10 text-center text-slate-500">
           Maßnahme nicht gefunden.
         </div>
       }

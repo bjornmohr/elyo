@@ -40,10 +40,10 @@ interface ChatEntry {
     <div class="w-full p-4 space-y-6">
       <header class="flex items-center justify-between gap-4">
         <div class="flex items-center space-x-4">
-          <a routerLink="/employee/dashboard" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>
-          <h1 class="text-xl font-bold text-slate-800">Check-in als Chat</h1>
+          <a routerLink="/employee/dashboard" class="inline-flex min-h-11 min-w-11 items-center justify-center p-2.5 hover:bg-slate-100 rounded-full transition-colors text-slate-500">←</a>
+          <h1 class="text-2xl font-bold text-slate-800">Check-in als Chat</h1>
         </div>
-        <a routerLink="/employee/checkin" class="text-xs font-semibold text-teal-600 hover:text-teal-700">Lieber geführt →</a>
+        <a routerLink="/employee/checkin" class="inline-flex min-h-11 items-center text-sm font-semibold text-teal-600 hover:text-teal-700">Lieber geführt →</a>
       </header>
 
       <div class="bg-white rounded-3xl border border-slate-100 p-6 space-y-4 min-h-[420px]">
@@ -140,10 +140,10 @@ interface ChatEntry {
             } @else {
               <p class="text-sm font-bold text-slate-800">Check-in für heute erledigt</p>
             }
-            <p class="text-xs text-slate-400 max-w-xs">Deine Angaben bleiben in dieser Demo lokal auf deinem Gerät gespeichert.</p>
+            <p class="text-sm text-slate-500 max-w-xs">Deine Angaben bleiben in dieser Demo lokal auf deinem Gerät gespeichert.</p>
             <div class="flex gap-3">
-              <button type="button" (click)="restart()" class="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">Erneut ausfüllen</button>
-              <a routerLink="/employee/dashboard" class="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors">Zurück zur Übersicht</a>
+              <button type="button" (click)="restart()" class="min-h-11 rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">Erneut ausfüllen</button>
+              <a routerLink="/employee/dashboard" class="inline-flex min-h-11 items-center rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors">Zurück zur Übersicht</a>
             </div>
           </div>
         }
@@ -153,13 +153,13 @@ interface ChatEntry {
   styles: [`
     .chat-chip {
       border-radius: 999px; border: 1px solid #e2e8f0; padding: 0.4rem 0.9rem;
-      font-size: 0.75rem; font-weight: 600; color: #475569; transition: all .15s;
+      min-height: 2.75rem; font-size: 0.875rem; font-weight: 600; color: #475569; transition: all .15s;
     }
     .chat-chip:hover { border-color: #99f6e4; }
     .chat-chip-active { border-color: #14b8a6; background: #f0fdfa; color: #0f766e; }
     .chat-chip-primary {
       border-radius: 999px; background: #0d9488; padding: 0.4rem 0.9rem;
-      font-size: 0.75rem; font-weight: 600; color: white;
+      min-height: 2.75rem; font-size: 0.875rem; font-weight: 600; color: white;
     }
   `]
 })
