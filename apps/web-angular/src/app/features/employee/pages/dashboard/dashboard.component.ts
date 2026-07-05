@@ -5,6 +5,8 @@ import { RouterLink } from '@angular/router';
 import { CheckinDemoStorageService, DemoCheckin } from '../../services/checkin-demo-storage.service';
 import { DashboardData, DashboardLever, EmployeeService, MetricAggregate } from '../../services/employee.service';
 import { categoryIcon } from '../../shared/measure-category-icons';
+import { EmployeeBadgesDemoService, BADGE_CATEGORY_LABELS } from '../../services/employee-badges-demo.service';
+import { EmployeeBadge } from '../../models/badge.model';
 
 type LeverSafeModeState = 'paused' | 'gentle' | null;
 
@@ -178,6 +180,76 @@ interface LeverCard extends DashboardLever {
           </div>
         }
       }
+
+      <section class="rounded-[24px] border border-slate-100 bg-white p-6">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 class="text-xl font-bold text-slate-800">Deine Präventions-Badges</h3>
+            <p class="mt-1 text-sm text-slate-500">Routinen, Check-ins und Maßnahmen werden zu langfristigen Fortschritten.</p>
+          </div>
+          <a routerLink="/employee/badges"
+             class="inline-flex min-h-11 items-center justify-center rounded-xl border border-teal-100 px-4 py-2 text-sm font-semibold text-teal-700 transition-colors hover:bg-teal-50">
+            Alle Badges ansehen
+          </a>
+        </div>
+
+        <div class="mt-6 grid gap-5 xl:grid-cols-[1.35fr_0.9fr]">
+          <div>
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <h4 class="text-sm font-bold uppercase tracking-wide text-slate-600">Aktive Fortschritte</h4>
+              <span class="text-sm font-semibold text-slate-500">{{ activeBadgeCards().length }} in Arbeit</span>
+            </div>
+            <div class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,14.5rem),1fr))] gap-4">
+              @for (badge of activeBadgeCards(); track badge.id) {
+                <a routerLink="/employee/badges"
+                   class="rounded-2xl border border-slate-100 p-5 transition-all hover:border-teal-200 hover:shadow-sm">
+                  <div class="flex items-start gap-3">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-base font-black" [ngClass]="badgeToneClass(badge)">
+                      {{ badge.icon }}
+                    </span>
+                    <div class="min-w-0">
+                      <p class="text-base font-bold text-slate-800">{{ badge.title }}</p>
+                      <p class="mt-1 text-sm leading-5 text-slate-500">{{ badge.description }}</p>
+                    </div>
+                  </div>
+                  <div class="mt-4">
+                    <div class="flex items-center justify-between gap-3 text-sm">
+                      <span class="font-semibold text-slate-700">{{ badge.progressCurrent }}/{{ badge.progressTarget }}</span>
+                      <span class="text-slate-500">{{ badgeProgressLabel(badge) }}</span>
+                    </div>
+                    <div class="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100" role="progressbar"
+                         [attr.aria-valuenow]="badge.progressCurrent" [attr.aria-valuemin]="0" [attr.aria-valuemax]="badge.progressTarget">
+                      <div class="h-full rounded-full bg-teal-500" [style.width.%]="badge.progressPercent"></div>
+                    </div>
+                  </div>
+                </a>
+              }
+            </div>
+          </div>
+
+          <div>
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <h4 class="text-sm font-bold uppercase tracking-wide text-slate-600">Zuletzt freigeschaltet</h4>
+              <span class="text-sm font-semibold text-slate-500">{{ earnedBadgeCards().length }} Badges</span>
+            </div>
+            <div class="space-y-3">
+              @for (badge of earnedBadgeCards(); track badge.id) {
+                <a routerLink="/employee/badges"
+                   class="flex items-center gap-3 rounded-2xl border border-teal-100 bg-teal-50/50 p-4 transition-all hover:bg-teal-50">
+                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-base font-black" [ngClass]="badgeToneClass(badge)">
+                    {{ badge.icon }}
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-base font-bold text-slate-800">{{ badge.title }}</p>
+                    <p class="text-sm text-slate-500">{{ categoryLabel(badge.category) }} · {{ formatEarnedAt(badge.earnedAt) }}</p>
+                  </div>
+                  <span class="rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-wide text-teal-700">frei</span>
+                </a>
+              }
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   `
 })
@@ -185,6 +257,7 @@ export class DashboardComponent implements OnInit {
   private employeeService = inject(EmployeeService);
   private checkinStorage = inject(CheckinDemoStorageService);
   private sanitizer = inject(DomSanitizer);
+  private badgeDemo = inject(EmployeeBadgesDemoService);
 
   data = signal<DashboardData | null>(null);
   today = new Date();
@@ -210,6 +283,10 @@ export class DashboardComponent implements OnInit {
   );
 
   checkinDone = computed(() => this.hasCompletedTodayCheckIn());
+
+  activeBadgeCards = computed(() => this.badgeDemo.activeBadges(this.data()?.streak, 3));
+
+  earnedBadgeCards = computed(() => this.badgeDemo.earnedBadges(3));
 
   safeModeFlag = computed(() => {
     const flag = this.data()?.healthFlag ?? null;
@@ -333,6 +410,35 @@ export class DashboardComponent implements OnInit {
 
   leverCtaLabel(lever: LeverCard): string {
     return lever.safeModeState === 'paused' ? 'Details ansehen' : 'Ansehen';
+  }
+
+  categoryLabel(category: EmployeeBadge['category']): string {
+    return BADGE_CATEGORY_LABELS[category];
+  }
+
+  badgeProgressLabel(badge: EmployeeBadge): string {
+    switch (badge.id) {
+      case 'seven-day-compass': return 'Tage';
+      case 'sleep-series': return 'Tage';
+      case 'hydration-series': return 'Tage';
+      case 'vitamin-d-routine': return 'Routinen';
+      default: return 'Schritte';
+    }
+  }
+
+  formatEarnedAt(date: string | undefined): string {
+    if (!date) return 'freigeschaltet';
+    return new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' }).format(new Date(date));
+  }
+
+  badgeToneClass(badge: EmployeeBadge): string {
+    switch (badge.tone) {
+      case 'blue': return 'bg-blue-50 text-blue-700';
+      case 'amber': return 'bg-amber-50 text-amber-700';
+      case 'violet': return 'bg-violet-50 text-violet-700';
+      case 'slate': return 'bg-slate-100 text-slate-700';
+      default: return 'bg-teal-50 text-teal-700';
+    }
   }
 
   private measureSafeModeState(lever: DashboardLever): LeverSafeModeState {

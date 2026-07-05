@@ -2,6 +2,8 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AssignedMeasureDetail, EmployeeService, MeasureEffect, MeasureExercise } from '../../services/employee.service';
+import { EmployeeBadgesDemoService } from '../../services/employee-badges-demo.service';
+import { EmployeeBadge } from '../../models/badge.model';
 
 interface LocalRunState {
   completedPositions: number[];
@@ -48,6 +50,21 @@ const CATEGORY_LABELS: Record<string, string> = {
           @if (m.assignmentReason) {
             <div class="rounded-xl bg-teal-50/60 border border-teal-100 px-4 py-3 text-sm text-teal-800">
               <span class="font-semibold">Warum dieses Programm?</span> Empfohlen {{ m.assignmentReason }}.
+            </div>
+          }
+
+          @if (questBadge(m.category); as badge) {
+            <div class="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p class="text-sm font-bold uppercase tracking-wide text-amber-700">Teil einer Quest</p>
+                  <p class="mt-1 text-base font-semibold text-slate-800">{{ badge.title }}</p>
+                  <p class="mt-1 text-sm text-slate-600">Fortschritt: {{ badge.progressCurrent }} von {{ badge.progressTarget }} Übungen</p>
+                </div>
+                <a routerLink="/employee/badges" class="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100">
+                  Badge ansehen
+                </a>
+              </div>
             </div>
           }
 
@@ -110,6 +127,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 export class EmployeeMeasureDetailComponent implements OnInit {
   private employeeService = inject(EmployeeService);
   private route = inject(ActivatedRoute);
+  private badgeDemo = inject(EmployeeBadgesDemoService);
 
   measure = signal<AssignedMeasureDetail | null>(null);
   loading = signal(true);
@@ -126,6 +144,10 @@ export class EmployeeMeasureDetailComponent implements OnInit {
 
   categoryLabel(category: string | null): string {
     return category ? (CATEGORY_LABELS[category] ?? category) : 'Programm';
+  }
+
+  questBadge(category: string | null): EmployeeBadge | null {
+    return this.badgeDemo.questForMeasure(category);
   }
 
   isDone(position: number): boolean {

@@ -31,6 +31,10 @@ import { NotificationBannerComponent } from '../notifications/notification-banne
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
               Verlauf
             </a>
+            <a routerLink="/employee/badges" routerLinkActive="bg-teal-50 text-teal-700" class="flex items-center gap-3 px-3.5 py-[11px] rounded-[10px] text-[15px] text-gray-600 hover:bg-gray-50 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"></circle><path d="M8.5 12.5 7 22l5-3 5 3-1.5-9.5"></path></svg>
+              Badges
+            </a>
             <a routerLink="/employee/surveys" routerLinkActive="bg-teal-50 text-teal-700" class="flex items-center gap-3 px-3.5 py-[11px] rounded-[10px] text-[15px] text-gray-600 hover:bg-gray-50 transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
               Umfragen
