@@ -27,6 +27,10 @@ import { NotificationBannerComponent } from '../notifications/notification-banne
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
               Maßnahmen
             </a>
+            <a routerLink="/employee/lab-markers" routerLinkActive="bg-teal-50 text-teal-700" class="flex items-center gap-3 px-3.5 py-[11px] rounded-[10px] text-[15px] text-gray-600 hover:bg-gray-50 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></svg>
+              Laborwerte
+            </a>
             <a routerLink="/employee/history" routerLinkActive="bg-teal-50 text-teal-700" class="flex items-center gap-3 px-3.5 py-[11px] rounded-[10px] text-[15px] text-gray-600 hover:bg-gray-50 transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
               Verlauf

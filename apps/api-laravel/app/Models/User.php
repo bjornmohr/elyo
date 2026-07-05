@@ -55,6 +55,11 @@ class User extends Authenticatable
         return $this->hasMany(WellbeingEntry::class);
     }
 
+    public function labMarkers(): HasMany
+    {
+        return $this->hasMany(LabMarker::class);
+    }
+
     public function surveyResponses(): HasMany
     {
         return $this->hasMany(SurveyResponse::class);

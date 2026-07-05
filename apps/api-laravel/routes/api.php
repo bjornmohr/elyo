@@ -19,6 +19,7 @@ use App\Http\Controllers\Company\MeasureStatisticsController;
 use App\Http\Controllers\Company\ReportController;
 use App\Http\Controllers\Company\TeamController;
 use App\Http\Controllers\Employee\EmployeeController;
+use App\Http\Controllers\Employee\LabMarkerController;
 use App\Http\Controllers\Employee\SurveyController;
 use App\Http\Controllers\Employee\UserSystemMeasureController;
 use App\Http\Controllers\Partner\PartnerAuthController;
@@ -130,6 +131,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/checkin/status', [EmployeeController::class, 'checkinStatus']);
         Route::post('/checkin', [EmployeeController::class, 'checkin']);
         Route::get('/history', [EmployeeController::class, 'history']);
+        Route::get('/lab-markers', [LabMarkerController::class, 'index']);
         Route::get('/profile', [EmployeeController::class, 'getProfile']);
         Route::put('/profile', [EmployeeController::class, 'updateProfile']);
         Route::post('/documents', [EmployeeController::class, 'uploadDocument']);

@@ -29,6 +29,7 @@ export const routes: Routes = [
       { path: 'measures/:id', loadComponent: () => import('./features/employee/pages/measure-detail/measure-detail.component').then(m => m.EmployeeMeasureDetailComponent) },
       { path: 'measures/:id/exercise/:position', loadComponent: () => import('./features/employee/pages/measure-exercise/measure-exercise.component').then(m => m.EmployeeMeasureExerciseComponent) },
       { path: 'measure-checkins/:token', loadComponent: () => import('./features/employee/pages/measure-checkin/measure-checkin.component').then(m => m.EmployeeMeasureCheckinComponent) },
+      { path: 'lab-markers', loadComponent: () => import('./features/employee/pages/lab-markers/lab-markers.component').then(m => m.EmployeeLabMarkersComponent) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     ]
   },

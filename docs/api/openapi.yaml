@@ -605,6 +605,26 @@ components:
           allOf:
             - $ref: '#/components/schemas/WellbeingEntry'
 
+    EmployeeLabMarker:
+      type: object
+      description: Employee-only voluntarily stored lab marker for personal orientation. Scoped to the authenticated user; Company/Admin endpoints do not expose individual lab values or aggregates.
+      required: [markerKey, name, unit, value, status, isHighlighted, low, high, group]
+      additionalProperties: false
+      properties:
+        markerKey: { type: string, example: vitd }
+        name: { type: string, example: Vitamin D }
+        unit: { type: string, example: ng/ml }
+        value: { type: number, example: 18 }
+        status:
+          type: string
+          enum: [unter Bereich, im Orientierungsbereich, über Bereich]
+        isHighlighted: { type: boolean }
+        low: { type: number, nullable: true }
+        high: { type: number, nullable: true }
+        group:
+          type: string
+          enum: [blutbild, immun, mikro, sonstige]
+
     CheckinAlreadyDoneError:
       type: object
       required: [error]
@@ -1772,6 +1792,30 @@ paths:
                   entries:
                     type: array
                     items: { $ref: '#/components/schemas/WellbeingEntry' }
+
+  /employee/lab-markers:
+    get:
+      tags: [Employee]
+      summary: Get authenticated employee lab markers
+      description: Returns voluntarily stored lab markers for the authenticated employee only. The response is for personal orientation and prevention support; individual lab values are not exposed through Company/Admin/Employer endpoints.
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Employee lab markers scoped to the authenticated user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EmployeeLabMarker'
+        401:
+          description: Unauthorized
+        403:
+          description: Forbidden for non-employee roles
 
   /employee/profile:
     get:

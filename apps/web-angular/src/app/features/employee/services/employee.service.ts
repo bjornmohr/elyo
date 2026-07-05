@@ -3,6 +3,7 @@ import { ApiClient } from '../../../core/services/api-client.service';
 import { environment } from '../../../../environments/environment';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { LabMarker } from '../models/lab-marker.model';
 
 export interface WellbeingEntry {
   id: string;
@@ -219,6 +220,10 @@ export class EmployeeService {
 
   getHistory(): Observable<WellbeingEntry[]> {
     return this.api.get<{ entries: WellbeingEntry[] }>('/employee/history').pipe(map(res => res.entries ?? []));
+  }
+
+  getLabMarkers(): Observable<LabMarker[]> {
+    return this.api.get<{ data: LabMarker[] }>('/employee/lab-markers').pipe(map(res => res.data ?? []));
   }
 
   submitCheckin(data: {

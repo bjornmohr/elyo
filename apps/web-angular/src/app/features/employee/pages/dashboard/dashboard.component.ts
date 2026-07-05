@@ -4,6 +4,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { CheckinDemoStorageService, DemoCheckin } from '../../services/checkin-demo-storage.service';
 import { DashboardData, DashboardLever, EmployeeService, MetricAggregate } from '../../services/employee.service';
+import { LabMarker } from '../../models/lab-marker.model';
 import { categoryIcon } from '../../shared/measure-category-icons';
 
 type LeverSafeModeState = 'paused' | 'gentle' | null;
@@ -96,6 +97,56 @@ interface LeverCard extends DashboardLever {
         </div>
       }
 
+      <div class="bg-white rounded-[20px] border border-slate-100 p-6">
+        <div class="flex items-start justify-between gap-4 mb-4">
+          <div class="flex items-center gap-3">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px] bg-teal-50 text-teal-700">
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></svg>
+            </span>
+            <div>
+              <h3 class="text-[17px] font-semibold text-slate-800">Laborwerte</h3>
+              <p class="text-[13px] text-slate-500 mt-0.5">Persönliche Orientierung</p>
+            </div>
+          </div>
+          <a routerLink="/employee/lab-markers" class="inline-flex min-h-11 items-center text-sm font-semibold text-teal-600 hover:text-teal-700 whitespace-nowrap">Ansehen →</a>
+        </div>
+
+        @if (labMarkersError()) {
+          <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+            Laborwerte können gerade nicht geladen werden.
+          </div>
+        } @else if (highlightedLabMarkers().length > 0) {
+          <p class="mb-4 text-sm text-slate-600">
+            <span class="font-bold text-slate-800">{{ highlightedLabMarkers().length }} Marker</span> außerhalb des Orientierungsbereichs.
+          </p>
+          <div class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,11.25rem),1fr))] gap-3.5">
+            @for (marker of highlightedLabMarkers().slice(0, 3); track marker.markerKey) {
+              <a routerLink="/employee/lab-markers" class="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-teal-100">
+                <div class="flex items-center gap-2">
+                  <span class="h-2.5 w-2.5 rounded-full" [ngClass]="labDotClass(marker.status)"></span>
+                  <span class="text-sm font-semibold text-slate-700">{{ marker.name }}</span>
+                </div>
+                <div class="mt-2">
+                  <span class="text-2xl font-bold text-slate-800">{{ formatLabValue(marker.value) }}</span>
+                  <span class="ml-1 text-sm text-slate-500">{{ marker.unit }}</span>
+                </div>
+                <span class="mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-bold" [ngClass]="labStatusClass(marker.status)">{{ marker.status }}</span>
+              </a>
+            }
+          </div>
+        } @else {
+          <div class="flex items-center gap-3 rounded-2xl border border-teal-100 bg-teal-50 px-4 py-4">
+            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-100 text-sm font-bold text-teal-700">✓</span>
+            <p class="text-sm text-teal-800"><span class="font-semibold">Alles im Orientierungsbereich.</span> Details findest du in der Laborwerte-Ansicht.</p>
+          </div>
+        }
+
+        <div class="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3 text-[13px] text-slate-500">
+          <span>🔒</span>
+          <span>Nur für dich sichtbar. Arbeitgeber sehen keine individuellen Werte.</span>
+        </div>
+      </div>
+
       <div class="bg-white rounded-[20px] border border-slate-100 p-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <p class="font-semibold text-slate-800 text-[17px]">
@@ -187,6 +238,8 @@ export class DashboardComponent implements OnInit {
   private sanitizer = inject(DomSanitizer);
 
   data = signal<DashboardData | null>(null);
+  labMarkers = signal<LabMarker[]>([]);
+  labMarkersError = signal(false);
   today = new Date();
 
   /** Levers enriched with their category icon + pre-sanitised glyph markup. */
@@ -204,6 +257,8 @@ export class DashboardComponent implements OnInit {
 
   /** Local demo check-in (Handoff 02) also counts as done — client-side polish only. */
   demoCheckinToday = computed(() => this.checkinStorage.loadToday());
+
+  highlightedLabMarkers = computed(() => this.labMarkers().filter(marker => marker.isHighlighted));
 
   hasCompletedTodayCheckIn = computed(() =>
     (this.data()?.todayCheckinCompleted ?? false) || this.demoCheckinToday() !== null
@@ -234,6 +289,13 @@ export class DashboardComponent implements OnInit {
   ngOnInit() {
     this.employeeService.getDashboard().subscribe(data => {
       this.data.set(data);
+    });
+    this.employeeService.getLabMarkers().subscribe({
+      next: markers => {
+        this.labMarkers.set(markers);
+        this.labMarkersError.set(false);
+      },
+      error: () => this.labMarkersError.set(true),
     });
   }
 
@@ -333,6 +395,26 @@ export class DashboardComponent implements OnInit {
 
   leverCtaLabel(lever: LeverCard): string {
     return lever.safeModeState === 'paused' ? 'Details ansehen' : 'Ansehen';
+  }
+
+  formatLabValue(value: number): string {
+    return String(Math.round(value * 100) / 100).replace('.', ',');
+  }
+
+  labStatusClass(status: LabMarker['status']): string {
+    switch (status) {
+      case 'unter Bereich': return 'bg-amber-50 text-amber-700';
+      case 'über Bereich': return 'bg-orange-50 text-orange-700';
+      default: return 'bg-teal-50 text-teal-700';
+    }
+  }
+
+  labDotClass(status: LabMarker['status']): string {
+    switch (status) {
+      case 'unter Bereich': return 'bg-amber-500';
+      case 'über Bereich': return 'bg-orange-500';
+      default: return 'bg-teal-500';
+    }
   }
 
   private measureSafeModeState(lever: DashboardLever): LeverSafeModeState {
