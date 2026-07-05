@@ -23,6 +23,7 @@ export const routes: Routes = [
       { path: 'checkin', loadComponent: () => import('./features/employee/pages/checkin/checkin-stepper.component').then(m => m.CheckinStepperComponent) },
       { path: 'checkin/chat', loadComponent: () => import('./features/employee/pages/checkin/checkin-chat.component').then(m => m.CheckinChatComponent) },
       { path: 'history', loadComponent: () => import('./features/employee/pages/history/history.component').then(m => m.HistoryComponent) },
+      { path: 'badges', loadComponent: () => import('./features/employee/pages/badges/badges.component').then(m => m.EmployeeBadgesComponent) },
       { path: 'profile', loadComponent: () => import('./features/employee/pages/profile/profile.component').then(m => m.ProfileComponent) },
       { path: 'surveys', loadComponent: () => import('./features/employee/pages/surveys/surveys.component').then(m => m.SurveysComponent) },
       { path: 'measures', loadComponent: () => import('./features/employee/pages/measures/measures.component').then(m => m.EmployeeMeasuresComponent) },
