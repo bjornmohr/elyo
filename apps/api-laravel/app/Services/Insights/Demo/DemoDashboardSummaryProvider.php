@@ -55,17 +55,18 @@ class DemoDashboardSummaryProvider implements DashboardSummaryProvider
             return $row;
         }, $base['impactReporting']);
 
+        $infectionWidget = $base['infectionWidget'];
+        $infectionWidget['rkiIncidence'] = $variance->count($infectionWidget['rkiIncidence'], 0.2);
+        $infectionWidget['rkiDeltaPercent'] = $variance->trend($infectionWidget['rkiDeltaPercent'], 5);
+        $infectionWidget['internalDeltaPp'] = $variance->trend($infectionWidget['internalDeltaPp'], 2);
+        $infectionWidget['safeModeActivations7d'] = $variance->count($infectionWidget['safeModeActivations7d'], 0.25);
+
         return [
             'period' => $base['period'],
             'kpis' => $kpis,
             'riskCompact' => $riskCompact,
             'funnelCompact' => $funnelCompact,
-            'infectionWidget' => [
-                'overallStatus' => $base['infectionWidget']['overallStatus'],
-                'highlightLocation' => $base['infectionWidget']['highlightLocation'],
-                'rkiIncidence' => $variance->count($base['infectionWidget']['rkiIncidence'], 0.2),
-                'rkiDeltaPercent' => $variance->trend($base['infectionWidget']['rkiDeltaPercent'], 5),
-            ],
+            'infectionWidget' => $infectionWidget,
             'impactReporting' => $impactReporting,
             'recommendations' => $base['recommendations'],
         ];

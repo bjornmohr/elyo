@@ -994,15 +994,72 @@ components:
           description: Optional per-category breakdown; each category funnel stays monotone (recommendationReceived >= measureStarted >= active14d).
           items: { $ref: '#/components/schemas/UsageFunnelCategory' }
 
+    InfectionRadarLevel:
+      type: string
+      enum: [NORMAL, WATCH, ELEVATED, CRITICAL]
+
+    InfectionRadarTrend:
+      type: string
+      enum: [UP, STABLE, DOWN]
+
+    InfectionRadarRecommendationType:
+      type: string
+      enum: [COMMUNICATION, MEASURE, WORK_ORGANIZATION]
+
     InfectionRadar:
       type: object
-      description: Concept module behind infectionRadarEnabled. Aggregate-only symptom counts, never individual data. Demo mode serves deterministic demo data with the last seven calendar days; prod mode returns data null until symptom check-in and RKI integration ship.
+      description: Concept module behind infectionRadarEnabled. Aggregate-only respiratory signals, never individual employee health data or raw answers. Demo mode serves deterministic demo data with internal check-in signals and RKI/ARE-style external context; prod mode returns data null until production symptom aggregation and external RKI/ARE integration ship.
       required: [overallStatus, locations, symptomReports7d, rkiIncidence]
       additionalProperties: false
       properties:
         overallStatus:
-          type: string
-          enum: [NORMAL, ELEVATED, CRITICAL]
+          $ref: '#/components/schemas/InfectionRadarLevel'
+        earlyWarning:
+          type: object
+          required: [level, score, summary, recommendedAction]
+          additionalProperties: false
+          properties:
+            level:
+              $ref: '#/components/schemas/InfectionRadarLevel'
+            score:
+              type: number
+              minimum: 0
+              maximum: 100
+              description: Organizational early-warning indicator, not a medical score.
+            summary: { type: string }
+            recommendedAction: { type: string }
+        internalSignals:
+          type: object
+          required: [symptomRate7d, symptomRateDelta, safeModeActivations7d, checkInCoverage, topSymptoms]
+          additionalProperties: false
+          properties:
+            symptomRate7d: { type: number, minimum: 0, maximum: 1 }
+            symptomRateDelta: { type: number, description: "Percentage-point delta represented as a fraction, e.g. 0.06 = +6 pp." }
+            safeModeActivations7d: { type: integer, minimum: 0 }
+            checkInCoverage: { type: number, minimum: 0, maximum: 1 }
+            topSymptoms:
+              type: array
+              items:
+                type: object
+                required: [label, share]
+                additionalProperties: false
+                properties:
+                  label: { type: string }
+                  share: { type: number, minimum: 0, maximum: 1 }
+        externalSignals:
+          type: object
+          required: [areLevel, areTrend, dominantSignals, dataUpdatedAt, source]
+          additionalProperties: false
+          properties:
+            areLevel:
+              $ref: '#/components/schemas/InfectionRadarLevel'
+            areTrend:
+              $ref: '#/components/schemas/InfectionRadarTrend'
+            dominantSignals:
+              type: array
+              items: { type: string }
+            dataUpdatedAt: { type: string, format: date }
+            source: { type: string, example: RKI/ARE-Demo }
         locations:
           type: array
           items:
@@ -1012,8 +1069,21 @@ components:
             properties:
               name: { type: string }
               status:
-                type: string
-                enum: [NORMAL, ELEVATED, CRITICAL]
+                $ref: '#/components/schemas/InfectionRadarLevel'
+              level:
+                $ref: '#/components/schemas/InfectionRadarLevel'
+              symptomRate:
+                type: number
+                nullable: true
+                minimum: 0
+                maximum: 1
+              trend:
+                nullable: true
+                allOf:
+                  - $ref: '#/components/schemas/InfectionRadarTrend'
+              reportable:
+                type: boolean
+                description: False when privacy/reportability thresholds are not met.
         symptomReports7d:
           type: array
           description: Aggregate daily counts for the last seven days.
@@ -1034,7 +1104,17 @@ components:
             district: { type: string }
         recommendations:
           type: array
-          items: { $ref: '#/components/schemas/InsightRecommendation' }
+          items:
+            type: object
+            required: [title, text]
+            additionalProperties: false
+            properties:
+              type:
+                $ref: '#/components/schemas/InfectionRadarRecommendationType'
+              title: { type: string }
+              text: { type: string }
+              actionLabel: { type: string }
+              target: { type: string }
 
     EmployeeMetricAggregate:
       type: object
@@ -2839,7 +2919,7 @@ paths:
     get:
       tags: [Company]
       summary: Get infection radar (concept)
-      description: Concept endpoint behind the infectionRadarEnabled flag. Aggregate-only data, never individual symptom reports. Demo data mode returns the deterministic per-company demo radar; prod data mode returns data null until symptom check-in and RKI OpenData integration ship.
+      description: Concept endpoint behind the infectionRadarEnabled flag. Aggregate-only respiratory signals, never individual symptom reports or raw answers. Demo data mode returns the deterministic per-company demo radar; prod data mode returns data null until production symptom aggregation and RKI/ARE integration ship.
       security: [{ Sanctum: [] }]
       responses:
         200:

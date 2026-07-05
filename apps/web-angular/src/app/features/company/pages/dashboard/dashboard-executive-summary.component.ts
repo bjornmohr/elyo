@@ -13,7 +13,19 @@ export interface ExecutiveSummary {
   };
   riskCompact: { field: string; fieldLabel: string; relevanceLevel: number; trend30d: number }[];
   funnelCompact: { rates: number[]; avgDaysToFirstDecision: number; returnRate14d: number };
-  infectionWidget: { overallStatus: string; highlightLocation: string; rkiIncidence: number; rkiDeltaPercent: number };
+  infectionWidget: {
+    overallStatus: string;
+    highlightLocation: string;
+    rkiIncidence: number;
+    rkiDeltaPercent: number;
+    subtitle?: string;
+    statusLabel?: string;
+    summary?: string;
+    internalDeltaPp?: number;
+    safeModeActivations7d?: number;
+    externalLevel?: string;
+    recommendedAction?: string;
+  };
   impactReporting: { program: string; usageRate: number; relevanceScore: number; rating: number }[];
   recommendations: string[];
 }
@@ -26,25 +38,25 @@ export interface ExecutiveSummary {
     <section class="space-y-6">
       <div class="flex items-center gap-3">
         <h2 class="text-xl font-semibold text-gray-900" style="font-family: 'Fraunces', Georgia, serif">Executive Summary</h2>
-        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase" style="background: #fdf3e3; color: #9a6b1f; letter-spacing: .04em">Konzept</span>
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full uppercase" style="background: #fdf3e3; color: #9a6b1f; letter-spacing: .04em">Konzept</span>
         <span class="text-xs" style="color: #9aa39c">{{ summary().period }}</span>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         <div class="bg-white p-4" style="border: 1px solid #ece6d8; border-radius: 14px">
-          <div class="text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Gesundheitsindex</div>
+          <div class="text-xs uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Gesundheitsindex</div>
           <div class="text-[26px] font-semibold" style="font-family: 'Fraunces', Georgia, serif">{{ summary().kpis.healthIndex.value }}<span class="text-sm font-normal" style="color: #9aa39c">/100</span></div>
           <div class="text-xs font-semibold" style="color: #0f766e">{{ deltaLabel(summary().kpis.healthIndex.deltaPercent) }} ggü. Vormonat</div>
         </div>
         <div class="bg-white p-4" style="border: 1px solid #ece6d8; border-radius: 14px">
-          <div class="text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Risikotrend (30 Tage)</div>
+          <div class="text-xs uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Risikotrend (30 Tage)</div>
           <div class="text-[26px] font-semibold" style="font-family: 'Fraunces', Georgia, serif" [style.color]="summary().kpis.riskTrend30d.value > 0 ? '#c14a3f' : '#0f766e'">
             {{ deltaLabel(summary().kpis.riskTrend30d.value) }} %
           </div>
           <div class="text-xs" style="color: #6f7d76">{{ summary().kpis.riskTrend30d.label }}</div>
         </div>
         <div class="bg-white p-4" style="border: 1px solid #ece6d8; border-radius: 14px">
-          <div class="text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Aktive Nutzerquote</div>
+          <div class="text-xs uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Aktive Nutzerquote</div>
           <div class="text-[26px] font-semibold" style="font-family: 'Fraunces', Georgia, serif">{{ summary().kpis.activeUserRate.value }} %</div>
           <div class="h-1.5 rounded-full mt-1 overflow-hidden" style="background: #f1ede3">
             <div class="h-full rounded-full" style="background: #14b8a6" [style.width.%]="summary().kpis.activeUserRate.value"></div>
@@ -52,16 +64,16 @@ export interface ExecutiveSummary {
           <div class="text-xs font-semibold mt-1" style="color: #0f766e">{{ deltaLabel(summary().kpis.activeUserRate.deltaPercent) }} Pp.</div>
         </div>
         <div class="bg-white p-4" style="border: 1px solid #ece6d8; border-radius: 14px">
-          <div class="text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Maßnahmenwirkung</div>
+          <div class="text-xs uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Maßnahmenwirkung</div>
           <div class="text-[26px] font-semibold" style="font-family: 'Fraunces', Georgia, serif">{{ summary().kpis.measureImpactScore.value }}<span class="text-sm font-normal" style="color: #9aa39c">/{{ summary().kpis.measureImpactScore.max }}</span></div>
           <div class="text-xs" style="color: #6f7d76">{{ summary().kpis.measureImpactScore.label }}</div>
         </div>
         <div class="bg-white p-4" style="border: 1px solid #ece6d8; border-radius: 14px">
-          <div class="text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Top-Handlungsfelder</div>
+          <div class="text-xs uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Top-Handlungsfelder</div>
           <div class="space-y-1 mt-1">
             @for (field of summary().kpis.topFields; track field.rank) {
               <div class="flex items-center gap-2 text-xs">
-                <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style="background: #0f766e">{{ field.rank }}</span>
+                <span class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background: #0f766e">{{ field.rank }}</span>
                 <span class="text-gray-900">{{ field.fieldLabel }}</span>
               </div>
             }
@@ -93,7 +105,7 @@ export interface ExecutiveSummary {
             <h3 class="text-sm font-semibold text-gray-900">Entscheidungs- & Nutzungsverhalten</h3>
             <span class="text-xs" style="color: #0f766e">Details →</span>
           </div>
-          <p class="text-[11px]" style="color: #9aa39c; margin-top: -4px">Vom Impuls zur Umsetzung</p>
+          <p class="text-xs" style="color: #6f7d76; margin-top: -4px">Vom Impuls zur Umsetzung</p>
           <div class="flex flex-col items-center pt-1" style="gap: 3px">
             @for (rate of summary().funnelCompact.rates; track $index; let first = $first; let last = $last) {
               <div class="text-white text-center text-xs font-semibold"
@@ -107,17 +119,17 @@ export interface ExecutiveSummary {
           </div>
           <div class="grid grid-cols-2 gap-2.5 pt-2">
             <div class="text-center rounded-[10px] p-3" style="background: #faf8f3">
-              <div class="text-[10px] uppercase" style="color: #9aa39c; letter-spacing: .04em">Ø Zeit bis 1. Entscheidung</div>
+              <div class="text-xs uppercase" style="color: #6f7d76; letter-spacing: .04em">Ø Zeit bis 1. Entscheidung</div>
               <div class="text-xl font-semibold mt-1" style="font-family: 'Fraunces', Georgia, serif">{{ summary().funnelCompact.avgDaysToFirstDecision }} Tage</div>
             </div>
             <div class="text-center rounded-[10px] p-3" style="background: #faf8f3">
-              <div class="text-[10px] uppercase" style="color: #9aa39c; letter-spacing: .04em">Wiederkehrrate (14 Tage)</div>
+              <div class="text-xs uppercase" style="color: #6f7d76; letter-spacing: .04em">Wiederkehrrate (14 Tage)</div>
               <div class="text-xl font-semibold mt-1" style="font-family: 'Fraunces', Georgia, serif">{{ summary().funnelCompact.returnRate14d }}%</div>
             </div>
           </div>
         </a>
 
-        <a routerLink="/company/infection-radar" class="p-5 space-y-2 hover:shadow-sm transition-shadow"
+        <a routerLink="/company/infection-radar" class="p-5 space-y-3 hover:shadow-sm transition-shadow"
            [style.background]="summary().infectionWidget.overallStatus === 'NORMAL' ? '#ecfaf7' : '#fdf3e3'"
            [style.border]="'1px solid ' + (summary().infectionWidget.overallStatus === 'NORMAL' ? '#c5ebe3' : '#f3e2bc')"
            style="border-radius: 14px">
@@ -125,10 +137,22 @@ export interface ExecutiveSummary {
             <h3 class="text-sm font-semibold" [style.color]="widgetText()">Infektionsradar</h3>
             <span class="text-xs" [style.color]="widgetText()">Details →</span>
           </div>
-          <div class="text-sm font-semibold" [style.color]="widgetText()">{{ overallStatusLabel() }}</div>
-          <div class="text-xs" [style.color]="widgetText()">Auffällig: {{ summary().infectionWidget.highlightLocation }}</div>
-          <div class="text-xs" [style.color]="widgetText()">
-            RKI-Inzidenz {{ summary().infectionWidget.rkiIncidence }} ({{ deltaLabel(summary().infectionWidget.rkiDeltaPercent) }} %)
+          <div class="inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold uppercase" [style.background]="widgetBadgeBackground()" [style.color]="widgetText()">
+            {{ summary().infectionWidget.subtitle ?? 'Atemwegs-Frühwarnsystem' }}
+          </div>
+          <div class="text-lg font-semibold" [style.color]="widgetText()" style="font-family: 'Fraunces', Georgia, serif">
+            {{ summary().infectionWidget.statusLabel ?? overallStatusLabel() }}
+          </div>
+          <p class="text-sm leading-5" [style.color]="widgetText()">
+            {{ summary().infectionWidget.summary ?? 'Aggregierte Erkältungssignale und externe Atemwegslage werden gemeinsam eingeordnet.' }}
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <span class="rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold" [style.color]="widgetText()">Intern: {{ deltaLabel(summary().infectionWidget.internalDeltaPp ?? summary().infectionWidget.rkiDeltaPercent) }} pp</span>
+            <span class="rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold" [style.color]="widgetText()">Schonmodus: {{ summary().infectionWidget.safeModeActivations7d ?? 0 }}</span>
+            <span class="rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold" [style.color]="widgetText()">Extern: {{ externalLevelLabel(summary().infectionWidget.externalLevel ?? summary().infectionWidget.overallStatus) }}</span>
+          </div>
+          <div class="rounded-xl bg-white/70 p-3 text-sm font-semibold" [style.color]="widgetText()">
+            {{ summary().infectionWidget.recommendedAction ?? 'Radar öffnen und Maßnahmen prüfen.' }}
           </div>
         </a>
       </div>
@@ -139,10 +163,10 @@ export interface ExecutiveSummary {
           <table class="w-full text-sm">
             <thead>
               <tr style="background: #faf8f3; border-bottom: 1px solid #f1ede3">
-                <th class="text-left px-5 py-2 text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Programm</th>
-                <th class="text-left px-5 py-2 text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Nutzung</th>
-                <th class="text-left px-5 py-2 text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Relevanz</th>
-                <th class="text-left px-5 py-2 text-[11px] uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Wirkung</th>
+                <th class="text-left px-5 py-2 text-xs uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Programm</th>
+                <th class="text-left px-5 py-2 text-xs uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Nutzung</th>
+                <th class="text-left px-5 py-2 text-xs uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Relevanz</th>
+                <th class="text-left px-5 py-2 text-xs uppercase font-semibold" style="color: #6f7d76; letter-spacing: .04em">Wirkung</th>
               </tr>
             </thead>
             <tbody>
@@ -203,13 +227,27 @@ export class DashboardExecutiveSummaryComponent {
 
   overallStatusLabel() {
     switch (this.summary().infectionWidget.overallStatus) {
-      case 'CRITICAL': return 'Kritisch';
-      case 'ELEVATED': return 'Erhöhtes Aufkommen';
-      default: return 'Normal';
+      case 'CRITICAL': return 'Frühwarnlage: Kritisch';
+      case 'ELEVATED': return 'Frühwarnlage: Erhöht';
+      case 'WATCH': return 'Frühwarnlage: Beobachten';
+      default: return 'Frühwarnlage: Normal';
+    }
+  }
+
+  externalLevelLabel(level: string) {
+    switch (level) {
+      case 'CRITICAL': return 'kritisch';
+      case 'ELEVATED': return 'erhöht';
+      case 'WATCH': return 'beobachten';
+      default: return 'normal';
     }
   }
 
   widgetText() {
     return this.summary().infectionWidget.overallStatus === 'NORMAL' ? '#0f766e' : '#9a6b1f';
+  }
+
+  widgetBadgeBackground() {
+    return this.summary().infectionWidget.overallStatus === 'NORMAL' ? '#d8f5ee' : '#f8e6bf';
   }
 }

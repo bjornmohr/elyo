@@ -59,13 +59,13 @@ import { DashboardExecutiveSummaryComponent } from './dashboard-executive-summar
                 class="flex-1 bg-teal-500/20 rounded-t-lg hover:bg-teal-500/40 transition-colors relative group"
                 [style.height.%]="i"
               >
-                <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                <div class="absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity">
                   {{ (i / 20).toFixed(1) }}
                 </div>
               </div>
             }
           </div>
-          <div class="flex justify-between mt-4 text-[10px] text-gray-400 uppercase tracking-widest">
+          <div class="flex justify-between mt-4 text-xs text-gray-500 uppercase tracking-widest">
             @for (point of data()?.trend; track point.period) {
               <span>{{ point.period }}</span>
             }
