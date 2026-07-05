@@ -31,7 +31,7 @@ import { DashboardExecutiveSummaryComponent } from './dashboard-executive-summar
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-up">
           <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h3 class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2">Gesamtscore</h3>
-            <p class="text-4xl font-bold text-teal-600">{{ scoreLabel() }}</p>
+            <p class="text-4xl font-bold text-teal-600">{{ scoreLabel() }}<span class="text-base font-semibold text-gray-300 ml-1">von 5</span></p>
             <p class="text-xs text-gray-400 mt-2">{{ responseCountLabel() }}</p>
           </div>
 
@@ -59,13 +59,13 @@ import { DashboardExecutiveSummaryComponent } from './dashboard-executive-summar
                 class="flex-1 bg-teal-500/20 rounded-t-lg hover:bg-teal-500/40 transition-colors relative group"
                 [style.height.%]="i"
               >
-                <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                  {{ (i / 10).toFixed(1) }}
+                <div class="absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                  {{ (i / 20).toFixed(1) }}
                 </div>
               </div>
             }
           </div>
-          <div class="flex justify-between mt-4 text-[10px] text-gray-400 uppercase tracking-widest">
+          <div class="flex justify-between mt-4 text-xs text-gray-500 uppercase tracking-widest">
             @for (point of data()?.trend; track point.period) {
               <span>{{ point.period }}</span>
             }
@@ -138,6 +138,7 @@ export class CompanyDashboardComponent implements OnInit {
 
   trendBars() {
     const trend = this.data()?.trend ?? [];
-    return trend.length ? trend.map((point: any) => Math.max(8, Math.min(100, Math.round((point.avgScore ?? 0) * 10)))) : [];
+    // avgScore is on the canonical 1-5 scale; scale to 0-100% bar heights.
+    return trend.length ? trend.map((point: any) => Math.max(8, Math.min(100, Math.round((point.avgScore ?? 0) * 20)))) : [];
   }
 }

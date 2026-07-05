@@ -20,6 +20,7 @@ use App\Http\Controllers\Company\ReportController;
 use App\Http\Controllers\Company\TeamController;
 use App\Http\Controllers\Employee\EmployeeController;
 use App\Http\Controllers\Employee\SurveyController;
+use App\Http\Controllers\Employee\UserSystemMeasureController;
 use App\Http\Controllers\Partner\PartnerAuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -132,7 +133,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/profile', [EmployeeController::class, 'getProfile']);
         Route::put('/profile', [EmployeeController::class, 'updateProfile']);
         Route::post('/documents', [EmployeeController::class, 'uploadDocument']);
-        Route::get('/measures', [EmployeeController::class, 'measures']);
+        Route::get('/measures', [UserSystemMeasureController::class, 'index']);
+        Route::get('/measures/{userSystemMeasure}', [UserSystemMeasureController::class, 'show'])->whereNumber('userSystemMeasure');
+        Route::get('/company-measures', [EmployeeController::class, 'measures']);
         Route::post('/measures/{measure}/participate', [EmployeeController::class, 'participateInMeasure']);
         Route::post('/measure-checkins/{token}', [EmployeeController::class, 'redeemMeasureCheckin']);
 

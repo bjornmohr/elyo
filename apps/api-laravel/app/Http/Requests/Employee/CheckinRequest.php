@@ -14,9 +14,9 @@ class CheckinRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'mood' => ['required', 'integer', 'min:1', 'max:10'],
-            'stress' => ['required', 'integer', 'min:1', 'max:10'],
-            'energy' => ['required', 'integer', 'min:1', 'max:10'],
+            'mood' => ['required', 'integer', 'min:1', 'max:5'],
+            'stress' => ['required', 'integer', 'min:1', 'max:5'],
+            'energy' => ['required', 'integer', 'min:1', 'max:5'],
             'note' => ['nullable', 'string', 'max:2000'],
         ];
     }

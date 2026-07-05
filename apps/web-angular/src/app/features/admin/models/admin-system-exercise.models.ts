@@ -29,6 +29,15 @@ export interface AdminSystemExerciseTag {
   isActive: boolean;
 }
 
+export type ExerciseLocationTag = 'office' | 'home' | 'plant' | 'onroad';
+export type ExercisePostureTag = 'standing' | 'sitting';
+
+export interface ExerciseStep {
+  text: string;
+  pictogramPath: string | null;
+  alt: string | null;
+}
+
 export interface AdminSystemExercise {
   id: number;
   slug: string;
@@ -46,6 +55,13 @@ export interface AdminSystemExercise {
   contraindications: string | null;
   defaultFeedbackPrompt: string | null;
   requiresFeedback: boolean;
+  steps: ExerciseStep[];
+  mainPictogramPath: string | null;
+  mainPictogramAlt: string | null;
+  locationTags: ExerciseLocationTag[] | null;
+  postureTags: ExercisePostureTag[] | null;
+  requiresFloor: boolean | null;
+  defaultEffort: number | null;
   status: SystemExerciseStatus;
   tags: AdminSystemExerciseTag[];
   createdAt: string;
@@ -85,6 +101,13 @@ export interface CreateSystemExercisePayload {
   contraindications?: string | null;
   defaultFeedbackPrompt?: string | null;
   requiresFeedback?: boolean;
+  steps?: ExerciseStep[] | null;
+  mainPictogramPath?: string | null;
+  mainPictogramAlt?: string | null;
+  locationTags?: ExerciseLocationTag[] | null;
+  postureTags?: ExercisePostureTag[] | null;
+  requiresFloor?: boolean | null;
+  defaultEffort?: number | null;
   tagIds?: number[];
 }
 

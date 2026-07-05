@@ -1,41 +1,41 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
-import { EmployeeMeasure, EmployeeService } from '../../services/employee.service';
-import { NotificationService } from '../../../../shared/notifications/notification.service';
+import { of } from 'rxjs';
+import { AssignedMeasure, EmployeeService } from '../../services/employee.service';
 import { EmployeeMeasuresComponent } from './measures.component';
 
 describe('EmployeeMeasuresComponent', () => {
   let employeeService: {
-    getMeasures: ReturnType<typeof vi.fn>;
-    participateInMeasure: ReturnType<typeof vi.fn>;
-  };
-  let notifications: {
-    success: ReturnType<typeof vi.fn>;
-    error: ReturnType<typeof vi.fn>;
+    getAssignedMeasures: ReturnType<typeof vi.fn>;
   };
 
-  const availableMeasure: EmployeeMeasure = {
-    id: 7,
-    title: 'Workshop',
-    description: 'Stressbewusster Arbeitsalltag',
-    category: 'mental',
-    verificationRequirement: 'SELF_REPORT',
-    team: null,
-    participation: {
-      isParticipating: false,
-      participatedAt: null,
-    },
+  const assignedMeasure: AssignedMeasure = {
+    id: 12,
+    title: 'Nacken-Mobilität',
+    category: 'MOBILITY',
+    assignmentReason: 'aus Check-in „Nackenschmerzen“',
+    exerciseCount: 4,
+    estMinutes: 10,
+    streakDays: 5,
+    weeklyDone: 3,
+    weeklyTarget: 4,
+    effect: { metric: 'pain', unit: 'nrs_0_10', before: 6, after: 3, direction: 'down' },
+    locationTags: ['office', 'plant'],
+    postureTags: ['standing'],
+    requiresFloor: false,
+  };
+
+  const floorMeasure: AssignedMeasure = {
+    ...assignedMeasure,
+    id: 13,
+    title: 'Boden-Programm',
+    requiresFloor: true,
   };
 
   beforeEach(async () => {
+    localStorage.clear();
     employeeService = {
-      getMeasures: vi.fn(() => of([availableMeasure])),
-      participateInMeasure: vi.fn(),
-    };
-    notifications = {
-      success: vi.fn(),
-      error: vi.fn(),
+      getAssignedMeasures: vi.fn(() => of([assignedMeasure, floorMeasure])),
     };
 
     await TestBed.configureTestingModule({
@@ -43,91 +43,51 @@ describe('EmployeeMeasuresComponent', () => {
       providers: [
         provideRouter([]),
         { provide: EmployeeService, useValue: employeeService },
-        { provide: NotificationService, useValue: notifications },
       ],
     }).compileComponents();
   });
 
-  it('shows a participation action for a measure that has not been joined', () => {
-    const fixture = TestBed.createComponent(EmployeeMeasuresComponent);
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.textContent).toContain('Teilnehmen');
-  });
-
-  it('shows QR check-in guidance instead of self-report for QR-required measures', () => {
-    employeeService.getMeasures.mockReturnValue(of([{
-      ...availableMeasure,
-      verificationRequirement: 'QR_CODE',
-    }]));
+  it('renders assigned measures with category, reason, progress and effect badge', () => {
     const fixture = TestBed.createComponent(EmployeeMeasuresComponent);
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent;
-    expect(text).toContain('QR-Check-in erforderlich');
-    expect(text).toContain('Teilnahme vor Ort per QR-Code');
-    expect(text).not.toContain('Teilnehmen');
+    expect(text).toContain('Nacken-Mobilität');
+    expect(text).toContain('Mobilität');
+    expect(text).toContain('aus Check-in „Nackenschmerzen“');
+    expect(text).toContain('3/4');
+    expect(text).toContain('Schmerz 6 → 3 ↓');
+    expect(text).toContain('🔥 5 Tage');
   });
 
-  it('does not call the self-report endpoint for QR-required measures', () => {
-    const qrMeasure: EmployeeMeasure = { ...availableMeasure, verificationRequirement: 'QR_CODE' };
+  it('hides floor-based measures at the office and shows the filter hint', () => {
     const fixture = TestBed.createComponent(EmployeeMeasuresComponent);
     fixture.detectChanges();
 
-    fixture.componentInstance.participate(qrMeasure);
-
-    expect(employeeService.participateInMeasure).not.toHaveBeenCalled();
-    expect(notifications.error).toHaveBeenCalledWith('Diese Maßnahme erfordert einen QR-Check-in vor Ort.');
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Heute: Büro');
+    expect(text).not.toContain('Boden-Programm');
+    expect(text).toContain('1 Maßnahme mit Bodenübungen ausgeblendet');
   });
 
-  it('marks a measure as participated after successful participation', () => {
-    employeeService.participateInMeasure.mockReturnValue(of({
-      data: {
-        ...availableMeasure,
-        participation: {
-          isParticipating: true,
-          participatedAt: '2026-06-01T10:00:00Z',
-        },
-      },
-    }));
+  it('shows floor-based measures when the local demo check-in says home', () => {
+    const key = `elyo.demo.checkin.${new Date().toISOString().slice(0, 10)}`;
+    localStorage.setItem(key, JSON.stringify({ location: 'home' }));
+
     const fixture = TestBed.createComponent(EmployeeMeasuresComponent);
     fixture.detectChanges();
 
-    fixture.componentInstance.participate(availableMeasure);
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.textContent).toContain('Teilgenommen');
-    expect(notifications.success).toHaveBeenCalledWith('Teilnahme wurde gespeichert.');
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Heute: Home-Office');
+    expect(text).toContain('Boden-Programm');
   });
 
-  it('treats duplicate participation as already participated', () => {
-    employeeService.participateInMeasure.mockReturnValue(throwError(() => ({
-      status: 409,
-      error: {
-        error: {
-          code: 'MEASURE_ALREADY_PARTICIPATED',
-        },
-      },
-    })));
+  it('shows an empty state when no measures are assigned', () => {
+    employeeService.getAssignedMeasures.mockReturnValue(of([]));
+
     const fixture = TestBed.createComponent(EmployeeMeasuresComponent);
     fixture.detectChanges();
 
-    fixture.componentInstance.participate(availableMeasure);
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.textContent).toContain('Teilgenommen');
-    expect(notifications.success).toHaveBeenCalledWith('Teilnahme ist bereits gespeichert.');
-    expect(notifications.error).not.toHaveBeenCalledWith('Teilnahme konnte nicht gespeichert werden.');
-  });
-
-  it('does not pass identity or timestamp fields when participating', () => {
-    employeeService.participateInMeasure.mockReturnValue(of({ data: availableMeasure }));
-    const fixture = TestBed.createComponent(EmployeeMeasuresComponent);
-    fixture.detectChanges();
-
-    fixture.componentInstance.participate(availableMeasure);
-
-    expect(employeeService.participateInMeasure).toHaveBeenCalledWith(availableMeasure.id);
-    expect(employeeService.participateInMeasure.mock.calls[0].length).toBe(1);
+    expect(fixture.nativeElement.textContent).toContain('Dir sind aktuell keine Maßnahmen zugewiesen.');
   });
 });

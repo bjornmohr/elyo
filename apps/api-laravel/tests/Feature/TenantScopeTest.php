@@ -28,9 +28,9 @@ class TenantScopeTest extends TestCase
         $otherUser = User::factory()->create(['company_id' => $otherCompany->id, 'role' => Role::EMPLOYEE]);
 
         $this->actingAs($employee, 'sanctum')->postJson('/api/employee/checkin', [
-            'mood' => 8,
-            'stress' => 3,
-            'energy' => 7,
+            'mood' => 4,
+            'stress' => 2,
+            'energy' => 4,
             'user_id' => $otherUser->id,
             'userId' => $otherUser->id,
             'company_id' => $otherCompany->id,

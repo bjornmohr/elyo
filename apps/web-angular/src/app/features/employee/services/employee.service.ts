@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { ApiClient } from '../../../core/services/api-client.service';
+import { environment } from '../../../../environments/environment';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
@@ -13,12 +14,52 @@ export interface WellbeingEntry {
   createdAt: string;
 }
 
+export interface MetricAggregate {
+  current: number | null;
+  previous: number | null;
+  delta: number | null;
+}
+
+export interface WellbeingAggregate extends MetricAggregate {
+  scale: number;
+  sparkline: number[];
+}
+
+export interface BodySignal {
+  label: string;
+  thisWeekDays: number;
+  lastWeekDays: number;
+  trend: 'up' | 'down' | 'flat';
+}
+
+export interface HealthFlag {
+  state: 'caution' | 'ok';
+  label: string;
+  badge: string;
+  note: string;
+}
+
+export interface DashboardLever {
+  title: string;
+  badge: string;
+  reason: string;
+  expected: string;
+  category: string | null;
+  measureId: number;
+}
+
 export interface DashboardData {
   recentEntries: WellbeingEntry[];
   streak: number;
   points: number;
   lastCheckin: string | null;
   todayCheckinCompleted: boolean;
+  wellbeing: WellbeingAggregate | null;
+  metrics: { mood: MetricAggregate; energy: MetricAggregate; stress: MetricAggregate } | null;
+  sleep: { currentH: number; previousH: number } | null;
+  bodySignals: BodySignal[] | null;
+  healthFlag: HealthFlag | null;
+  levers: DashboardLever[] | null;
 }
 
 export interface SurveyListItem {
@@ -78,11 +119,83 @@ export interface EmployeeMeasure {
   participation?: EmployeeMeasureParticipation | null;
 }
 
+export interface MeasureEffect {
+  metric: 'pain' | 'stress' | 'sleep_hours';
+  unit: string | null;
+  before: number | null;
+  after: number | null;
+  direction: 'up' | 'down';
+}
+
+export interface AssignedMeasure {
+  id: number;
+  title: string;
+  category: string | null;
+  assignmentReason: string | null;
+  exerciseCount: number;
+  estMinutes: number | null;
+  streakDays: number | null;
+  weeklyDone: number | null;
+  weeklyTarget: number | null;
+  effect: MeasureEffect | null;
+  locationTags: string[];
+  postureTags: string[];
+  requiresFloor: boolean;
+}
+
+export interface MeasureExerciseStep {
+  text: string;
+  pictogramPath: string | null;
+  alt: string | null;
+}
+
+export interface MeasureExercise {
+  id: number;
+  position: number;
+  title: string;
+  description: string | null;
+  instructions: string | null;
+  sets: number | null;
+  repetitions: number | null;
+  holdSeconds: number | null;
+  durationMinutes: number | null;
+  safetyNotes: string | null;
+  status: string;
+  mainPictogramPath: string | null;
+  mainPictogramAlt: string | null;
+  steps: MeasureExerciseStep[];
+  defaultEffort: number | null;
+  locationTags: string[];
+  postureTags: string[];
+  requiresFloor: boolean;
+}
+
+export interface AssignedMeasureDetail extends AssignedMeasure {
+  description: string | null;
+  lastSession: { effect: MeasureEffect; effort: number | null; points: number | null } | null;
+  exercises: MeasureExercise[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class EmployeeService {
   private api = inject(ApiClient);
+
+  /** Base origin serving static assets (pictograms) — the API origin without the /api suffix. */
+  assetUrl(path: string | null): string | null {
+    if (!path) return null;
+    const origin = environment.apiBaseUrl.replace(/\/api\/?$/, '');
+    return `${origin}/${path.replace(/^\//, '')}`;
+  }
+
+  getAssignedMeasures(): Observable<AssignedMeasure[]> {
+    return this.api.get<{ data: AssignedMeasure[] }>('/employee/measures').pipe(map(res => res.data ?? []));
+  }
+
+  getAssignedMeasure(id: number): Observable<AssignedMeasureDetail> {
+    return this.api.get<{ data: AssignedMeasureDetail }>(`/employee/measures/${id}`).pipe(map(res => res.data));
+  }
 
   getDashboard(): Observable<DashboardData> {
     return this.api.get<any>('/employee/dashboard').pipe(map(res => ({
@@ -91,6 +204,12 @@ export class EmployeeService {
       points: res.points ?? 0,
       lastCheckin: res.latest?.createdAt ?? null,
       todayCheckinCompleted: res.todayCheckinCompleted ?? false,
+      wellbeing: res.wellbeing ?? null,
+      metrics: res.metrics ?? null,
+      sleep: res.sleep ?? null,
+      bodySignals: res.bodySignals ?? null,
+      healthFlag: res.healthFlag ?? null,
+      levers: res.levers ?? null,
     })));
   }
 
@@ -163,7 +282,7 @@ export class EmployeeService {
   }
 
   getMeasures(): Observable<EmployeeMeasure[]> {
-    return this.api.get<{ data: EmployeeMeasure[] }>('/employee/measures').pipe(map(res => res.data ?? []));
+    return this.api.get<{ data: EmployeeMeasure[] }>('/employee/company-measures').pipe(map(res => res.data ?? []));
   }
 
   participateInMeasure(measureId: number): Observable<{ data: EmployeeMeasure }> {

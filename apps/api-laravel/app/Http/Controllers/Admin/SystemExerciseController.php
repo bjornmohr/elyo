@@ -29,8 +29,28 @@ class SystemExerciseController extends Controller
         'contraindications' => 'contraindications',
         'defaultFeedbackPrompt' => 'default_feedback_prompt',
         'requiresFeedback' => 'requires_feedback',
+        'mainPictogramPath' => 'main_pictogram_path',
+        'mainPictogramAlt' => 'main_pictogram_alt',
+        'locationTags' => 'location_tags',
+        'postureTags' => 'posture_tags',
+        'requiresFloor' => 'requires_floor',
+        'defaultEffort' => 'default_effort',
         'status' => 'status',
     ];
+
+    /** Normalize camelCase step keys from the API to the snake_case shape stored in jsonb. */
+    private function normalizeSteps(?array $steps): ?array
+    {
+        if ($steps === null) {
+            return null;
+        }
+
+        return array_values(array_map(fn (array $step) => [
+            'text' => $step['text'],
+            'pictogram_path' => $step['pictogramPath'] ?? null,
+            'alt' => $step['alt'] ?? null,
+        ], $steps));
+    }
 
     public function index(Request $request)
     {
@@ -123,6 +143,9 @@ class SystemExerciseController extends Controller
         $attributes['requires_feedback'] = $data['requiresFeedback'] ?? true;
         $attributes['status'] = $data['status'] ?? SystemExercise::STATUS_ACTIVE;
         $attributes['created_by_user_id'] = $request->user()?->id;
+        if (array_key_exists('steps', $data)) {
+            $attributes['steps'] = $this->normalizeSteps($data['steps']);
+        }
 
         $exercise = SystemExercise::create($attributes);
         $exercise->tags()->sync($data['tagIds'] ?? []);
@@ -146,6 +169,9 @@ class SystemExerciseController extends Controller
             if (array_key_exists($param, $data)) {
                 $systemExercise->{$column} = $data[$param];
             }
+        }
+        if (array_key_exists('steps', $data)) {
+            $systemExercise->steps = $this->normalizeSteps($data['steps']);
         }
         $systemExercise->save();
 

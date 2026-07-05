@@ -583,4 +583,64 @@ class AdminSystemExerciseTest extends TestCase
             ->deleteJson("/api/admin/system-exercise-tags/{$tag->id}")
             ->assertNotFound();
     }
+
+    // ── Catalog fields (pictograms, steps, suitability) ──
+
+    public function test_create_and_update_roundtrip_for_catalog_fields(): void
+    {
+        $created = $this->actingAs($this->platformAdmin)
+            ->postJson('/api/admin/system-exercises', [
+                'title' => 'Schulterkreisen',
+                'exerciseType' => SystemExercise::TYPE_MOBILITY,
+                'difficulty' => SystemExercise::DIFFICULTY_BEGINNER,
+                'mainPictogramPath' => 'pictograms/nacken-mobilitaet/schulterkreisen/main.svg',
+                'mainPictogramAlt' => 'Strichfigur mit Rotationspfeilen.',
+                'steps' => [
+                    ['text' => 'Aufrecht hinstellen.', 'pictogramPath' => 'pictograms/nacken-mobilitaet/schulterkreisen/step-1.svg', 'alt' => 'Stehende Figur.'],
+                    ['text' => 'Schultern kreisen.'],
+                ],
+                'locationTags' => ['office', 'plant'],
+                'postureTags' => ['standing'],
+                'requiresFloor' => false,
+                'defaultEffort' => 2,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.mainPictogramPath', 'pictograms/nacken-mobilitaet/schulterkreisen/main.svg')
+            ->assertJsonPath('data.steps.0.text', 'Aufrecht hinstellen.')
+            ->assertJsonPath('data.steps.0.pictogramPath', 'pictograms/nacken-mobilitaet/schulterkreisen/step-1.svg')
+            ->assertJsonPath('data.steps.1.pictogramPath', null)
+            ->assertJsonPath('data.locationTags', ['office', 'plant'])
+            ->assertJsonPath('data.postureTags', ['standing'])
+            ->assertJsonPath('data.requiresFloor', false)
+            ->assertJsonPath('data.defaultEffort', 2);
+
+        $exerciseId = $created->json('data.id');
+
+        $this->actingAs($this->platformAdmin)
+            ->patchJson("/api/admin/system-exercises/{$exerciseId}", [
+                'steps' => [['text' => 'Nur noch ein Schritt.']],
+                'locationTags' => ['home'],
+                'defaultEffort' => 4,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.steps.0.text', 'Nur noch ein Schritt.')
+            ->assertJsonCount(1, 'data.steps')
+            ->assertJsonPath('data.locationTags', ['home'])
+            ->assertJsonPath('data.defaultEffort', 4);
+    }
+
+    public function test_create_rejects_invalid_catalog_field_values(): void
+    {
+        $this->actingAs($this->platformAdmin)
+            ->postJson('/api/admin/system-exercises', [
+                'title' => 'Kaputt',
+                'exerciseType' => SystemExercise::TYPE_MOBILITY,
+                'difficulty' => SystemExercise::DIFFICULTY_BEGINNER,
+                'locationTags' => ['spaceship'],
+                'defaultEffort' => 9,
+                'steps' => [['pictogramPath' => 'x.svg']],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['locationTags.0', 'defaultEffort', 'steps.0.text']);
+    }
 }

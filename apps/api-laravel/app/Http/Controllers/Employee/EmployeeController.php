@@ -10,6 +10,9 @@ use App\Http\Resources\Employee\WellbeingEntryResource;
 use App\Models\AnamnesisProfile;
 use App\Models\Measure;
 use App\Models\UserDocument;
+use App\Models\UserSystemMeasure;
+use App\Services\EmployeeDashboardService;
+use App\Services\Insights\Contracts\EmployeeDashboardProvider;
 use App\Services\MeasureCheckinTokenService;
 use App\Services\MeasureParticipationService;
 use App\Services\PointsService;
@@ -26,7 +29,9 @@ class EmployeeController extends Controller
         protected WellbeingService $wellbeingService,
         protected PointsService $pointsService,
         protected MeasureParticipationService $measureParticipationService,
-        protected MeasureCheckinTokenService $measureCheckinTokenService
+        protected MeasureCheckinTokenService $measureCheckinTokenService,
+        protected EmployeeDashboardService $employeeDashboardService,
+        protected EmployeeDashboardProvider $employeeDashboardProvider
     ) {}
 
     public function dashboard(Request $request): JsonResponse
@@ -41,13 +46,54 @@ class EmployeeController extends Controller
         $latest = $entries->first();
         $streakCount = $this->pointsService->calculateStreak($user);
 
+        $aggregates = $this->employeeDashboardService->weeklyAggregates($user);
+        $blocks = $this->employeeDashboardProvider->blocksFor($user);
+
         return response()->json([
             'latest' => $latest ? new WellbeingEntryResource($latest) : null,
             'entries' => WellbeingEntryResource::collection($entries->reverse()),
             'streakCount' => $streakCount,
             'points' => $user->userPoints?->total ?? 0,
             'todayCheckinCompleted' => $this->wellbeingService->hasDailyCheckin($user),
+            'wellbeing' => $aggregates['wellbeing'] ?? null,
+            'metrics' => $aggregates['metrics'] ?? null,
+            'sleep' => $blocks['sleep'] ?? null,
+            'bodySignals' => $blocks['bodySignals'] ?? null,
+            'healthFlag' => $blocks['healthFlag'] ?? null,
+            'levers' => $blocks === null ? null : $this->resolveLevers($user->id, $blocks['levers'] ?? []),
         ]);
+    }
+
+    /**
+     * Map demo lever measureSlugs onto the user's own assigned measure ids;
+     * levers that don't resolve are dropped.
+     */
+    private function resolveLevers(int $userId, array $levers): array
+    {
+        $slugs = array_values(array_filter(array_column($levers, 'measureSlug')));
+        if ($slugs === []) {
+            return [];
+        }
+
+        $measureIdsBySlug = UserSystemMeasure::query()
+            ->where('user_system_measures.user_id', $userId)
+            ->whereIn('user_system_measures.status', [UserSystemMeasure::STATUS_ASSIGNED, UserSystemMeasure::STATUS_ACTIVE])
+            ->join('system_measure_templates', 'system_measure_templates.id', '=', 'user_system_measures.source_system_measure_template_id')
+            ->whereIn('system_measure_templates.slug', $slugs)
+            ->pluck('user_system_measures.id', 'system_measure_templates.slug');
+
+        $resolved = [];
+        foreach ($levers as $lever) {
+            $measureId = $measureIdsBySlug[$lever['measureSlug'] ?? null] ?? null;
+            if ($measureId === null) {
+                continue;
+            }
+            unset($lever['measureSlug']);
+            $lever['measureId'] = $measureId;
+            $resolved[] = $lever;
+        }
+
+        return $resolved;
     }
 
     public function checkinStatus(Request $request): JsonResponse

@@ -169,6 +169,26 @@ components:
         sortOrder: { type: integer }
         isActive: { type: boolean }
 
+    SuitabilityLocationTag:
+      type: string
+      enum: [office, home, plant, onroad]
+
+    SuitabilityPostureTag:
+      type: string
+      enum: [standing, sitting]
+
+    ExerciseStep:
+      type: object
+      description: One "So geht's" step of an exercise, optionally illustrated by a pictogram.
+      required: [text]
+      properties:
+        text: { type: string }
+        pictogramPath:
+          type: string
+          nullable: true
+          description: Path relative to the API origin (e.g. pictograms/<measure>/<exercise>/step-1.svg).
+        alt: { type: string, nullable: true }
+
     AdminSystemExercise:
       type: object
       properties:
@@ -190,6 +210,24 @@ components:
         contraindications: { type: string, nullable: true }
         defaultFeedbackPrompt: { type: string, nullable: true }
         requiresFeedback: { type: boolean }
+        steps:
+          type: array
+          items: { $ref: '#/components/schemas/ExerciseStep' }
+        mainPictogramPath: { type: string, nullable: true }
+        mainPictogramAlt: { type: string, nullable: true }
+        locationTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor:
+          type: boolean
+          nullable: true
+          description: Null means the exercise inherits the template-level value.
+        defaultEffort: { type: integer, minimum: 1, maximum: 5, nullable: true }
         status: { $ref: '#/components/schemas/SystemExerciseStatus' }
         tags:
           type: array
@@ -221,6 +259,22 @@ components:
         requiresFeedback:
           type: boolean
           description: Defaults to true when omitted.
+        steps:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/ExerciseStep' }
+        mainPictogramPath: { type: string, maxLength: 255, nullable: true }
+        mainPictogramAlt: { type: string, maxLength: 255, nullable: true }
+        locationTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor: { type: boolean, nullable: true }
+        defaultEffort: { type: integer, minimum: 1, maximum: 5, nullable: true }
         tagIds:
           type: array
           description: IDs of existing system exercise tags; the assignment is synced exactly to this list.
@@ -245,6 +299,22 @@ components:
         contraindications: { type: string, nullable: true }
         defaultFeedbackPrompt: { type: string, nullable: true }
         requiresFeedback: { type: boolean }
+        steps:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/ExerciseStep' }
+        mainPictogramPath: { type: string, maxLength: 255, nullable: true }
+        mainPictogramAlt: { type: string, maxLength: 255, nullable: true }
+        locationTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor: { type: boolean, nullable: true }
+        defaultEffort: { type: integer, minimum: 1, maximum: 5, nullable: true }
         tagIds:
           type: array
           description: When present, tag assignment is synced exactly to this list; when absent, tags are untouched.
@@ -296,6 +366,31 @@ components:
         estimatedDurationMinutes: { type: integer, nullable: true }
         status: { $ref: '#/components/schemas/SystemMeasureTemplateStatus' }
         isFeatured: { type: boolean }
+        targetSignal:
+          type: string
+          nullable: true
+          description: The signal the measure targets (e.g. neck_pain, sleep, stress).
+        assignmentReasonTemplate:
+          type: string
+          nullable: true
+          description: Reason text template shown on assignments (e.g. "aus Check-in „Nackenschmerzen“").
+        effectMetric:
+          type: string
+          nullable: true
+          enum: [pain, stress, sleep_hours, null]
+        effectMetricUnit:
+          type: string
+          nullable: true
+          description: Unit of the effect metric (e.g. nrs_0_10, scale_1_5, hours).
+        locationTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor: { type: boolean }
         exerciseCount: { type: integer }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -363,6 +458,22 @@ components:
         isFeatured:
           type: boolean
           description: Defaults to false when omitted.
+        targetSignal: { type: string, maxLength: 255, nullable: true }
+        assignmentReasonTemplate: { type: string, nullable: true }
+        effectMetric:
+          type: string
+          nullable: true
+          enum: [pain, stress, sleep_hours, null]
+        effectMetricUnit: { type: string, maxLength: 50, nullable: true }
+        locationTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor: { type: boolean }
 
     AdminSystemMeasureTemplateUpdatePayload:
       type: object
@@ -376,6 +487,22 @@ components:
         status: { $ref: '#/components/schemas/SystemMeasureTemplateStatus' }
         estimatedDurationMinutes: { type: integer, minimum: 1, maximum: 100000, nullable: true }
         isFeatured: { type: boolean }
+        targetSignal: { type: string, maxLength: 255, nullable: true }
+        assignmentReasonTemplate: { type: string, nullable: true }
+        effectMetric:
+          type: string
+          nullable: true
+          enum: [pain, stress, sleep_hours, null]
+        effectMetricUnit: { type: string, maxLength: 50, nullable: true }
+        locationTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor: { type: boolean }
 
     AdminSystemMeasureTemplateExerciseCreatePayload:
       type: object
@@ -867,15 +994,72 @@ components:
           description: Optional per-category breakdown; each category funnel stays monotone (recommendationReceived >= measureStarted >= active14d).
           items: { $ref: '#/components/schemas/UsageFunnelCategory' }
 
+    InfectionRadarLevel:
+      type: string
+      enum: [NORMAL, WATCH, ELEVATED, CRITICAL]
+
+    InfectionRadarTrend:
+      type: string
+      enum: [UP, STABLE, DOWN]
+
+    InfectionRadarRecommendationType:
+      type: string
+      enum: [COMMUNICATION, MEASURE, WORK_ORGANIZATION]
+
     InfectionRadar:
       type: object
-      description: Concept module behind infectionRadarEnabled. Aggregate-only symptom counts, never individual data. Demo mode serves deterministic demo data with the last seven calendar days; prod mode returns data null until symptom check-in and RKI integration ship.
+      description: Concept module behind infectionRadarEnabled. Aggregate-only respiratory signals, never individual employee health data or raw answers. Demo mode serves deterministic demo data with internal check-in signals and RKI/ARE-style external context; prod mode returns data null until production symptom aggregation and external RKI/ARE integration ship.
       required: [overallStatus, locations, symptomReports7d, rkiIncidence]
       additionalProperties: false
       properties:
         overallStatus:
-          type: string
-          enum: [NORMAL, ELEVATED, CRITICAL]
+          $ref: '#/components/schemas/InfectionRadarLevel'
+        earlyWarning:
+          type: object
+          required: [level, score, summary, recommendedAction]
+          additionalProperties: false
+          properties:
+            level:
+              $ref: '#/components/schemas/InfectionRadarLevel'
+            score:
+              type: number
+              minimum: 0
+              maximum: 100
+              description: Organizational early-warning indicator, not a medical score.
+            summary: { type: string }
+            recommendedAction: { type: string }
+        internalSignals:
+          type: object
+          required: [symptomRate7d, symptomRateDelta, safeModeActivations7d, checkInCoverage, topSymptoms]
+          additionalProperties: false
+          properties:
+            symptomRate7d: { type: number, minimum: 0, maximum: 1 }
+            symptomRateDelta: { type: number, description: "Percentage-point delta represented as a fraction, e.g. 0.06 = +6 pp." }
+            safeModeActivations7d: { type: integer, minimum: 0 }
+            checkInCoverage: { type: number, minimum: 0, maximum: 1 }
+            topSymptoms:
+              type: array
+              items:
+                type: object
+                required: [label, share]
+                additionalProperties: false
+                properties:
+                  label: { type: string }
+                  share: { type: number, minimum: 0, maximum: 1 }
+        externalSignals:
+          type: object
+          required: [areLevel, areTrend, dominantSignals, dataUpdatedAt, source]
+          additionalProperties: false
+          properties:
+            areLevel:
+              $ref: '#/components/schemas/InfectionRadarLevel'
+            areTrend:
+              $ref: '#/components/schemas/InfectionRadarTrend'
+            dominantSignals:
+              type: array
+              items: { type: string }
+            dataUpdatedAt: { type: string, format: date }
+            source: { type: string, example: RKI/ARE-Demo }
         locations:
           type: array
           items:
@@ -885,8 +1069,21 @@ components:
             properties:
               name: { type: string }
               status:
-                type: string
-                enum: [NORMAL, ELEVATED, CRITICAL]
+                $ref: '#/components/schemas/InfectionRadarLevel'
+              level:
+                $ref: '#/components/schemas/InfectionRadarLevel'
+              symptomRate:
+                type: number
+                nullable: true
+                minimum: 0
+                maximum: 1
+              trend:
+                nullable: true
+                allOf:
+                  - $ref: '#/components/schemas/InfectionRadarTrend'
+              reportable:
+                type: boolean
+                description: False when privacy/reportability thresholds are not met.
         symptomReports7d:
           type: array
           description: Aggregate daily counts for the last seven days.
@@ -907,7 +1104,115 @@ components:
             district: { type: string }
         recommendations:
           type: array
-          items: { $ref: '#/components/schemas/InsightRecommendation' }
+          items:
+            type: object
+            required: [title, text]
+            additionalProperties: false
+            properties:
+              type:
+                $ref: '#/components/schemas/InfectionRadarRecommendationType'
+              title: { type: string }
+              text: { type: string }
+              actionLabel: { type: string }
+              target: { type: string }
+
+    EmployeeMetricAggregate:
+      type: object
+      description: Week vs. previous-week average of one wellbeing metric on the 1-5 scale.
+      properties:
+        current: { type: number, nullable: true }
+        previous: { type: number, nullable: true }
+        delta: { type: number, nullable: true }
+
+    MeasureEffect:
+      type: object
+      nullable: true
+      description: Before/after demo effect shown as a badge (3a) and "Wirkung deiner letzten Einheit" (3c).
+      properties:
+        metric:
+          type: string
+          enum: [pain, stress, sleep_hours]
+        unit: { type: string, nullable: true }
+        before: { type: number, nullable: true }
+        after: { type: number, nullable: true }
+        direction:
+          type: string
+          enum: [up, down]
+
+    AssignedMeasure:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        category: { type: string, nullable: true }
+        assignmentReason: { type: string, nullable: true }
+        exerciseCount: { type: integer }
+        estMinutes: { type: integer, nullable: true }
+        streakDays: { type: integer, nullable: true }
+        weeklyDone: { type: integer, nullable: true }
+        weeklyTarget: { type: integer, nullable: true }
+        effect: { $ref: '#/components/schemas/MeasureEffect' }
+        locationTags:
+          type: array
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor: { type: boolean }
+
+    AssignedMeasureExercise:
+      type: object
+      properties:
+        id: { type: integer }
+        position: { type: integer }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        instructions: { type: string, nullable: true }
+        sets: { type: integer, nullable: true }
+        repetitions: { type: integer, nullable: true }
+        holdSeconds: { type: integer, nullable: true }
+        durationMinutes: { type: integer, nullable: true }
+        safetyNotes: { type: string, nullable: true }
+        status: { type: string }
+        mainPictogramPath:
+          type: string
+          nullable: true
+          description: Path relative to the API origin; resolved from the source system exercise.
+        mainPictogramAlt: { type: string, nullable: true }
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              text: { type: string }
+              pictogramPath: { type: string, nullable: true }
+              alt: { type: string, nullable: true }
+        defaultEffort: { type: integer, nullable: true }
+        locationTags:
+          type: array
+          description: Exercise-level tags; falls back to the template-level tags when the exercise defines none.
+          items: { $ref: '#/components/schemas/SuitabilityLocationTag' }
+        postureTags:
+          type: array
+          items: { $ref: '#/components/schemas/SuitabilityPostureTag' }
+        requiresFloor: { type: boolean }
+
+    AssignedMeasureDetail:
+      allOf:
+        - $ref: '#/components/schemas/AssignedMeasure'
+        - type: object
+          properties:
+            description: { type: string, nullable: true }
+            lastSession:
+              type: object
+              nullable: true
+              properties:
+                effect: { $ref: '#/components/schemas/MeasureEffect' }
+                effort: { type: integer, nullable: true }
+                points: { type: integer, nullable: true }
+            exercises:
+              type: array
+              items: { $ref: '#/components/schemas/AssignedMeasureExercise' }
 
     EmployeeMeasure:
       allOf:
@@ -1298,7 +1603,8 @@ paths:
   /employee/dashboard:
     get:
       tags: [Employee]
-      summary: Get employee dashboard data
+      summary: Get employee dashboard data (1a)
+      description: Weekly wellbeing aggregates (canonical 1-5 scale) are computed from the employee's daily entries and always present when data exists. sleep/bodySignals/healthFlag/levers are demo-provider blocks and null in prod mode. Lever measureIds reference the employee's own assigned system measures.
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -1315,6 +1621,61 @@ paths:
                   streakCount: { type: integer }
                   points: { type: integer }
                   todayCheckinCompleted: { type: boolean }
+                  wellbeing:
+                    type: object
+                    nullable: true
+                    description: Derived weekly score (mean of mood, inverted stress, energy) vs. previous week.
+                    properties:
+                      current: { type: number, nullable: true }
+                      previous: { type: number, nullable: true }
+                      delta: { type: number, nullable: true }
+                      scale: { type: integer, enum: [5] }
+                      sparkline:
+                        type: array
+                        description: Up to 14 daily scores, oldest first.
+                        items: { type: number }
+                  metrics:
+                    type: object
+                    nullable: true
+                    properties:
+                      mood: { $ref: '#/components/schemas/EmployeeMetricAggregate' }
+                      energy: { $ref: '#/components/schemas/EmployeeMetricAggregate' }
+                      stress: { $ref: '#/components/schemas/EmployeeMetricAggregate' }
+                  sleep:
+                    type: object
+                    nullable: true
+                    properties:
+                      currentH: { type: number }
+                      previousH: { type: number }
+                  bodySignals:
+                    type: array
+                    nullable: true
+                    items:
+                      type: object
+                      properties:
+                        label: { type: string }
+                        thisWeekDays: { type: integer }
+                        lastWeekDays: { type: integer }
+                        trend: { type: string, enum: [up, down, flat] }
+                  healthFlag:
+                    type: object
+                    nullable: true
+                    properties:
+                      state: { type: string, enum: [caution, ok] }
+                      label: { type: string }
+                      badge: { type: string }
+                      note: { type: string }
+                  levers:
+                    type: array
+                    nullable: true
+                    items:
+                      type: object
+                      properties:
+                        title: { type: string }
+                        badge: { type: string }
+                        reason: { type: string }
+                        expected: { type: string }
+                        measureId: { type: integer }
         401:
           description: Unauthorized
 
@@ -1330,9 +1691,9 @@ paths:
             schema:
               type: object
               properties:
-                mood: { type: integer, minimum: 1, maximum: 10 }
-                stress: { type: integer, minimum: 1, maximum: 10 }
-                energy: { type: integer, minimum: 1, maximum: 10 }
+                mood: { type: integer, minimum: 1, maximum: 5 }
+                stress: { type: integer, minimum: 1, maximum: 5 }
+                energy: { type: integer, minimum: 1, maximum: 5 }
                 note: { type: string, nullable: true }
       responses:
         200:
@@ -1451,8 +1812,51 @@ paths:
   /employee/measures:
     get:
       tags: [Employee]
-      summary: List active measures visible to the authenticated employee
-      description: Returns active company-wide measures and active measures targeted to the authenticated employee's current team, including only that employee's participation state.
+      summary: List system measures assigned to the authenticated employee (3a)
+      description: Returns the employee's assigned/active user system measures with category, assignment reason, weekly progress, demo streak, effect badge, and suitability tags. Demo display values come from the assignment's recommendation context.
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Assigned measures
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AssignedMeasure'
+
+  /employee/measures/{userSystemMeasure}:
+    get:
+      tags: [Employee]
+      summary: Get an assigned system measure with its exercises (3c)
+      description: Returns the measure detail including exercises with sets/reps/hold/duration, pictogram paths, steps, suitability tags, and the demo "last session" effect. Scoped to the authenticated employee; foreign IDs return 404.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: userSystemMeasure
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Assigned measure detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AssignedMeasureDetail'
+        404:
+          description: Measure not found or not assigned to the authenticated employee
+
+  /employee/company-measures:
+    get:
+      tags: [Employee]
+      summary: List active company measures visible to the authenticated employee
+      description: Returns active company-wide measures and active measures targeted to the authenticated employee's current team, including only that employee's participation state. (Formerly served at /employee/measures.)
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -2515,7 +2919,7 @@ paths:
     get:
       tags: [Company]
       summary: Get infection radar (concept)
-      description: Concept endpoint behind the infectionRadarEnabled flag. Aggregate-only data, never individual symptom reports. Demo data mode returns the deterministic per-company demo radar; prod data mode returns data null until symptom check-in and RKI OpenData integration ship.
+      description: Concept endpoint behind the infectionRadarEnabled flag. Aggregate-only respiratory signals, never individual symptom reports or raw answers. Demo data mode returns the deterministic per-company demo radar; prod data mode returns data null until production symptom aggregation and RKI/ARE integration ship.
       security: [{ Sanctum: [] }]
       responses:
         200:

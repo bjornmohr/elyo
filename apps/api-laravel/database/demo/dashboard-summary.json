@@ -28,7 +28,14 @@
     "overallStatus": "ELEVATED",
     "highlightLocation": "Standort Süd",
     "rkiIncidence": 142,
-    "rkiDeltaPercent": 18
+    "rkiDeltaPercent": 18,
+    "subtitle": "Atemwegs-Frühwarnsystem",
+    "statusLabel": "Frühwarnlage: Erhöht",
+    "summary": "Interne Erkältungssignale steigen seit 5 Tagen. Die regionale Atemwegslage ist ebenfalls erhöht.",
+    "internalDeltaPp": 6,
+    "safeModeActivations7d": 12,
+    "externalLevel": "ELEVATED",
+    "recommendedAction": "Sanfte Maßnahmen aktivieren und Kommunikation vorbereiten."
   },
   "impactReporting": [
     { "program": "Schlaf-Coaching", "usageRate": 29, "relevanceScore": 41, "rating": 4 },

@@ -12,10 +12,10 @@ import { NotificationService } from '../../../../shared/notifications/notificati
   template: `
     <div class="max-w-3xl mx-auto p-4 space-y-6">
       <header class="flex items-center space-x-4">
-        <a routerLink="/employee" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
+        <a routerLink="/employee" class="inline-flex min-h-11 min-w-11 items-center justify-center p-2.5 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
            ←
         </a>
-        <h1 class="text-xl font-bold text-slate-800">Umfragen</h1>
+        <h1 class="text-2xl font-bold text-slate-800">Umfragen</h1>
       </header>
 
       <!-- List View -->
@@ -27,20 +27,20 @@ import { NotificationService } from '../../../../shared/notifications/notificati
                 <div class="flex items-center space-x-2">
                   <h2 class="font-bold text-slate-800">{{ survey.title }}</h2>
                   @if (survey.isCompleted) {
-                    <span class="bg-teal-100 text-teal-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Abgeschlossen</span>
+                    <span class="bg-teal-100 text-teal-700 text-xs font-black px-2 py-0.5 rounded-full uppercase">Abgeschlossen</span>
                   }
                 </div>
                 <p class="text-sm text-slate-500">{{ survey.description }}</p>
               </div>
               <button (click)="selectSurvey(survey)"
-                      class="bg-slate-50 group-hover:bg-teal-600 group-hover:text-white text-slate-400 p-3 rounded-xl transition-all disabled:opacity-30">
+                      class="min-h-11 min-w-11 bg-slate-50 group-hover:bg-teal-600 group-hover:text-white text-slate-500 p-3 rounded-xl transition-all disabled:opacity-30">
                 →
               </button>
             </div>
           }
 
           @if (surveys().length === 0) {
-            <div class="text-center py-12 text-slate-400">
+            <div class="text-center py-12 text-slate-500">
               Aktuell sind keine Umfragen verfügbar.
             </div>
           }
@@ -65,7 +65,7 @@ import { NotificationService } from '../../../../shared/notifications/notificati
                  @if (q.type === 'SCALE') {
                    <div class="space-y-4">
                       <input type="range" min="1" max="10" [(ngModel)]="answers[q.id]" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
-                      <div class="flex justify-between text-xs text-slate-400 font-bold uppercase tracking-widest">
+                      <div class="flex justify-between text-sm text-slate-500 font-bold uppercase tracking-widest">
                         <span>1</span><span>10</span>
                       </div>
                    </div>

@@ -49,12 +49,49 @@ export interface UsageFunnel {
   categories?: UsageFunnelCategory[];
 }
 
+export type InfectionRadarLevel = 'NORMAL' | 'WATCH' | 'ELEVATED' | 'CRITICAL';
+export type InfectionRadarTrend = 'UP' | 'STABLE' | 'DOWN';
+export type InfectionRadarRecommendationType = 'COMMUNICATION' | 'MEASURE' | 'WORK_ORGANIZATION';
+
 export interface InfectionRadar {
-  overallStatus: 'NORMAL' | 'ELEVATED' | 'CRITICAL';
-  locations: { name: string; status: 'NORMAL' | 'ELEVATED' | 'CRITICAL' }[];
+  overallStatus: InfectionRadarLevel;
+  earlyWarning?: {
+    level: InfectionRadarLevel;
+    score: number;
+    summary: string;
+    recommendedAction: string;
+  };
+  internalSignals?: {
+    symptomRate7d: number;
+    symptomRateDelta: number;
+    safeModeActivations7d: number;
+    checkInCoverage: number;
+    topSymptoms: { label: string; share: number }[];
+  };
+  externalSignals?: {
+    areLevel: InfectionRadarLevel;
+    areTrend: InfectionRadarTrend;
+    dominantSignals: string[];
+    dataUpdatedAt: string;
+    source: string;
+  };
+  locations: {
+    name: string;
+    status?: InfectionRadarLevel;
+    level?: InfectionRadarLevel;
+    symptomRate?: number | null;
+    trend?: InfectionRadarTrend | null;
+    reportable?: boolean;
+  }[];
   symptomReports7d: { date: string; count: number }[];
   rkiIncidence: { value: number; deltaPercent: number; district: string };
-  recommendations: { title: string; text: string }[];
+  recommendations: {
+    type?: InfectionRadarRecommendationType;
+    title: string;
+    text: string;
+    actionLabel?: string;
+    target?: string;
+  }[];
 }
 
 @Injectable({

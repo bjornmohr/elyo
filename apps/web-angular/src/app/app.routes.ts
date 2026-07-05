@@ -20,11 +20,14 @@ export const routes: Routes = [
     loadComponent: () => import('./shared/shells/employee-shell.component').then(m => m.EmployeeShellComponent),
     children: [
       { path: 'dashboard', loadComponent: () => import('./features/employee/pages/dashboard/dashboard.component').then(m => m.DashboardComponent) },
-      { path: 'checkin', loadComponent: () => import('./features/employee/pages/checkin/checkin.component').then(m => m.CheckinComponent) },
+      { path: 'checkin', loadComponent: () => import('./features/employee/pages/checkin/checkin-stepper.component').then(m => m.CheckinStepperComponent) },
+      { path: 'checkin/chat', loadComponent: () => import('./features/employee/pages/checkin/checkin-chat.component').then(m => m.CheckinChatComponent) },
       { path: 'history', loadComponent: () => import('./features/employee/pages/history/history.component').then(m => m.HistoryComponent) },
       { path: 'profile', loadComponent: () => import('./features/employee/pages/profile/profile.component').then(m => m.ProfileComponent) },
       { path: 'surveys', loadComponent: () => import('./features/employee/pages/surveys/surveys.component').then(m => m.SurveysComponent) },
       { path: 'measures', loadComponent: () => import('./features/employee/pages/measures/measures.component').then(m => m.EmployeeMeasuresComponent) },
+      { path: 'measures/:id', loadComponent: () => import('./features/employee/pages/measure-detail/measure-detail.component').then(m => m.EmployeeMeasureDetailComponent) },
+      { path: 'measures/:id/exercise/:position', loadComponent: () => import('./features/employee/pages/measure-exercise/measure-exercise.component').then(m => m.EmployeeMeasureExerciseComponent) },
       { path: 'measure-checkins/:token', loadComponent: () => import('./features/employee/pages/measure-checkin/measure-checkin.component').then(m => m.EmployeeMeasureCheckinComponent) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     ]

@@ -40,6 +40,15 @@ class UpdateSystemMeasureTemplateRequest extends FormRequest
             ])],
             'estimatedDurationMinutes' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:100000'],
             'isFeatured' => ['sometimes', 'boolean'],
+            'targetSignal' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'assignmentReasonTemplate' => ['sometimes', 'nullable', 'string'],
+            'effectMetric' => ['sometimes', 'nullable', Rule::in(['pain', 'stress', 'sleep_hours'])],
+            'effectMetricUnit' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'locationTags' => ['sometimes', 'nullable', 'array'],
+            'locationTags.*' => ['string', Rule::in(['office', 'home', 'plant', 'onroad'])],
+            'postureTags' => ['sometimes', 'nullable', 'array'],
+            'postureTags.*' => ['string', Rule::in(['standing', 'sitting'])],
+            'requiresFloor' => ['sometimes', 'boolean'],
         ];
     }
 }

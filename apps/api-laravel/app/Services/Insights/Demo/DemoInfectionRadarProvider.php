@@ -28,8 +28,14 @@ class DemoInfectionRadarProvider implements InfectionRadarProvider
             ];
         }
 
+        $internalSignals = $base['internalSignals'];
+        $internalSignals['safeModeActivations7d'] = $variance->count($internalSignals['safeModeActivations7d'], 0.25);
+
         return [
             'overallStatus' => $base['overallStatus'],
+            'earlyWarning' => $base['earlyWarning'],
+            'internalSignals' => $internalSignals,
+            'externalSignals' => $base['externalSignals'],
             'locations' => $base['locations'],
             'symptomReports7d' => $reports,
             'rkiIncidence' => [

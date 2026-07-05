@@ -36,6 +36,8 @@ class SystemMeasureTemplate extends Model
         'slug', 'title', 'short_description', 'description', 'goal_summary',
         'category', 'difficulty', 'estimated_duration_minutes', 'recommended_frequency',
         'default_points', 'streak_enabled', 'requires_feedback', 'is_featured',
+        'target_signal', 'assignment_reason_template', 'effect_metric', 'effect_metric_unit',
+        'location_tags', 'posture_tags', 'requires_floor',
         'status', 'created_by_user_id',
     ];
 
@@ -45,6 +47,9 @@ class SystemMeasureTemplate extends Model
         'streak_enabled' => 'boolean',
         'requires_feedback' => 'boolean',
         'is_featured' => 'boolean',
+        'location_tags' => 'array',
+        'posture_tags' => 'array',
+        'requires_floor' => 'boolean',
     ];
 
     protected static function booted(): void

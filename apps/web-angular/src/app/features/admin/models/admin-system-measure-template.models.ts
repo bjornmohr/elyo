@@ -1,5 +1,7 @@
 import {
   AdminSystemExerciseTag,
+  ExerciseLocationTag,
+  ExercisePostureTag,
   SystemExerciseDifficulty,
   SystemExerciseStatus,
   SystemExerciseType,
@@ -18,6 +20,8 @@ export type SystemMeasureTemplateCategory =
 
 export type SystemMeasureTemplateDifficulty = SystemExerciseDifficulty;
 
+export type MeasureEffectMetric = 'pain' | 'stress' | 'sleep_hours';
+
 export interface AdminSystemMeasureTemplate {
   id: number;
   slug: string;
@@ -29,6 +33,13 @@ export interface AdminSystemMeasureTemplate {
   estimatedDurationMinutes: number | null;
   status: SystemMeasureTemplateStatus;
   isFeatured: boolean;
+  targetSignal: string | null;
+  assignmentReasonTemplate: string | null;
+  effectMetric: MeasureEffectMetric | null;
+  effectMetricUnit: string | null;
+  locationTags: ExerciseLocationTag[] | null;
+  postureTags: ExercisePostureTag[] | null;
+  requiresFloor: boolean;
   exerciseCount?: number;
   exercises?: AdminSystemMeasureTemplateExercise[];
   createdAt: string;
@@ -79,6 +90,13 @@ export interface CreateSystemMeasureTemplatePayload {
   status?: SystemMeasureTemplateStatus;
   estimatedDurationMinutes?: number | null;
   isFeatured?: boolean;
+  targetSignal?: string | null;
+  assignmentReasonTemplate?: string | null;
+  effectMetric?: MeasureEffectMetric | null;
+  effectMetricUnit?: string | null;
+  locationTags?: ExerciseLocationTag[] | null;
+  postureTags?: ExercisePostureTag[] | null;
+  requiresFloor?: boolean;
 }
 
 export type UpdateSystemMeasureTemplatePayload = Partial<CreateSystemMeasureTemplatePayload>;

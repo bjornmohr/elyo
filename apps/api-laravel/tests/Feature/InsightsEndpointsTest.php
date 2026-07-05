@@ -35,6 +35,11 @@ class InsightsEndpointsTest extends TestCase
 
         $radar = $this->actingAs($admin)->getJson('/api/company/infection-radar')->assertOk();
         $this->assertSame('ELEVATED', $radar->json('data.overallStatus'));
+        $this->assertSame('ELEVATED', $radar->json('data.earlyWarning.level'));
+        $this->assertSame(68, $radar->json('data.earlyWarning.score'));
+        $this->assertSame(0.18, $radar->json('data.internalSignals.symptomRate7d'));
+        $this->assertSame('RKI/ARE-Demo', $radar->json('data.externalSignals.source'));
+        $this->assertFalse($radar->json('data.locations.2.reportable'));
         $this->assertCount(7, $radar->json('data.symptomReports7d'));
         $this->assertSame(142, $radar->json('data.rkiIncidence.value'));
 
@@ -178,6 +183,9 @@ class InsightsEndpointsTest extends TestCase
 
         $radar = $this->actingAs($admin)->getJson('/api/company/infection-radar')->json('data');
         $this->assertContains($radar['overallStatus'], ['NORMAL', 'ELEVATED', 'CRITICAL']);
+        $this->assertContains($radar['earlyWarning']['level'], ['NORMAL', 'WATCH', 'ELEVATED', 'CRITICAL']);
+        $this->assertArrayHasKey('internalSignals', $radar);
+        $this->assertArrayHasKey('externalSignals', $radar);
         foreach ($radar['symptomReports7d'] as $point) {
             $this->assertGreaterThanOrEqual(0, $point['count']);
         }

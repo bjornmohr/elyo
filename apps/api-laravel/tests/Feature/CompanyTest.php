@@ -69,10 +69,10 @@ class CompanyTest extends TestCase
             WellbeingEntry::factory()->create([
                 'user_id' => $emp->id,
                 'company_id' => $this->company->id,
-                'mood' => 8,
-                'stress' => 2,
-                'energy' => 9,
-                'score' => 8.5,
+                'mood' => 4,
+                'stress' => 1,
+                'energy' => 5,
+                'score' => 4.7,
                 'period_key' => '2024-W10',
             ]);
         }
@@ -98,18 +98,18 @@ class CompanyTest extends TestCase
         WellbeingEntry::factory()->create([
             'user_id' => $emp3->id,
             'company_id' => $this->company->id,
-            'mood' => 5,
-            'stress' => 5,
-            'energy' => 5,
-            'score' => 5.0,
+            'mood' => 3,
+            'stress' => 3,
+            'energy' => 3,
+            'score' => 3.0,
             'period_key' => '2024-W10',
         ]);
 
         $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
         $response->assertJsonPath('company.isAboveThreshold', true);
         $response->assertJsonPath('company.responseCount', 3);
-        // (8.5 + 8.5 + 5.0) / 3 = 22 / 3 = 7.333 -> 7.3
-        $response->assertJsonPath('company.avgScore', 7.3);
+        // (4.7 + 4.7 + 3.0) / 3 = 12.4 / 3 = 4.133 -> 4.1
+        $response->assertJsonPath('company.avgScore', 4.1);
         $response->assertJsonMissingPath('trend.0.respondents');
     }
 
@@ -178,7 +178,7 @@ class CompanyTest extends TestCase
             'role' => Role::EMPLOYEE,
         ]);
         foreach ($emps1 as $emp) {
-            WellbeingEntry::factory()->create(['user_id' => $emp->id, 'company_id' => $this->company->id, 'score' => 8.0]);
+            WellbeingEntry::factory()->create(['user_id' => $emp->id, 'company_id' => $this->company->id, 'score' => 4.5]);
         }
 
         // Other team entries
@@ -188,19 +188,19 @@ class CompanyTest extends TestCase
             'role' => Role::EMPLOYEE,
         ]);
         foreach ($emps2 as $emp) {
-            WellbeingEntry::factory()->create(['user_id' => $emp->id, 'company_id' => $this->company->id, 'score' => 2.0]);
+            WellbeingEntry::factory()->create(['user_id' => $emp->id, 'company_id' => $this->company->id, 'score' => 1.5]);
         }
 
-        // Manager dashboard should only see their team's average (8.0)
+        // Manager dashboard should only see their team's average (4.5)
         $response = $this->actingAs($this->manager)->getJson('/api/company/dashboard');
         $response->assertStatus(200);
-        $this->assertEquals(8.0, $response->json('company.avgScore'));
+        $this->assertEquals(4.5, $response->json('company.avgScore'));
         $response->assertJsonCount(1, 'teams');
         $response->assertJsonPath('teams.0.name', 'Tech Team');
 
         // Admin dashboard should see overall average ( (8*3 + 2*3) / 6 = 30 / 6 = 5.0 )
         $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
-        $this->assertEquals(5.0, $response->json('company.avgScore'));
+        $this->assertEquals(3.0, $response->json('company.avgScore'));
         $response->assertJsonCount(2, 'teams');
     }
 
@@ -579,7 +579,7 @@ class CompanyTest extends TestCase
             WellbeingEntry::factory()->create([
                 'user_id' => $employee->id,
                 'company_id' => $this->company->id,
-                'score' => 8.0,
+                'score' => 4.0,
                 'period_key' => '2026-W20',
             ]);
         }
@@ -599,7 +599,7 @@ class CompanyTest extends TestCase
             WellbeingEntry::factory()->create([
                 'user_id' => $employee->id,
                 'company_id' => $this->company->id,
-                'score' => 8.0,
+                'score' => 4.0,
                 'period_key' => '2026-W20',
             ]);
         }
@@ -1651,7 +1651,7 @@ class CompanyTest extends TestCase
             WellbeingEntry::factory()->create([
                 'user_id' => $employee->id,
                 'company_id' => $this->company->id,
-                'score' => 7.0,
+                'score' => 3.5,
             ]);
         }
 
@@ -1960,9 +1960,9 @@ class CompanyTest extends TestCase
             'user_id' => $managedMember->id,
             'company_id' => $this->company->id,
             'mood' => 2,
-            'stress' => 9,
+            'stress' => 5,
             'energy' => 3,
-            'score' => 2.3,
+            'score' => 2.0,
             'note' => 'Private health note',
         ]);
 

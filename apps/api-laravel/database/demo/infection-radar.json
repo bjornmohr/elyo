@@ -1,9 +1,33 @@
 {
   "overallStatus": "ELEVATED",
+  "earlyWarning": {
+    "level": "ELEVATED",
+    "score": 68,
+    "summary": "Interne Erkältungssignale und regionale Atemwegslage steigen gleichzeitig.",
+    "recommendedAction": "Sanfte Maßnahmen aktivieren und Kommunikation vorbereiten."
+  },
+  "internalSignals": {
+    "symptomRate7d": 0.18,
+    "symptomRateDelta": 0.06,
+    "safeModeActivations7d": 12,
+    "checkInCoverage": 0.64,
+    "topSymptoms": [
+      { "label": "Husten", "share": 0.41 },
+      { "label": "Schnupfen", "share": 0.38 },
+      { "label": "Halsschmerzen", "share": 0.27 }
+    ]
+  },
+  "externalSignals": {
+    "areLevel": "ELEVATED",
+    "areTrend": "UP",
+    "dominantSignals": ["Rhinoviren", "RSV"],
+    "dataUpdatedAt": "2026-06-23",
+    "source": "RKI/ARE-Demo"
+  },
   "locations": [
-    { "name": "Standort Süd", "status": "CRITICAL" },
-    { "name": "Standort Nord", "status": "ELEVATED" },
-    { "name": "Standort West", "status": "NORMAL" }
+    { "name": "Standort Süd", "status": "CRITICAL", "level": "CRITICAL", "symptomRate": 0.24, "trend": "UP", "reportable": true },
+    { "name": "Standort Nord", "status": "ELEVATED", "level": "ELEVATED", "symptomRate": 0.16, "trend": "STABLE", "reportable": true },
+    { "name": "Standort West", "status": "NORMAL", "level": "NORMAL", "symptomRate": null, "trend": null, "reportable": false }
   ],
   "symptomReports7d": [7, 8, 11, 12, 16, 18, 20],
   "rkiIncidence": {
@@ -13,16 +37,32 @@
   },
   "recommendations": [
     {
-      "title": "Hygiene-Hinweise verstärken",
-      "text": "Aushänge und Erinnerungen an Standorten mit erhöhtem Aufkommen."
+      "type": "COMMUNICATION",
+      "title": "Schonmodus kommunizieren",
+      "text": "Mitarbeitende auf sanfte Maßnahmen, Erholung und freiwillige Rücksichtnahme hinweisen.",
+      "actionLabel": "Kommunikation prüfen",
+      "target": "Alle Standorte"
     },
     {
-      "title": "Homeoffice-Option kommunizieren",
-      "text": "Für Standort Süd bis zur Normalisierung der Symptommeldungen."
+      "type": "MEASURE",
+      "title": "Intensive Challenges temporär pausieren",
+      "text": "Erholungseinheiten und leichte Mobilisation priorisieren, bis die Signale wieder sinken.",
+      "actionLabel": "Maßnahme vorbereiten",
+      "target": "Standort Süd"
     },
     {
-      "title": "Masken bereitstellen",
-      "text": "FFP2-Masken in Gemeinschaftsbereichen anbieten."
+      "type": "WORK_ORGANIZATION",
+      "title": "Präsentismus vermeiden",
+      "text": "Führungskräfte für krankheitsbedingte Erholung und flexible Arbeitstage sensibilisieren.",
+      "actionLabel": "Details ansehen",
+      "target": "Führungskräfte"
+    },
+    {
+      "type": "MEASURE",
+      "title": "Sanfte Maßnahmen priorisieren",
+      "text": "Atempausen, kurze Mobilisation und Regenerationsimpulse in den Vordergrund stellen.",
+      "actionLabel": "Maßnahmen prüfen",
+      "target": "Employee Portal"
     }
   ]
 }

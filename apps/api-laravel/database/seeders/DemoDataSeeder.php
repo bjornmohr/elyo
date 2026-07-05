@@ -89,10 +89,10 @@ class DemoDataSeeder extends Seeder
 
         foreach ($employeeIds as $idx => $userId) {
             foreach ($periods as $weekIdx => $periodKey) {
-                $mood = max(1, min(10, 7 + (($idx + $weekIdx) % 3) - 1));
-                $stress = max(1, min(10, 4 + (($idx + $weekIdx) % 4) - 1));
-                $energy = max(1, min(10, 7 + (($idx + $weekIdx + 1) % 3) - 1));
-                $score = round(($mood + (11 - $stress) + $energy) / 3, 1);
+                $mood = max(1, min(5, 4 + (($idx + $weekIdx) % 3) - 1));
+                $stress = max(1, min(5, 2 + (($idx + $weekIdx) % 4) - 1));
+                $energy = max(1, min(5, 4 + (($idx + $weekIdx + 1) % 3) - 1));
+                $score = round(($mood + (6 - $stress) + $energy) / 3, 1);
 
                 DB::table('wellbeing_entries')->insert([
                     'mood' => $mood,
@@ -108,6 +108,9 @@ class DemoDataSeeder extends Seeder
                 ]);
             }
         }
+
+        $this->seedDailyWellbeingEntries($companyId, $employeeIds, $now);
+        $this->seedAssignedSystemMeasures($employeeIds, $adminId, $now);
 
         $surveyId = DB::table('surveys')->where('company_id', $companyId)->where('title', 'Quarterly Pulse Check')->value('id');
         if (! $surveyId) {
@@ -370,10 +373,10 @@ class DemoDataSeeder extends Seeder
         $periods = collect(range(0, $weeks - 1))->map(fn ($week) => $now->copy()->subWeeks($week)->format('Y-\WW'))->values();
         foreach ($userIds as $idx => $userId) {
             foreach ($periods as $weekIdx => $periodKey) {
-                $mood = max(1, min(10, 7 + (($idx + $weekIdx) % 3) - 1));
-                $stress = max(1, min(10, 4 + (($idx + $weekIdx) % 4) - 1));
-                $energy = max(1, min(10, 7 + (($idx + $weekIdx + 1) % 3) - 1));
-                $score = round(($mood + (11 - $stress) + $energy) / 3, 1);
+                $mood = max(1, min(5, 4 + (($idx + $weekIdx) % 3) - 1));
+                $stress = max(1, min(5, 2 + (($idx + $weekIdx) % 4) - 1));
+                $energy = max(1, min(5, 4 + (($idx + $weekIdx + 1) % 3) - 1));
+                $score = round(($mood + (6 - $stress) + $energy) / 3, 1);
 
                 DB::table('wellbeing_entries')->insert([
                     'mood' => $mood,
@@ -639,6 +642,173 @@ class DemoDataSeeder extends Seeder
                         'updated_at' => $now,
                     ]
                 );
+            }
+        }
+    }
+
+    /**
+     * Daily entries for the employee dashboard (1a): 14 days ending yesterday
+     * (today stays open so the check-in CTA shows as pending), ascending from
+     * a weaker previous week (~3.2) to a better current week (~3.8). Daily
+     * period keys (Y-m-d) never collide with the weekly keys (Y-Www).
+     */
+    private function seedDailyWellbeingEntries(int $companyId, array $userIds, mixed $now): void
+    {
+        foreach ($userIds as $idx => $userId) {
+            for ($daysAgo = 14; $daysAgo >= 1; $daysAgo--) {
+                $date = $now->copy()->subDays($daysAgo);
+                $isCurrentWeek = $daysAgo <= 7;
+
+                $wave = ($idx + $daysAgo) % 2;
+                $mood = $isCurrentWeek ? 4 + $wave : 3 + $wave;      // 3-4 -> 4-5
+                $stress = $isCurrentWeek ? 2 : 3;                     // 3   -> 2
+                $energy = $isCurrentWeek ? 3 + $wave : 3;             // 3   -> 3-4
+                $mood = max(1, min(5, $mood));
+                $energy = max(1, min(5, $energy));
+                $score = round(($mood + (6 - $stress) + $energy) / 3, 1);
+
+                DB::table('wellbeing_entries')->insert([
+                    'mood' => $mood,
+                    'stress' => $stress,
+                    'energy' => $energy,
+                    'score' => $score,
+                    'note' => null,
+                    'period_key' => $date->toDateString(),
+                    'company_id' => $companyId,
+                    'user_id' => $userId,
+                    'created_at' => $date->copy()->setTime(8, 30)->addMinutes($idx * 7),
+                    'updated_at' => $now,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Assign the three demo system-measure templates to every demo employee,
+     * snapshotting the template exercises. Demo display values (streak, weekly
+     * progress, last-session effect) live in recommendation_context->demo.
+     */
+    private function seedAssignedSystemMeasures(array $employeeIds, int $adminId, mixed $now): void
+    {
+        $demoContexts = [
+            'nacken-mobilitaet' => [
+                'streakDays' => 5, 'weeklyTarget' => 4, 'weeklyDone' => 3,
+                'lastEffect' => ['before' => 6, 'after' => 3],
+                'lastEffort' => 2, 'lastPoints' => 5,
+            ],
+            'abend-routine-schlaf' => [
+                'streakDays' => 3, 'weeklyTarget' => 3, 'weeklyDone' => 2,
+                'lastEffect' => ['before' => 6.5, 'after' => 7.4],
+                'lastEffort' => 1, 'lastPoints' => 5,
+            ],
+            'atem-balance' => [
+                'streakDays' => 0, 'weeklyTarget' => 3, 'weeklyDone' => 1,
+                'lastEffect' => ['before' => 4, 'after' => 2],
+                'lastEffort' => 1, 'lastPoints' => 5,
+            ],
+            'ruecken-fit-alltag' => [
+                'streakDays' => 2, 'weeklyTarget' => 5, 'weeklyDone' => 2,
+                'lastEffect' => ['before' => 5, 'after' => 2],
+                'lastEffort' => 2, 'lastPoints' => 5,
+            ],
+        ];
+
+        $templates = DB::table('system_measure_templates')
+            ->whereIn('slug', array_keys($demoContexts))
+            ->get()
+            ->keyBy('slug');
+
+        if ($templates->isEmpty()) {
+            return;
+        }
+
+        DB::table('user_system_measures')
+            ->whereIn('user_id', $employeeIds)
+            ->whereIn('source_system_measure_template_id', $templates->pluck('id'))
+            ->delete();
+
+        foreach ($employeeIds as $userId) {
+            foreach ($demoContexts as $slug => $demo) {
+                $template = $templates->get($slug);
+                if (! $template) {
+                    continue;
+                }
+
+                $measureId = DB::table('user_system_measures')->insertGetId([
+                    'user_id' => $userId,
+                    'source_system_measure_template_id' => $template->id,
+                    'assigned_by_user_id' => $adminId,
+                    'title' => $template->title,
+                    'description' => $template->description,
+                    'assignment_reason' => $template->assignment_reason_template,
+                    'recommendation_context' => json_encode(['demo' => $demo]),
+                    'status' => 'ACTIVE',
+                    'starts_at' => $now->copy()->subWeeks(2),
+                    'assigned_at' => $now->copy()->subWeeks(2),
+                    'streak_enabled' => true,
+                    'points_enabled' => true,
+                    'points_per_completion' => $template->default_points,
+                    'requires_feedback' => $template->requires_feedback,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+
+                $templateExercises = DB::table('system_measure_template_exercises')
+                    ->join('system_exercises', 'system_exercises.id', '=', 'system_measure_template_exercises.system_exercise_id')
+                    ->where('system_measure_template_exercises.system_measure_template_id', $template->id)
+                    ->orderBy('system_measure_template_exercises.position')
+                    ->select([
+                        'system_measure_template_exercises.position',
+                        'system_measure_template_exercises.is_required',
+                        'system_measure_template_exercises.custom_title',
+                        'system_measure_template_exercises.custom_instructions',
+                        'system_measure_template_exercises.custom_duration_minutes',
+                        'system_measure_template_exercises.custom_sets',
+                        'system_measure_template_exercises.custom_repetitions',
+                        'system_measure_template_exercises.custom_hold_seconds',
+                        'system_measure_template_exercises.custom_feedback_prompt',
+                        'system_exercises.id as exercise_id',
+                        'system_exercises.title',
+                        'system_exercises.short_description',
+                        'system_exercises.description',
+                        'system_exercises.exercise_type',
+                        'system_exercises.difficulty',
+                        'system_exercises.default_duration_minutes',
+                        'system_exercises.default_sets',
+                        'system_exercises.default_repetitions',
+                        'system_exercises.default_hold_seconds',
+                        'system_exercises.instructions',
+                        'system_exercises.safety_notes',
+                        'system_exercises.contraindications',
+                        'system_exercises.default_feedback_prompt',
+                        'system_exercises.requires_feedback',
+                    ])
+                    ->get();
+
+                foreach ($templateExercises as $exercise) {
+                    DB::table('user_system_measure_exercises')->insert([
+                        'user_system_measure_id' => $measureId,
+                        'source_system_exercise_id' => $exercise->exercise_id,
+                        'position' => $exercise->position,
+                        'title' => $exercise->custom_title ?? $exercise->title,
+                        'short_description' => $exercise->short_description,
+                        'description' => $exercise->description,
+                        'exercise_type' => $exercise->exercise_type,
+                        'difficulty' => $exercise->difficulty,
+                        'duration_minutes' => $exercise->custom_duration_minutes ?? $exercise->default_duration_minutes,
+                        'sets' => $exercise->custom_sets ?? $exercise->default_sets,
+                        'repetitions' => $exercise->custom_repetitions ?? $exercise->default_repetitions,
+                        'hold_seconds' => $exercise->custom_hold_seconds ?? $exercise->default_hold_seconds,
+                        'instructions' => $exercise->custom_instructions ?? $exercise->instructions,
+                        'safety_notes' => $exercise->safety_notes,
+                        'contraindications' => $exercise->contraindications,
+                        'feedback_prompt' => $exercise->custom_feedback_prompt ?? $exercise->default_feedback_prompt,
+                        'requires_feedback' => $exercise->requires_feedback,
+                        'status' => 'PENDING',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
             }
         }
     }
