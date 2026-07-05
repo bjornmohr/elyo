@@ -1,14 +1,17 @@
-<svg width="220" height="240" viewBox="0 0 220 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <g stroke="#0f766e" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="126" cy="56" r="24" transform="rotate(18 126 56)"/>
-    <path d="M116 78 L110 96"/>
-    <path d="M74 112 Q110 96 146 112"/>
-    <path d="M78 112 L70 176 Q69 186 79 186 L141 186 Q151 186 150 176 L142 112"/>
-    <path d="M78 116 L60 168"/>
-    <path d="M142 116 Q168 96 150 62"/>
+<svg width="220" height="240" viewBox="0 0 220 240" fill="none" xmlns="http://www.w3.org/2000/svg" stroke-linecap="round" stroke-linejoin="round">
+  <g stroke="#0f766e" stroke-width="6" fill="none">
+    <circle cx="124" cy="54" r="22" transform="rotate(16 124 54)"/>
+    <path d="M116 74 L110 92"/>
+    <path d="M76 106 Q110 92 144 106"/>
+    <path d="M104 100 L104 160 M116 100 L116 160"/>
+    <path d="M104 160 L94 216 M116 160 L126 216"/>
+    <path d="M78 108 L70 158"/>
+    <path d="M142 108 Q168 92 148 60"/>
   </g>
-  <svg x="42" y="18" width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#c2620f" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M20 7a9 9 0 0 0-14 3"/>
-    <path d="M6 5v5h5"/>
-  </svg>
+  <g stroke="#c2620f" stroke-width="5" fill="none">
+    <path d="M60 40 Q78 24 98 30"/>
+    <path d="M92 24 L98 30 L91 36"/>
+    <path d="M64 66 L64 78 M58 72 L70 72"/>
+  </g>
+
 </svg>

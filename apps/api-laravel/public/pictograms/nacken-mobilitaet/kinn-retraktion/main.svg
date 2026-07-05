@@ -1,5 +1,5 @@
-<svg width="220" height="240" viewBox="0 0 220 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <g stroke="#0f766e" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+<svg width="220" height="240" viewBox="0 0 220 240" fill="none" xmlns="http://www.w3.org/2000/svg" stroke-linecap="round" stroke-linejoin="round">
+  <g stroke="#0f766e" stroke-width="6" fill="none">
     <circle cx="122" cy="58" r="24"/>
     <path d="M116 82 L112 96"/>
     <path d="M76 112 Q112 96 148 112"/>
@@ -7,9 +7,10 @@
     <path d="M80 116 L62 168"/>
     <path d="M144 116 L162 168"/>
   </g>
-  <g stroke="#c2620f" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <path d="M92 58 L56 58"/>
-    <path d="M66 48 L56 58 L66 68"/>
-    <path d="M92 44 L92 72" stroke-dasharray="2 10"/>
+  <g stroke="#c2620f" stroke-width="5" fill="none">
+    <path d="M92 58 L54 58"/>
+    <path d="M64 48 L54 58 L64 68"/>
+    <path d="M92 42 L92 74"/>
   </g>
+
 </svg>

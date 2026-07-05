@@ -706,6 +706,11 @@ class DemoDataSeeder extends Seeder
                 'lastEffect' => ['before' => 4, 'after' => 2],
                 'lastEffort' => 1, 'lastPoints' => 5,
             ],
+            'ruecken-fit-alltag' => [
+                'streakDays' => 2, 'weeklyTarget' => 5, 'weeklyDone' => 2,
+                'lastEffect' => ['before' => 5, 'after' => 2],
+                'lastEffort' => 2, 'lastPoints' => 5,
+            ],
         ];
 
         $templates = DB::table('system_measure_templates')

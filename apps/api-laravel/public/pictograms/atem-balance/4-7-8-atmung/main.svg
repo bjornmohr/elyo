@@ -1,14 +1,11 @@
-<svg width="220" height="240" viewBox="0 0 220 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <g stroke="#0f766e" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+<svg width="220" height="240" viewBox="0 0 220 240" fill="none" xmlns="http://www.w3.org/2000/svg" stroke-linecap="round" stroke-linejoin="round">
+  <g stroke="#0f766e" stroke-width="6" fill="none">
     <circle cx="110" cy="120" r="56"/>
     <circle cx="110" cy="120" r="30" stroke-dasharray="4 14"/>
   </g>
-  <g stroke="#c2620f" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+  <g stroke="#c2620f" stroke-width="5" fill="none">
     <path d="M110 40 L110 20 M102 28 L110 20 L118 28"/>
     <path d="M110 200 L110 220 M102 212 L110 220 L118 212"/>
   </g>
-  <g stroke="#0f766e" stroke-width="5" stroke-linecap="round" fill="none">
-    <path d="M40 118 L46 112 L52 122 L58 112 L64 118" opacity="0.7"/>
-    <path d="M156 118 L162 112 L168 122 L174 112 L180 118" opacity="0.7"/>
-  </g>
+
 </svg>

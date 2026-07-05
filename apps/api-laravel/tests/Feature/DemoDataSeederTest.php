@@ -63,20 +63,20 @@ class DemoDataSeederTest extends TestCase
 
         foreach ($employeeIds as $employeeId) {
             $assigned = DB::table('user_system_measures')->where('user_id', $employeeId)->get();
-            $this->assertCount(3, $assigned, "employee {$employeeId} should have 3 assigned measures");
+            $this->assertCount(4, $assigned, "employee {$employeeId} should have 4 assigned measures");
             $this->assertEqualsCanonicalizing(
-                ['Nacken-Mobilität', 'Abend-Routine für besseren Schlaf', 'Atem-Balance'],
+                ['Nacken-Mobilität', 'Abend-Routine für besseren Schlaf', 'Atem-Balance', 'Rücken-Fit im Alltag'],
                 $assigned->pluck('title')->all()
             );
         }
 
-        // Snapshot exercises copied per assignment: 4 + 3 + 3.
+        // Snapshot exercises copied per assignment: 5 + 4 + 4 + 3.
         $nacken = DB::table('user_system_measures')
             ->where('user_id', $employeeIds->first())
             ->where('title', 'Nacken-Mobilität')
             ->first();
         $this->assertNotNull($nacken->assignment_reason);
-        $this->assertSame(4, DB::table('user_system_measure_exercises')
+        $this->assertSame(5, DB::table('user_system_measure_exercises')
             ->where('user_system_measure_id', $nacken->id)
             ->count());
 
@@ -93,7 +93,7 @@ class DemoDataSeederTest extends TestCase
         $this->seed(DemoDataSeeder::class);
 
         $employeeId = DB::table('users')->where('email', 'employee1@demo.de')->value('id');
-        $this->assertSame(3, DB::table('user_system_measures')->where('user_id', $employeeId)->count());
+        $this->assertSame(4, DB::table('user_system_measures')->where('user_id', $employeeId)->count());
     }
 
     public function test_seeder_creates_daily_wellbeing_entries_on_1_5_scale(): void
@@ -140,9 +140,11 @@ class DemoDataSeederTest extends TestCase
             $this->assertTrue(File::exists(public_path($path)), "missing pictogram asset: {$path}");
         }
 
-        $steps = DB::table('system_exercises')->where('slug', 'schulterkreisen')->value('steps');
-        foreach (json_decode($steps, true) as $step) {
-            if (! empty($step['pictogram_path'])) {
+        // Every step of every seeded exercise ships its own pictogram.
+        $allSteps = DB::table('system_exercises')->whereNotNull('steps')->pluck('steps', 'slug');
+        foreach ($allSteps as $slug => $steps) {
+            foreach (json_decode($steps, true) as $index => $step) {
+                $this->assertNotEmpty($step['pictogram_path'] ?? null, "exercise {$slug} step {$index} has no pictogram");
                 $this->assertTrue(File::exists(public_path($step['pictogram_path'])), "missing step pictogram: {$step['pictogram_path']}");
             }
         }
