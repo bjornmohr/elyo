@@ -115,6 +115,22 @@ For every task, report:
 5. Open questions
 6. Intentional deviations, if any
 
+For feature development, extensions, or relevant behavior changes, include:
+
+```md
+## Tests & Validation
+
+- Test-first applied: yes/no
+- Tests added/updated:
+  - ...
+- ACs covered by tests:
+  - ...
+- Validation commands executed:
+  - ...
+- Known gaps / intentionally not tested:
+  - ...
+```
+
 ## Review Expectations
 
 Before considering a task done, check:
@@ -126,6 +142,58 @@ Before considering a task done, check:
 - Are tests included for changed backend behavior?
 - Does Angular still build?
 - Is OpenAPI updated if API behavior changed?
+
+## Test-First Development Workflow
+
+For every new feature, extension, new endpoint, UI flow, business rule, aggregation, permission rule, validation, or relevant bugfix with reproducible behavior, a test-first workflow is required before implementation.
+
+Allowed exceptions are limited to:
+- Documentation-only changes.
+- Styling-only changes without logic or behavior changes.
+- Refactorings with no behavior change.
+- Technical spikes.
+
+Every exception must be explicitly justified in the plan, handoff, or final response.
+
+Required workflow:
+
+1. Read the task and acceptance criteria.
+2. Summarize the desired functional behavior.
+3. Derive test cases from the desired behavior and acceptance criteria.
+4. Inspect existing tests and decide whether to extend existing tests, add new tests, or intentionally skip tests with justification.
+5. Implement tests before the production implementation.
+6. Run the tests and confirm that they fail as expected before implementation, or at minimum that they do not yet fully cover the new behavior.
+7. Implement the change.
+8. Re-run the new and relevant existing tests repeatedly during development.
+9. Run the appropriate final test suites, static checks, build commands, and validation commands.
+10. Document in the handoff which tests were added or changed, which acceptance criteria they cover, which validations were executed, and any intentionally untested areas.
+
+Tests must be derived from:
+- Task description.
+- Acceptance criteria.
+- Domain rules.
+- API contract and OpenAPI where relevant.
+- UI expectations and user journeys.
+- Role, scope, security, and privacy requirements.
+- Relevant edge cases and error cases.
+
+If acceptance criteria are missing or unclear, the agent must formulate reasonable, testable assumptions before implementation and document them in the plan or handoff.
+
+Tests are the primary development validation loop, not only a final check. If a test fails after implementation begins, do not simply change the test to match the current implementation. First determine whether the implementation is wrong, the test is wrong, or the acceptance criteria need clarification. Any test changes after implementation begins must be justified, especially when they change the functional expectation.
+
+Test quality requirements:
+- Tests must verify observable behavior, not private implementation details.
+- Tests must cover relevant success cases, error cases, permissions, scoping, validation, and boundaries.
+- Tests must be deterministic.
+- Tests must avoid unnecessary sleeps, uncontrolled random data, and fragile selectors.
+- Tests must use clear names that express the functional expectation.
+- API changes require tests for HTTP status, response shape, and relevant error cases.
+- UI changes require tests for relevant user interactions, visible states, and error messages where the repo has a suitable UI test layer.
+- Privacy, role, company/team scoping, and authorization changes require negative tests proving that foreign or unauthorized data is not visible or mutable.
+
+The existing codebase may be used for orientation, but it is not the sole source of truth. If existing behavior conflicts with the acceptance criteria, tests must encode the acceptance criteria and the conflict must be documented in the plan or handoff. Do not cement legacy behavior without checking it against the requested behavior.
+
+Keep the workflow pragmatic. Small changes need focused tests. Complex features should use multiple levels where appropriate, such as unit, feature/integration, and UI/E2E tests. Do not require isolated tests for every internal helper when a higher-value feature test covers the observable behavior cleanly.
 
 ## Codex Workflow
 
