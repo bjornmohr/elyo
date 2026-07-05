@@ -2,24 +2,98 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { EmployeeService, WellbeingEntry } from '../../services/employee.service';
+import { CheckinDemoStorageService, DemoCheckin } from '../../services/checkin-demo-storage.service';
+import { LOCATIONS, FREQUENT_SYMPTOMS, OTHER_SYMPTOMS } from '../checkin/checkin-state';
 
-interface SummaryCard {
-  label: string;
-  value: string;
-  subline: string;
-}
+type FocusMetric = 'wohlbefinden' | 'energie' | 'stress';
 
-interface DailyCheckInCard {
+/** One slot on the 14-day axis (index 0 = oldest, 13 = today). */
+interface DayCell {
+  index: number;
   date: Date;
   dateKey: string;
+  label: string;
   entry: WellbeingEntry | null;
-  isToday: boolean;
 }
 
-interface DetailRow {
+interface MetricMeta {
+  key: FocusMetric;
+  name: string;
+  color: string;
+  value: (entry: WellbeingEntry) => number | null;
+}
+
+interface MiniCard {
+  key: FocusMetric;
+  name: string;
+  color: string;
+  current: string;
+  avg: string;
+  deltaText: string;
+  deltaGood: boolean;
+  sparkPath: string;
+  active: boolean;
+}
+
+interface ChartPoint {
+  x: number;
+  y: number;
+  r: number;
+  fill: string;
+  dateKey: string;
+}
+
+interface ChartGrid {
+  y: number;
+  ty: number;
   label: string;
-  value: string;
-  hint: string | null;
+}
+
+interface FocusChart {
+  color: string;
+  grids: ChartGrid[];
+  linePath: string;
+  areaPath: string;
+  points: ChartPoint[];
+  xLabels: Array<{ x: number; t: string }>;
+  hasSel: boolean;
+  selX: number;
+  labelY: number;
+}
+
+interface CoreRow {
+  label: string;
+  valText: string;
+  color: string;
+  width: number;
+}
+
+interface SymptomRow {
+  label: string;
+  region: string;
+  sevText: string;
+  color: string;
+  width: number;
+}
+
+interface DayReport {
+  longDate: string;
+  submitted: string;
+  hasLocation: boolean;
+  locIcon: string;
+  locLabel: string;
+  core: CoreRow[];
+  hasSleep: boolean;
+  sleepText: string;
+  sleepRecText: string;
+  sleepWidth: number;
+  sleepEmpty: string;
+  hasSymptoms: boolean;
+  symptoms: SymptomRow[];
+  symptomsEmpty: string;
+  hasNote: boolean;
+  note: string;
+  noteEmpty: string;
 }
 
 @Component({
@@ -27,29 +101,14 @@ interface DetailRow {
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <div class="w-full max-w-[min(100%,76rem)] space-y-7">
-      <header class="flex flex-col gap-4 sm:flex-row sm:items-start">
-        <a routerLink="/employee"
-           aria-label="Zurück zur Übersicht"
-           class="inline-flex min-h-11 min-w-11 items-center justify-center self-start rounded-full p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700">
-          ←
-        </a>
-        <div>
-          <h1 class="text-[30px] font-bold leading-tight text-slate-800">Dein Check-in Verlauf</h1>
-          <p class="mt-2 max-w-2xl text-base leading-relaxed text-slate-500">
-            Sieh dir an, wie sich Wohlbefinden, Energie und Stress über die letzten Tage entwickelt haben.
-          </p>
-        </div>
-      </header>
-
+    <div class="w-full max-w-[min(100%,76rem)]">
       @if (isLoading()) {
-        <section class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-5" aria-label="Verlauf wird geladen">
+        <section class="grid grid-cols-[repeat(3,1fr)] gap-4" aria-label="Verlauf wird geladen">
           @for (item of loadingCards; track item) {
-            <div class="min-h-40 animate-pulse rounded-[20px] border border-slate-100 bg-white p-5">
+            <div class="min-h-40 animate-pulse rounded-[18px] border border-slate-100 bg-white p-[18px]">
               <div class="h-4 w-24 rounded bg-slate-100"></div>
-              <div class="mt-8 h-8 w-20 rounded bg-slate-100"></div>
-              <div class="mt-5 h-4 w-full rounded bg-slate-100"></div>
-              <div class="mt-3 h-4 w-2/3 rounded bg-slate-100"></div>
+              <div class="mt-6 h-8 w-20 rounded bg-slate-100"></div>
+              <div class="mt-5 h-11 w-full rounded bg-slate-100"></div>
             </div>
           }
         </section>
@@ -68,240 +127,334 @@ interface DetailRow {
             Sobald du ein paar Check-ins gemacht hast, siehst du hier deine Entwicklung.
           </p>
           <a routerLink="/employee/checkin"
-             class="mt-6 inline-flex min-h-11 items-center justify-center rounded-2xl bg-teal-600 px-8 py-3 text-base font-bold text-white shadow-lg shadow-teal-100 transition-colors hover:bg-teal-700">
+             class="mt-6 inline-flex min-h-11 items-center justify-center rounded-2xl bg-teal-600 px-8 py-3 text-base font-bold text-white shadow-lg shadow-teal-100 transition-colors hover:bg-teal-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600">
             Check-in starten
           </a>
         </section>
       } @else {
-        <section class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-5" aria-label="Zusammenfassung">
-          @for (card of summaryCards(); track card.label) {
-            <div class="rounded-[20px] border border-slate-100 bg-white p-5">
-              <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ card.label }}</p>
-              <p class="mt-2 text-3xl font-bold leading-tight text-slate-800">{{ card.value }}</p>
-              <p class="mt-2 text-sm leading-relaxed text-slate-500">{{ card.subline }}</p>
-            </div>
+        <!-- 1. Kopfzeile -->
+        <header class="mb-[22px]">
+          <h1 class="text-[28px] font-bold leading-tight text-[#1e293b]" style="font-family:var(--font-display)">Dein Check-in Verlauf</h1>
+          <p class="mt-1 text-[15px] text-[#64748b]">Letzte 14 Tage · Trend wählen, Tag anklicken für alle Details</p>
+        </header>
+
+        <!-- 2. Drei Mini-Trend-Karten -->
+        <section class="mb-[22px] grid grid-cols-1 gap-4 sm:grid-cols-3" aria-label="Trend wählen">
+          @for (card of miniCards(); track card.key) {
+            <button type="button"
+                    (click)="setFocus(card.key)"
+                    [attr.aria-pressed]="card.active"
+                    class="rounded-[18px] bg-white p-[18px] text-left transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                    [style.border]="card.active ? ('2px solid ' + card.color) : '1px solid #f1f5f9'"
+                    [style.boxShadow]="card.active ? '0 6px 18px rgba(0,0,0,.06)' : 'none'">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-[14px] font-semibold text-[#475569]">{{ card.name }}</span>
+                <span class="whitespace-nowrap rounded-full px-2 py-0.5 text-[13px] font-semibold"
+                      [style.color]="card.deltaGood ? '#0f766e' : '#dc2626'"
+                      [style.background]="card.deltaGood ? '#f0fdfa' : '#fef2f2'">{{ card.deltaText }}</span>
+              </div>
+              <div class="my-[10px] flex items-baseline gap-1.5">
+                <span class="text-[34px] font-extrabold leading-none" style="font-family:var(--font-display)" [style.color]="card.color">{{ card.current }}</span>
+                <span class="text-[13px] text-[#94a3b8]">/ 5 · Ø {{ card.avg }}</span>
+              </div>
+              <svg viewBox="0 0 220 44" class="block h-11 w-full" preserveAspectRatio="none" aria-hidden="true">
+                <path [attr.d]="card.sparkPath" fill="none" [attr.stroke]="card.color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </button>
           }
         </section>
 
-        <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
-          <section aria-label="Tägliche Check-ins">
-            <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h2 class="text-xl font-bold text-slate-800">Letzte 14 Tage</h2>
-                <p class="mt-1 text-sm text-slate-500">Wähle einen erledigten Check-in aus, um die Details zu sehen.</p>
+        <!-- 3. Fokus-Kurve -->
+        <p class="mb-3 text-[14px] font-semibold text-[#334155]">{{ focusMetricName() }} über die Zeit</p>
+        <div class="mb-[24px] rounded-[20px] border border-[#f1f5f9] bg-white px-4 pb-2 pt-5">
+          <svg viewBox="0 0 940 220" class="block h-auto w-full overflow-visible" role="img" [attr.aria-label]="focusMetricName() + ' über die letzten 14 Tage'">
+            <defs>
+              <linearGradient [attr.id]="gradientId" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" [attr.stop-color]="focusChart().color" stop-opacity="0.22"></stop>
+                <stop offset="100%" [attr.stop-color]="focusChart().color" stop-opacity="0"></stop>
+              </linearGradient>
+            </defs>
+            @for (g of focusChart().grids; track g.label) {
+              <line x1="0" x2="940" [attr.y1]="g.y" [attr.y2]="g.y" stroke="#f1f5f9" stroke-width="1"></line>
+              <text x="0" [attr.y]="g.ty" font-size="11" fill="#cbd5e1" font-family="DM Sans">{{ g.label }}</text>
+            }
+            @if (focusChart().hasSel) {
+              <line [attr.x1]="focusChart().selX" [attr.x2]="focusChart().selX" y1="0" y2="220" [attr.stroke]="focusChart().color" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"></line>
+            }
+            <path [attr.d]="focusChart().areaPath" [attr.fill]="'url(#' + gradientId + ')'"></path>
+            <path [attr.d]="focusChart().linePath" fill="none" [attr.stroke]="focusChart().color" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
+            @for (p of focusChart().points; track p.dateKey) {
+              <circle [attr.cx]="p.x" [attr.cy]="p.y" [attr.r]="p.r" [attr.fill]="p.fill" [attr.stroke]="focusChart().color" stroke-width="2.5"
+                      role="button" tabindex="0"
+                      [attr.aria-label]="'Tag ' + p.dateKey + ' auswählen'"
+                      class="cursor-pointer outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-600"
+                      (click)="selectDay(p.dateKey)"
+                      (keydown.enter)="selectDay(p.dateKey)"
+                      (keydown.space)="$event.preventDefault(); selectDay(p.dateKey)"></circle>
+            }
+            @for (xl of focusChart().xLabels; track xl.x) {
+              <text [attr.x]="xl.x" [attr.y]="focusChart().labelY" font-size="11" fill="#94a3b8" text-anchor="middle" font-family="DM Sans">{{ xl.t }}</text>
+            }
+          </svg>
+        </div>
+
+        <!-- 4. Tagesreport -->
+        @if (report(); as rep) {
+          <div class="rounded-[20px] border border-[#e5ded3] p-6" style="background:hsl(40,20%,98%)">
+            <div class="mb-5 flex flex-wrap items-center justify-between gap-4">
+              <div class="flex flex-wrap items-baseline gap-3">
+                <h2 class="text-[22px] font-bold text-[#1e293b]" style="font-family:var(--font-display)">{{ rep.longDate }}</h2>
+                <span class="text-[14px] text-[#94a3b8]">{{ rep.submitted }}</span>
               </div>
-            </div>
-
-            <div class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-5">
-              @for (card of checkInCards(); track card.dateKey) {
-                <button type="button"
-                        [disabled]="!card.entry"
-                        [attr.aria-pressed]="card.entry ? isSelected(card.entry) : null"
-                        (click)="card.entry && selectCheckIn(card.entry)"
-                        class="group min-h-[15rem] rounded-[20px] border p-5 text-left transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 disabled:cursor-default"
-                        [ngClass]="cardClass(card)">
-                  <div class="flex items-start justify-between gap-4">
-                    <div>
-                      <p class="text-sm font-bold uppercase tracking-wide text-slate-500">{{ formatWeekday(card.date) }}</p>
-                      <p class="mt-1 text-lg font-bold text-slate-800">{{ formatDateLabel(card.date) }}</p>
-                    </div>
-                    <span class="rounded-full px-3 py-1.5 text-sm font-semibold" [ngClass]="statusClass(card)">
-                      {{ statusLabel(card) }}
-                    </span>
-                  </div>
-
-                  @if (card.entry; as entry) {
-                    <div class="mt-6">
-                      <div class="flex items-baseline gap-2">
-                        <span class="text-[34px] font-black leading-none" [ngClass]="scoreTextClass(entry.score)">
-                          {{ formatScore(entry.score) }}
-                        </span>
-                        <span class="text-base font-semibold text-slate-500">/ 5</span>
-                      </div>
-                      <p class="mt-2 text-sm text-slate-500">Wohlbefinden</p>
-                    </div>
-
-                    <div class="mt-5 flex flex-wrap gap-2">
-                      @for (pill of metricPills(entry); track pill.label) {
-                        <span class="rounded-full bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-700">
-                          {{ pill.label }} {{ pill.value }}
-                        </span>
-                      }
-                    </div>
-
-                    <div class="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
-                      @if (entry.notes) {
-                        <span class="rounded-full bg-teal-50 px-3 py-1.5 text-sm font-semibold text-teal-700">Notiz vorhanden</span>
-                      }
-                      @if (isSelected(entry)) {
-                        <span class="rounded-full bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white">Ausgewählt</span>
-                      }
-                    </div>
-                  } @else {
-                    <div class="mt-6">
-                      <p class="text-2xl font-bold text-slate-700">Kein Check-in</p>
-                      <p class="mt-2 text-sm leading-relaxed text-slate-500">
-                        {{ card.isToday ? 'Du kannst heute noch einchecken.' : 'Noch keine Daten für diesen Tag.' }}
-                      </p>
-                    </div>
-                  }
-                </button>
+              @if (rep.hasLocation) {
+                <span class="inline-flex items-center gap-2 rounded-full border border-[#f1f5f9] bg-white px-3 py-[5px] text-[14px] font-semibold text-[#334155]">
+                  {{ rep.locIcon }} {{ rep.locLabel }}
+                </span>
               }
             </div>
-          </section>
 
-          <aside class="rounded-[24px] border border-slate-100 bg-white p-6 lg:sticky lg:top-6" aria-label="Check-in Details">
-            @if (selectedEntry(); as selected) {
-              <div class="flex items-start justify-between gap-4">
-                <div>
-                  <p class="text-sm font-semibold uppercase tracking-wide text-teal-700">Ausgewählter Tag</p>
-                  <h2 class="mt-1 text-xl font-bold text-slate-800">{{ formatLongDate(selected.createdAt) }}</h2>
-                  <p class="mt-1 text-sm text-slate-500">{{ formatSubmittedTime(selected) }}</p>
-                </div>
-                <button type="button"
-                        (click)="closeSelectedCheckIn()"
-                        aria-label="Details schließen"
-                        class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600">
-                  ×
-                </button>
-              </div>
-
-              <div class="mt-6 rounded-[20px] bg-slate-50 p-5">
-                <p class="text-sm font-semibold text-slate-500">Wohlbefinden</p>
-                <div class="mt-2 flex items-baseline gap-2">
-                  <span class="text-[38px] font-black leading-none" [ngClass]="scoreTextClass(selected.score)">
-                    {{ formatScore(selected.score) }}
-                  </span>
-                  <span class="text-base font-semibold text-slate-500">/ 5</span>
-                </div>
-              </div>
-
-              <div class="mt-5 space-y-3">
-                @for (row of selectedDetailRows(); track row.label) {
-                  <div class="rounded-2xl border border-slate-100 p-4">
-                    <div class="flex items-start justify-between gap-4">
-                      <span class="text-sm font-semibold text-slate-500">{{ row.label }}</span>
-                      <span class="text-base font-bold text-slate-800">{{ row.value }}</span>
+            <div class="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4">
+              <!-- Kernwerte -->
+              <div class="rounded-[16px] border border-[#f1f5f9] bg-white p-[18px]">
+                <p class="mb-[14px] text-[13px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Kernwerte</p>
+                <div class="flex flex-col gap-[14px]">
+                  @for (m of rep.core; track m.label) {
+                    <div>
+                      <div class="mb-1.5 flex items-baseline justify-between">
+                        <span class="text-[14px] font-semibold text-[#475569]">{{ m.label }}</span>
+                        <span class="text-[13px] text-[#94a3b8]">{{ m.valText }}</span>
+                      </div>
+                      <div class="h-2 overflow-hidden rounded-full bg-[#f1f5f9]">
+                        <div class="h-full rounded-full" [style.width.%]="m.width" [style.background]="m.color"></div>
+                      </div>
                     </div>
-                    @if (row.hint) {
-                      <p class="mt-1 text-sm text-slate-500">{{ row.hint }}</p>
-                    }
+                  }
+                </div>
+              </div>
+
+              <!-- Schlaf & Erholung -->
+              <div class="rounded-[16px] border border-[#f1f5f9] bg-white p-[18px]">
+                <p class="mb-[14px] text-[13px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Schlaf &amp; Erholung</p>
+                @if (rep.hasSleep) {
+                  <p class="mb-1 text-[20px] font-bold text-[#0891b2]" style="font-family:var(--font-display)">{{ rep.sleepText }}</p>
+                  <div class="mb-1.5 mt-3 flex items-baseline justify-between">
+                    <span class="text-[14px] font-semibold text-[#475569]">Erholung</span>
+                    <span class="text-[13px] text-[#94a3b8]">{{ rep.sleepRecText }}</span>
                   </div>
+                  <div class="h-2 overflow-hidden rounded-full bg-[#f1f5f9]">
+                    <div class="h-full rounded-full bg-[#0891b2]" [style.width.%]="rep.sleepWidth"></div>
+                  </div>
+                } @else {
+                  <p class="text-[14px] leading-relaxed text-[#cbd5e1]">{{ rep.sleepEmpty }}</p>
                 }
               </div>
 
-              @if (selected.notes) {
-                <div class="mt-5 rounded-2xl border border-teal-100 bg-teal-50 p-4">
-                  <p class="text-sm font-semibold text-teal-700">Notiz</p>
-                  <p class="mt-2 text-sm leading-relaxed text-slate-700">"{{ selected.notes }}"</p>
-                </div>
-              }
-
-              @if (hasPartialDetails(selected)) {
-                <p class="mt-5 rounded-2xl bg-amber-50 p-4 text-sm leading-relaxed text-amber-800">
-                  Für diesen Check-in sind noch nicht alle Detailwerte verfügbar.
-                </p>
-              }
-            } @else {
-              <div class="rounded-[20px] bg-slate-50 p-5">
-                <h2 class="text-lg font-bold text-slate-800">Details ansehen</h2>
-                <p class="mt-2 text-sm leading-relaxed text-slate-500">
-                  Klicke auf eine Check-in Karte, um die für diesen Tag eingetragenen Werte klar zu sehen.
-                </p>
+              <!-- Körpersignale -->
+              <div class="rounded-[16px] border border-[#f1f5f9] bg-white p-[18px]">
+                <p class="mb-[14px] text-[13px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Körpersignale</p>
+                @if (rep.hasSymptoms) {
+                  <div class="flex flex-col gap-[14px]">
+                    @for (s of rep.symptoms; track s.label) {
+                      <div>
+                        <div class="mb-0.5 flex items-baseline justify-between">
+                          <span class="text-[14px] font-semibold text-[#334155]">{{ s.label }}</span>
+                          <span class="text-[13px] text-[#94a3b8]">{{ s.sevText }}</span>
+                        </div>
+                        <p class="mb-1.5 text-[13px] text-[#94a3b8]">{{ s.region }}</p>
+                        <div class="h-2 overflow-hidden rounded-full bg-[#f1f5f9]">
+                          <div class="h-full rounded-full" [style.width.%]="s.width" [style.background]="s.color"></div>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                } @else {
+                  <p class="text-[14px] leading-relaxed text-[#cbd5e1]">{{ rep.symptomsEmpty }}</p>
+                }
               </div>
-            }
-          </aside>
-        </div>
+
+              <!-- Notiz -->
+              <div class="col-[1/-1] rounded-[16px] border border-[#f1f5f9] bg-white p-[18px]">
+                <p class="mb-2.5 text-[13px] font-bold uppercase tracking-[0.04em] text-[#94a3b8]">Notiz</p>
+                @if (rep.hasNote) {
+                  <p class="text-[15px] italic leading-relaxed text-[#334155]">{{ rep.note }}</p>
+                } @else {
+                  <p class="text-[14px] leading-relaxed text-[#cbd5e1]">{{ rep.noteEmpty }}</p>
+                }
+              </div>
+            </div>
+          </div>
+        }
       }
     </div>
   `
 })
 export class HistoryComponent implements OnInit {
   private employeeService = inject(EmployeeService);
+  private demoStorage = inject(CheckinDemoStorageService);
 
   entries = signal<WellbeingEntry[]>([]);
   isLoading = signal(true);
   loadError = signal(false);
-  selectedEntry = signal<WellbeingEntry | null>(null);
+  focusMetric = signal<FocusMetric>('wohlbefinden');
+  selectedDay = signal<string | null>(null);
 
-  readonly loadingCards = [1, 2, 3, 4, 5, 6];
+  readonly loadingCards = [1, 2, 3];
+  readonly gradientId = 'history-focus-gradient';
 
   private readonly dayCount = 14;
   private readonly today = new Date();
 
-  sortedEntries = computed(() =>
-    [...this.entries()].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  private readonly metrics: Record<FocusMetric, MetricMeta> = {
+    wohlbefinden: { key: 'wohlbefinden', name: 'Wohlbefinden', color: '#0d9488', value: e => e.score },
+    energie: { key: 'energie', name: 'Energie', color: '#4f46e5', value: e => e.energy },
+    stress: { key: 'stress', name: 'Stress', color: '#e11d48', value: e => e.stress },
+  };
+
+  private readonly locationMap = new Map(LOCATIONS.map(l => [l.value, l]));
+  private readonly symptomLabels = new Map(
+    [...FREQUENT_SYMPTOMS, ...OTHER_SYMPTOMS].map(s => [s.key, s.label])
   );
 
-  summaryCards = computed<SummaryCard[]>(() => {
-    const entries = this.entries();
-    const scores = entries.map(entry => entry.score).filter(score => Number.isFinite(score));
-    const cards: SummaryCard[] = [];
-
-    cards.push({
-      label: 'Ø Wohlbefinden',
-      value: scores.length ? `${this.formatScore(this.average(scores))} / 5` : 'Noch nicht genug Daten',
-      subline: scores.length ? `berechnet aus ${scores.length} Check-ins` : 'Sobald Werte vorliegen, erscheint hier dein Schnitt.',
-    });
-
-    cards.push({
-      label: 'Check-ins diese Woche',
-      value: `${this.entriesThisWeek(entries)}`,
-      subline: 'seit Montag erfasst',
-    });
-
-    const stressEntries = entries.filter(entry => entry.stress !== null);
-    if (stressEntries.length) {
-      cards.push({
-        label: 'Stress-Tage',
-        value: `${stressEntries.filter(entry => (entry.stress ?? 0) >= 4).length}`,
-        subline: 'Tage mit Stresswert ab 4 / 5',
-      });
-    }
-
-    // TODO: Add "Häufigstes Körpersignal" when the history API exposes body signals per day.
-    return cards;
-  });
-
-  checkInCards = computed<DailyCheckInCard[]>(() => {
-    const entriesByDay = new Map<string, WellbeingEntry>();
-    for (const entry of this.sortedEntries()) {
+  /** 14-day window, oldest → newest, entry attached where a check-in exists. */
+  days = computed<DayCell[]>(() => {
+    const byDay = new Map<string, WellbeingEntry>();
+    for (const entry of this.entries()) {
       const key = this.dateKey(entry.createdAt);
-      if (key && !entriesByDay.has(key)) {
-        entriesByDay.set(key, entry);
+      const existing = byDay.get(key);
+      // Keep the most recent entry per calendar day.
+      if (key && (!existing || new Date(entry.createdAt) > new Date(existing.createdAt))) {
+        byDay.set(key, entry);
       }
     }
 
+    const start = this.addDays(this.startOfDay(this.today), -(this.dayCount - 1));
     return Array.from({ length: this.dayCount }, (_, index) => {
-      const date = this.addDays(this.startOfDay(this.today), -index);
+      const date = this.addDays(start, index);
       const dateKey = this.dateKey(date);
+      return { index, date, dateKey, label: this.formatDateLabel(date), entry: byDay.get(dateKey) ?? null };
+    });
+  });
 
+  focusMetricName = computed(() => this.metrics[this.focusMetric()].name);
+
+  miniCards = computed<MiniCard[]>(() => {
+    const days = this.days();
+    return (['wohlbefinden', 'energie', 'stress'] as FocusMetric[]).map(key => {
+      const meta = this.metrics[key];
+      const points = days.filter(d => d.entry && this.metricValue(d.entry, key) !== null);
+      const values = points.map(d => this.metricValue(d.entry as WellbeingEntry, key) as number);
+      const current = values.length ? values[values.length - 1] : 0;
+      const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+      const delta = this.deltaFor(key);
       return {
-        date,
-        dateKey,
-        entry: entriesByDay.get(dateKey) ?? null,
-        isToday: index === 0,
+        key,
+        name: meta.name,
+        color: meta.color,
+        current: this.fmt(current),
+        avg: this.fmt(avg),
+        deltaText: delta.text,
+        deltaGood: delta.good,
+        sparkPath: this.buildSparkPath(key),
+        active: key === this.focusMetric(),
       };
     });
   });
 
-  selectedDetailRows = computed<DetailRow[]>(() => {
-    const entry = this.selectedEntry();
-    if (!entry) return [];
+  focusChart = computed<FocusChart>(() => {
+    const key = this.focusMetric();
+    const meta = this.metrics[key];
+    const days = this.days();
+    const W = 940, H = 220, padT = 14, padB = 26, padL = 22, padR = 6;
+    const innerW = W - padL - padR, innerH = H - padT - padB;
+    const N = this.dayCount;
+    const x = (i: number) => +(padL + (i / (N - 1)) * innerW).toFixed(1);
+    const y = (v: number) => +(padT + (1 - (v - 1) / 4) * innerH).toFixed(1);
+    const baseY = +(padT + innerH).toFixed(1);
+    const selected = this.selectedDay();
 
-    const rows: DetailRow[] = [];
-    if (entry.mood !== null) {
-      rows.push({ label: 'Stimmung', value: `${entry.mood} / 5`, hint: this.getMoodLabel(entry.mood) });
-    }
-    if (entry.energy !== null) {
-      rows.push({ label: 'Energie', value: `${entry.energy} / 5`, hint: this.getEnergyLabel(entry.energy) });
-    }
-    if (entry.stress !== null) {
-      rows.push({ label: 'Stress', value: `${entry.stress} / 5`, hint: this.getStressLabel(entry.stress) });
+    const grids: ChartGrid[] = [1, 2, 3, 4, 5].map(v => ({ y: y(v), ty: y(v) + 3, label: String(v) }));
+
+    const points: ChartPoint[] = days
+      .filter(d => d.entry && this.metricValue(d.entry, key) !== null)
+      .map(d => {
+        const v = this.metricValue(d.entry as WellbeingEntry, key) as number;
+        const sel = d.dateKey === selected;
+        return { x: x(d.index), y: y(v), r: sel ? 6 : 4, fill: sel ? meta.color : '#ffffff', dateKey: d.dateKey };
+      });
+
+    let linePath = '';
+    points.forEach((p, k) => { linePath += (k === 0 ? 'M' : 'L') + p.x + ',' + p.y + ' '; });
+
+    let areaPath = '';
+    if (points.length) {
+      areaPath = 'M' + points[0].x + ',' + baseY + ' ';
+      points.forEach(p => { areaPath += 'L' + p.x + ',' + p.y + ' '; });
+      areaPath += 'L' + points[points.length - 1].x + ',' + baseY + ' Z';
     }
 
-    // TODO: Add Schlaf / Erholung and Körpersignale when those fields are available in history entries.
-    return rows;
+    const xLabels = days.filter(d => d.index % 3 === 0).map(d => ({ x: x(d.index), t: d.label }));
+    const selDay = days.find(d => d.dateKey === selected && d.entry);
+
+    return {
+      color: meta.color,
+      grids,
+      linePath: linePath.trim(),
+      areaPath,
+      points,
+      xLabels,
+      hasSel: !!selDay,
+      selX: selDay ? x(selDay.index) : 0,
+      labelY: H - 6,
+    };
+  });
+
+  report = computed<DayReport | null>(() => {
+    const key = this.selectedDay();
+    if (!key) return null;
+    const day = this.days().find(d => d.dateKey === key);
+    const entry = day?.entry ?? null;
+    if (!entry) return null;
+
+    const demo = this.demoStorage.load(key);
+    const loc = demo ? this.locationMap.get(demo.location) : undefined;
+
+    const mood = demo ? demo.mood : entry.mood;
+    const energy = demo ? demo.energy : entry.energy;
+    const stress = demo ? demo.stress : entry.stress;
+
+    const core: CoreRow[] = [
+      this.coreRow('Stimmung', mood, this.getMoodLabel, '#0d9488'),
+      this.coreRow('Energie', energy, this.getEnergyLabel, '#4f46e5'),
+      this.coreRow('Stress', stress, this.getStressLabel, '#e11d48'),
+    ];
+
+    const symptoms: SymptomRow[] = (demo?.symptoms ?? []).map(s => ({
+      label: this.symptomLabels.get(s.key) ?? s.key,
+      region: s.region,
+      sevText: `Stärke ${s.severity}/5`,
+      color: this.severityColor(s.severity),
+      width: (s.severity / 5) * 100,
+    }));
+
+    return {
+      longDate: this.formatLongDate(entry.createdAt),
+      submitted: this.formatSubmittedTime(entry),
+      hasLocation: !!loc,
+      locIcon: loc?.icon ?? '',
+      locLabel: loc?.label ?? '',
+      core,
+      hasSleep: !!demo?.sleep,
+      sleepText: demo?.sleep ? `${this.fmt(demo.sleep.hours)} h geschlafen` : '',
+      sleepRecText: demo?.sleep ? `Erholung ${demo.sleep.recovery}/5` : '',
+      sleepWidth: demo?.sleep ? (demo.sleep.recovery / 5) * 100 : 0,
+      sleepEmpty: 'Nur bei niedriger Energie abgefragt — an diesem Tag nicht erfasst.',
+      hasSymptoms: symptoms.length > 0,
+      symptoms,
+      symptomsEmpty: 'Keine Körpersignale gemeldet.',
+      hasNote: !!entry.notes,
+      note: entry.notes ? `„${entry.notes}"` : '',
+      noteEmpty: 'Keine Notiz hinterlegt.',
+    };
   });
 
   ngOnInit() {
@@ -309,6 +462,7 @@ export class HistoryComponent implements OnInit {
       next: entries => {
         this.entries.set(entries);
         this.loadError.set(false);
+        this.selectedDay.set(this.latestDayKey(entries));
       },
       error: () => {
         this.loadError.set(true);
@@ -321,73 +475,81 @@ export class HistoryComponent implements OnInit {
     });
   }
 
-  selectCheckIn(entry: WellbeingEntry): void {
-    this.selectedEntry.set(entry);
+  setFocus(metric: FocusMetric): void {
+    this.focusMetric.set(metric);
   }
 
-  closeSelectedCheckIn(): void {
-    this.selectedEntry.set(null);
+  selectDay(dateKey: string): void {
+    this.selectedDay.set(dateKey);
   }
 
-  isSelected(entry: WellbeingEntry): boolean {
-    return this.selectedEntry()?.id === entry.id;
+  // ── Metric helpers ──
+
+  private metricValue(entry: WellbeingEntry, key: FocusMetric): number | null {
+    const v = this.metrics[key].value(entry);
+    return v !== null && Number.isFinite(v) ? v : null;
   }
 
-  cardClass(card: DailyCheckInCard): string {
-    if (!card.entry) {
-      return 'border-dashed border-slate-200 bg-slate-50 text-slate-500';
+  /** Ø(this week: newest 7 days) − Ø(previous 7 days) on the 14-day axis. */
+  private deltaFor(key: FocusMetric): { good: boolean; text: string } {
+    const days = this.days();
+    const valuesIn = (from: number, to: number) =>
+      days.filter(d => d.index >= from && d.index <= to && d.entry && this.metricValue(d.entry, key) !== null)
+        .map(d => this.metricValue(d.entry as WellbeingEntry, key) as number);
+
+    const thisW = valuesIn(7, 13);
+    const lastW = valuesIn(0, 6);
+    const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+
+    if (!thisW.length || !lastW.length) {
+      return { good: true, text: '▬ ±0,0' };
     }
 
-    if (this.isSelected(card.entry)) {
-      return 'border-slate-900 bg-white shadow-sm ring-2 ring-slate-900';
-    }
-
-    return 'border-slate-100 bg-white hover:border-teal-200 hover:shadow-sm';
+    const delta = avg(thisW) - avg(lastW);
+    const good = key === 'stress' ? delta < 0 : delta > 0;
+    const arrow = delta > 0.05 ? '▲' : delta < -0.05 ? '▼' : '▬';
+    const sign = delta >= 0 ? '+' : '−';
+    return { good, text: `${arrow} ${sign}${this.fmt(Math.abs(delta))}` };
   }
 
-  statusLabel(card: DailyCheckInCard): string {
-    if (card.entry) return 'Erledigt';
-    return card.isToday ? 'Heute offen' : 'Fehlt';
+  private buildSparkPath(key: FocusMetric): string {
+    const W = 220, H = 44, pad = 4, maxI = this.dayCount - 1;
+    const x = (i: number) => +((i / maxI) * W).toFixed(1);
+    const y = (v: number) => +(pad + (1 - (v - 1) / 4) * (H - pad * 2)).toFixed(1);
+    const points = this.days().filter(d => d.entry && this.metricValue(d.entry, key) !== null);
+    let path = '';
+    points.forEach((d, k) => {
+      const v = this.metricValue(d.entry as WellbeingEntry, key) as number;
+      path += (k === 0 ? 'M' : 'L') + x(d.index) + ',' + y(v) + ' ';
+    });
+    return path.trim();
   }
 
-  statusClass(card: DailyCheckInCard): string {
-    if (card.entry) return 'bg-teal-50 text-teal-700';
-    if (card.isToday) return 'bg-amber-50 text-amber-700';
-    return 'bg-slate-100 text-slate-600';
+  private coreRow(label: string, value: number | null, labelFn: (v: number) => string, color: string): CoreRow {
+    const valid = value !== null && Number.isFinite(value);
+    return {
+      label,
+      color,
+      valText: valid ? `${value} / 5 · ${labelFn.call(this, value as number)}` : 'nicht erfasst',
+      width: valid ? ((value as number) / 5) * 100 : 0,
+    };
   }
 
-  scoreTextClass(score: number): string {
-    if (score >= 4) return 'text-teal-600';
-    if (score >= 3) return 'text-emerald-700';
-    if (score >= 2.5) return 'text-amber-600';
-    return 'text-red-600';
+  private severityColor(v: number): string {
+    return v >= 4 ? '#dc2626' : v >= 3 ? '#d97706' : '#f59e0b';
   }
 
-  metricPills(entry: WellbeingEntry): Array<{ label: string; value: string }> {
-    const pills: Array<{ label: string; value: string }> = [];
-    if (entry.mood !== null) pills.push({ label: 'Stimmung', value: this.getMoodLabel(entry.mood) });
-    if (entry.energy !== null) pills.push({ label: 'Energie', value: this.getEnergyLabel(entry.energy) });
-    if (entry.stress !== null) pills.push({ label: 'Stress', value: this.getStressLabel(entry.stress) });
-    return pills;
+  // ── Formatting ──
+
+  private fmt(value: number): string {
+    return value.toFixed(1).replace('.', ',');
   }
 
-  hasPartialDetails(entry: WellbeingEntry): boolean {
-    return entry.mood === null || entry.energy === null || entry.stress === null;
-  }
-
-  formatScore(score: number): string {
-    return score.toFixed(1).replace('.', ',');
-  }
-
-  formatWeekday(date: Date): string {
-    return new Intl.DateTimeFormat('de-DE', { weekday: 'short' }).format(date);
-  }
-
-  formatDateLabel(date: Date): string {
+  private formatDateLabel(date: Date): string {
     return new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' }).format(date);
   }
 
-  formatLongDate(value: string | Date): string {
+  private formatLongDate(value: string | Date): string {
     return new Intl.DateTimeFormat('de-DE', {
       weekday: 'long',
       day: 'numeric',
@@ -396,7 +558,7 @@ export class HistoryComponent implements OnInit {
     }).format(new Date(value));
   }
 
-  formatSubmittedTime(entry: WellbeingEntry): string {
+  private formatSubmittedTime(entry: WellbeingEntry): string {
     const time = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(new Date(entry.createdAt));
     return `Eingetragen um ${time} Uhr`;
   }
@@ -419,24 +581,14 @@ export class HistoryComponent implements OnInit {
     return 'niedrig';
   }
 
-  private entriesThisWeek(entries: WellbeingEntry[]): number {
-    const weekStart = this.startOfWeek(this.today);
-    const todayEnd = this.addDays(this.startOfDay(this.today), 1);
+  // ── Date utilities ──
 
-    return entries.filter(entry => {
-      const date = new Date(entry.createdAt);
-      return date >= weekStart && date < todayEnd;
-    }).length;
-  }
-
-  private average(values: number[]): number {
-    return values.reduce((sum, value) => sum + value, 0) / values.length;
-  }
-
-  private startOfWeek(date: Date): Date {
-    const day = date.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    return this.addDays(this.startOfDay(date), diff);
+  private latestDayKey(entries: WellbeingEntry[]): string | null {
+    let latest: WellbeingEntry | null = null;
+    for (const entry of entries) {
+      if (!latest || new Date(entry.createdAt) > new Date(latest.createdAt)) latest = entry;
+    }
+    return latest ? this.dateKey(latest.createdAt) : null;
   }
 
   private startOfDay(date: Date): Date {
