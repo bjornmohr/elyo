@@ -17,6 +17,7 @@
       "badge": "Größter Hebel",
       "reason": "Deine Energie hängt diese Woche klar an kurzen Nächten (Ø 6,5 h). 30 Minuten früher ins Bett bringt am meisten.",
       "expected": "Erwartet: Energie ↑",
+      "category": "SLEEP",
       "measureSlug": "abend-routine-schlaf"
     },
     {
@@ -24,6 +25,7 @@
       "badge": "Läuft gut",
       "reason": "3× Nackenschmerzen gemeldet. Deine Mobilitäts-Übung zeigt Wirkung — dranbleiben.",
       "expected": "Schmerz 6 → 3 ↓",
+      "category": "MOBILITY",
       "measureSlug": "nacken-mobilitaet"
     },
     {
@@ -31,6 +33,7 @@
       "badge": "Neu für dich",
       "reason": "Stress ist diese Woche dein schwächster Wert. An angespannten Tagen hilft eine kurze Atem-Balance.",
       "expected": "Erwartet: Stress ↓",
+      "category": "BREATHING",
       "measureSlug": "atem-balance"
     }
   ]

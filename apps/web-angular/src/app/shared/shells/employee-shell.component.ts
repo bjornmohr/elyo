@@ -10,11 +10,14 @@ import { NotificationBannerComponent } from '../notifications/notification-banne
   template: `
     <div class="min-h-screen flex" style="background: hsl(40, 20%, 97%)">
       <aside class="w-64 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col">
-        <div class="p-6 flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background: linear-gradient(135deg, #14b8a6, #0d9488)">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2C8 2 3 5.5 3 9a5 5 0 0010 0C13 5.5 8 2 8 2z" fill="white" fill-opacity="0.9"/><path d="M8 6v4M6 8h4" stroke="#0a4540" stroke-width="1.5" stroke-linecap="round"/></svg>
-          </div>
-          <span class="text-gray-900 text-lg font-semibold" style="font-family: 'Fraunces', Georgia, serif">Elyo</span>
+        <div class="p-6">
+          <svg viewBox="0 0 300 100" height="30" fill="none" stroke="#33404E" stroke-width="16"
+               stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="ELYO">
+            <path d="M8 8V92 M8 8H48 M8 50H42 M8 92H48"/>
+            <path d="M78 8V92 M78 92H112"/>
+            <path d="M140 8L166 50 M192 8L166 50 M166 50V92"/>
+            <circle cx="250" cy="50" r="38"/>
+          </svg>
         </div>
         <nav class="flex-1 px-3 space-y-1">
           <a routerLink="/employee/dashboard" routerLinkActive="bg-teal-50 text-teal-700" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">

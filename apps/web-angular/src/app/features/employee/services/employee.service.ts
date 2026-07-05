@@ -44,6 +44,7 @@ export interface DashboardLever {
   badge: string;
   reason: string;
   expected: string;
+  category: string | null;
   measureId: number;
 }
 

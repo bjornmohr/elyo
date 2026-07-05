@@ -116,6 +116,7 @@ class EmployeeDashboardTest extends TestCase
         $this->assertCount(1, $levers);
         $this->assertSame('Schlaf stabilisieren', $levers[0]['title']);
         $this->assertSame($measure->id, $levers[0]['measureId']);
+        $this->assertSame('SLEEP', $levers[0]['category']);
         $this->assertArrayNotHasKey('measureSlug', $levers[0]);
     }
 

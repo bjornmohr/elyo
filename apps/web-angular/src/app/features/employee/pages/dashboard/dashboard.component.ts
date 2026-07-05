@@ -1,8 +1,10 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { CheckinDemoStorageService } from '../../services/checkin-demo-storage.service';
 import { DashboardData, EmployeeService, MetricAggregate } from '../../services/employee.service';
+import { categoryIcon } from '../../shared/measure-category-icons';
 
 /**
  * 1a — weekly trend dashboard: hero score, four metric tiles, body signals,
@@ -120,23 +122,35 @@ import { DashboardData, EmployeeService, MetricAggregate } from '../../services/
         </div>
       }
 
-      @if (data()?.levers; as levers) {
+      @if (leverCards(); as levers) {
         @if (levers.length > 0) {
-          <div class="bg-white rounded-2xl border border-slate-100 p-6">
+          <div>
             <div class="flex items-center justify-between mb-4">
-              <h3 class="text-xs font-bold tracking-wide uppercase text-teal-700">Deine Hebel</h3>
-              <a routerLink="/employee/measures" class="text-xs font-semibold text-teal-600 hover:text-teal-700">Alle Maßnahmen →</a>
+              <div class="flex items-center gap-2.5">
+                <h3 class="text-base font-bold text-slate-800">Deine Hebel für diese Woche</h3>
+                <span class="rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-700">aus deinen Check-ins</span>
+              </div>
+              <a routerLink="/employee/measures" class="text-xs font-semibold text-teal-600 hover:text-teal-700 whitespace-nowrap">Alle Maßnahmen →</a>
             </div>
-            <div class="space-y-3">
+            <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
               @for (lever of levers; track lever.title) {
                 <a [routerLink]="['/employee/measures', lever.measureId]"
-                   class="block rounded-xl border border-slate-100 p-4 hover:border-teal-200 transition-colors">
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm font-semibold text-slate-800">{{ lever.title }}</span>
-                    <span class="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-bold text-teal-700">{{ lever.badge }}</span>
+                   class="group flex flex-col rounded-2xl border border-slate-100 bg-white p-5 hover:border-teal-200 hover:shadow-sm transition-all">
+                  <div class="flex items-center justify-between mb-3">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl" [style.background]="lever.icon.bg">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" [attr.stroke]="lever.icon.color"
+                           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                           [innerHTML]="lever.iconSvg"></svg>
+                    </span>
+                    <span class="rounded-full px-2.5 py-1 text-[11px] font-bold"
+                          [style.color]="lever.icon.color" [style.background]="lever.icon.bg">{{ lever.badge }}</span>
                   </div>
-                  <p class="text-xs text-slate-500 mt-1">{{ lever.reason }}</p>
-                  <p class="text-xs font-semibold text-teal-600 mt-1.5">{{ lever.expected }}</p>
+                  <span class="text-sm font-semibold text-slate-800">{{ lever.title }}</span>
+                  <p class="text-xs text-slate-500 leading-relaxed mt-1.5 mb-3">{{ lever.reason }}</p>
+                  <div class="mt-auto flex items-center justify-between">
+                    <span class="text-[11px] font-semibold text-teal-600">{{ lever.expected }}</span>
+                    <span class="text-xs font-semibold text-teal-600 group-hover:text-teal-700">Ansehen →</span>
+                  </div>
                 </a>
               }
             </div>
@@ -149,9 +163,22 @@ import { DashboardData, EmployeeService, MetricAggregate } from '../../services/
 export class DashboardComponent implements OnInit {
   private employeeService = inject(EmployeeService);
   private checkinStorage = inject(CheckinDemoStorageService);
+  private sanitizer = inject(DomSanitizer);
 
   data = signal<DashboardData | null>(null);
   today = new Date();
+
+  /** Levers enriched with their category icon + pre-sanitised glyph markup. */
+  leverCards = computed(() =>
+    (this.data()?.levers ?? []).map(lever => {
+      const icon = categoryIcon(lever.category);
+      return {
+        ...lever,
+        icon,
+        iconSvg: this.sanitizer.bypassSecurityTrustHtml(icon.svg) as SafeHtml,
+      };
+    })
+  );
 
   /** Local demo check-in (Handoff 02) also counts as done — client-side polish only. */
   checkinDone = computed(() =>
