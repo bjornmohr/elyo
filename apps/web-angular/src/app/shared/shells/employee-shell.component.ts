@@ -10,14 +10,8 @@ import { NotificationBannerComponent } from '../notifications/notification-banne
   template: `
     <div class="min-h-screen flex" style="background: hsl(40, 20%, 97%)">
       <aside class="w-64 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col">
-        <div class="p-[26px]">
-          <svg viewBox="0 0 300 100" height="34" fill="none" stroke="#33404E" stroke-width="16"
-               stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="ELYO">
-            <path d="M8 8V92 M8 8H48 M8 50H42 M8 92H48"/>
-            <path d="M78 8V92 M78 92H112"/>
-            <path d="M140 8L166 50 M192 8L166 50 M166 50V92"/>
-            <circle cx="250" cy="50" r="38"/>
-          </svg>
+        <div class="px-[26px] py-7">
+          <img src="assets/brand/elyo-logo.png" alt="ELYO" class="h-auto w-32 object-contain" />
         </div>
         <nav class="flex-1 px-3 space-y-[5px]">
           <a routerLink="/employee/dashboard" routerLinkActive="bg-teal-50 text-teal-700" class="flex items-center gap-3 px-3.5 py-[11px] rounded-[10px] text-[15px] text-gray-600 hover:bg-gray-50 transition-colors">

@@ -12,16 +12,8 @@ import { RouterLink } from '@angular/router';
       <div class="hidden lg:flex flex-col justify-between w-[420px] p-12 flex-shrink-0" style="background: #064e4b">
         <div>
           <!-- Logo -->
-          <div class="flex items-center gap-3 mb-16">
-            <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background: linear-gradient(135deg, #14b8a6, #0d9488)">
-              <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2C8 2 3 5.5 3 9a5 5 0 0010 0C13 5.5 8 2 8 2z" fill="white" fill-opacity="0.9"/>
-                <path d="M8 6v4M6 8h4" stroke="#0a4540" stroke-width="1.5" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <span class="text-white text-xl font-semibold" style="font-family: 'Fraunces', Georgia, serif">
-              Elyo
-            </span>
+          <div class="mb-16 inline-flex rounded-2xl bg-white px-4 py-3">
+            <img src="assets/brand/elyo-logo.png" alt="ELYO" class="h-auto w-32 object-contain" />
           </div>
           <!-- Headline -->
           <div class="space-y-4">
@@ -51,16 +43,8 @@ import { RouterLink } from '@angular/router';
       <div class="flex-1 flex items-center justify-center p-6">
         <div class="w-full max-w-sm">
           <!-- Mobile logo -->
-          <div class="flex items-center gap-3 mb-10 lg:hidden">
-            <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background: linear-gradient(135deg, #14b8a6, #0d9488)">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2C8 2 3 5.5 3 9a5 5 0 0010 0C13 5.5 8 2 8 2z" fill="white" fill-opacity="0.9"/>
-                <path d="M8 6v4M6 8h4" stroke="#0a4540" stroke-width="1.5" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <span class="text-gray-900 text-lg font-semibold" style="font-family: 'Fraunces', Georgia, serif">
-              Elyo
-            </span>
+          <div class="mb-10 lg:hidden">
+            <img src="assets/brand/elyo-logo.png" alt="ELYO" class="h-auto w-32 object-contain" />
           </div>
           <ng-content></ng-content>
         </div>

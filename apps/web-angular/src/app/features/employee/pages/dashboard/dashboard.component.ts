@@ -2,9 +2,17 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
-import { CheckinDemoStorageService } from '../../services/checkin-demo-storage.service';
-import { DashboardData, EmployeeService, MetricAggregate } from '../../services/employee.service';
+import { CheckinDemoStorageService, DemoCheckin } from '../../services/checkin-demo-storage.service';
+import { DashboardData, DashboardLever, EmployeeService, MetricAggregate } from '../../services/employee.service';
 import { categoryIcon } from '../../shared/measure-category-icons';
+
+type LeverSafeModeState = 'paused' | 'gentle' | null;
+
+interface LeverCard extends DashboardLever {
+  icon: ReturnType<typeof categoryIcon>;
+  iconSvg: SafeHtml;
+  safeModeState: LeverSafeModeState;
+}
 
 /**
  * 1a — weekly trend dashboard: hero score, four metric tiles, body signals,
@@ -33,12 +41,12 @@ import { categoryIcon } from '../../shared/measure-category-icons';
         </div>
       </header>
 
-      @if (data()?.healthFlag; as flag) {
-        @if (flag.state === 'caution') {
+      @if (safeModeFlag(); as flag) {
+        @if (shouldShowSafeModeBanner()) {
           <div class="rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4">
             <div class="flex items-center gap-2.5">
               <span class="text-[17px] font-bold leading-tight text-amber-800">{{ flag.label }}</span>
-              <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-amber-700">{{ flag.badge }}</span>
+              <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-amber-700">{{ safeModeBadge(flag.badge) }}</span>
             </div>
             <p class="text-sm text-amber-800 mt-1">{{ flag.note }}</p>
           </div>
@@ -135,7 +143,8 @@ import { categoryIcon } from '../../shared/measure-category-icons';
             <div class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,21.25rem),1fr))] gap-5">
               @for (lever of levers; track lever.title) {
                 <a [routerLink]="['/employee/measures', lever.measureId]"
-                   class="group flex flex-col rounded-[20px] border border-slate-100 bg-white p-6 hover:border-teal-200 hover:shadow-sm transition-all">
+                   class="group flex flex-col rounded-[20px] border p-6 transition-all"
+                   [ngClass]="leverCardClass(lever)">
                   <div class="flex items-center justify-between mb-4">
                     <span class="flex h-12 w-12 items-center justify-center rounded-[14px]" [style.background]="lever.icon.bg">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" [attr.stroke]="lever.icon.color"
@@ -143,13 +152,25 @@ import { categoryIcon } from '../../shared/measure-category-icons';
                            [innerHTML]="lever.iconSvg"></svg>
                     </span>
                     <span class="rounded-full px-3 py-1.5 text-[13px] font-bold"
-                          [style.color]="lever.icon.color" [style.background]="lever.icon.bg">{{ lever.badge }}</span>
+                          [ngClass]="leverBadgeClass(lever)"
+                          [style.color]="lever.safeModeState ? null : lever.icon.color"
+                          [style.background]="lever.safeModeState ? null : lever.icon.bg">
+                      {{ leverBadge(lever) }}
+                    </span>
                   </div>
                   <span class="text-[17px] font-semibold text-slate-800">{{ lever.title }}</span>
                   <p class="text-sm text-slate-500 leading-relaxed mt-2 mb-4">{{ lever.reason }}</p>
-                  <div class="mt-auto flex items-center justify-between">
-                    <span class="text-[13px] font-semibold text-teal-600">{{ lever.expected }}</span>
-                    <span class="text-sm font-semibold text-teal-600 group-hover:text-teal-700">Ansehen →</span>
+                  @if (leverSafeModeNote(lever); as note) {
+                    <p class="mb-4 rounded-2xl px-4 py-3 text-sm font-semibold leading-relaxed"
+                       [ngClass]="lever.safeModeState === 'paused' ? 'bg-amber-50 text-amber-800' : 'bg-teal-50 text-teal-700'">
+                      {{ note }}
+                    </p>
+                  }
+                  <div class="mt-auto flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span class="text-[13px] font-semibold" [ngClass]="lever.safeModeState === 'paused' ? 'text-amber-700' : 'text-teal-600'">{{ lever.expected }}</span>
+                    <span class="text-sm font-semibold" [ngClass]="lever.safeModeState === 'paused' ? 'text-slate-600' : 'text-teal-600 group-hover:text-teal-700'">
+                      {{ leverCtaLabel(lever) }} →
+                    </span>
                   </div>
                 </a>
               }
@@ -169,20 +190,45 @@ export class DashboardComponent implements OnInit {
   today = new Date();
 
   /** Levers enriched with their category icon + pre-sanitised glyph markup. */
-  leverCards = computed(() =>
+  leverCards = computed<LeverCard[]>(() =>
     (this.data()?.levers ?? []).map(lever => {
       const icon = categoryIcon(lever.category);
       return {
         ...lever,
         icon,
         iconSvg: this.sanitizer.bypassSecurityTrustHtml(icon.svg) as SafeHtml,
+        safeModeState: this.measureSafeModeState(lever),
       };
     })
   );
 
   /** Local demo check-in (Handoff 02) also counts as done — client-side polish only. */
-  checkinDone = computed(() =>
-    (this.data()?.todayCheckinCompleted ?? false) || this.checkinStorage.todayCompleted()
+  demoCheckinToday = computed(() => this.checkinStorage.loadToday());
+
+  hasCompletedTodayCheckIn = computed(() =>
+    (this.data()?.todayCheckinCompleted ?? false) || this.demoCheckinToday() !== null
+  );
+
+  checkinDone = computed(() => this.hasCompletedTodayCheckIn());
+
+  safeModeFlag = computed(() => {
+    const flag = this.data()?.healthFlag ?? null;
+    return flag?.state === 'caution' ? flag : null;
+  });
+
+  isSafeModeActive = computed(() => {
+    const demoCheckin = this.demoCheckinToday();
+    if (demoCheckin) {
+      return this.demoCheckinTriggersSafeMode(demoCheckin);
+    }
+
+    // When no demo check-in exists, the API health flag is the only available
+    // recovery-mode signal. It is still gated by hasCompletedTodayCheckIn.
+    return this.safeModeFlag() !== null;
+  });
+
+  shouldShowSafeModeBanner = computed(() =>
+    this.hasCompletedTodayCheckIn() && this.isSafeModeActive()
   );
 
   ngOnInit() {
@@ -243,6 +289,74 @@ export class DashboardComponent implements OnInit {
       : trend === 'up'
         ? 'bg-red-50 text-red-600'
         : 'bg-slate-100 text-slate-600';
+  }
+
+  safeModeBadge(badge: string): string {
+    return badge.toUpperCase();
+  }
+
+  leverCardClass(lever: LeverCard): string {
+    if (lever.safeModeState === 'paused') {
+      return 'border-amber-200 bg-amber-50/40 hover:border-amber-300 hover:shadow-sm';
+    }
+
+    if (lever.safeModeState === 'gentle') {
+      return 'border-teal-200 bg-white shadow-sm hover:border-teal-300';
+    }
+
+    return 'border-slate-100 bg-white hover:border-teal-200 hover:shadow-sm';
+  }
+
+  leverBadge(lever: LeverCard): string {
+    if (lever.safeModeState === 'paused') return 'pausiert';
+    if (lever.safeModeState === 'gentle') return 'sanft empfohlen';
+    return lever.badge;
+  }
+
+  leverBadgeClass(lever: LeverCard): string {
+    if (lever.safeModeState === 'paused') return 'bg-amber-100 text-amber-800';
+    if (lever.safeModeState === 'gentle') return 'bg-teal-50 text-teal-700';
+    return '';
+  }
+
+  leverSafeModeNote(lever: LeverCard): string | null {
+    if (lever.safeModeState === 'paused') {
+      return 'Heute wegen Schonmodus pausiert.';
+    }
+
+    if (lever.safeModeState === 'gentle') {
+      return 'Sanfte Einheit im Schonmodus empfohlen.';
+    }
+
+    return null;
+  }
+
+  leverCtaLabel(lever: LeverCard): string {
+    return lever.safeModeState === 'paused' ? 'Details ansehen' : 'Ansehen';
+  }
+
+  private measureSafeModeState(lever: DashboardLever): LeverSafeModeState {
+    if (!this.shouldShowSafeModeBanner()) return null;
+
+    const category = lever.category?.toUpperCase() ?? '';
+    if (['SLEEP', 'BREATHING', 'MINDFULNESS', 'REFLECTION'].includes(category)) {
+      return 'gentle';
+    }
+
+    // TODO: Replace this demo-category mapping with backend measure intensity
+    // metadata once the dashboard contract exposes which levers are paused.
+    if (['MOBILITY', 'STRENGTH', 'MIXED'].includes(category)) {
+      return 'paused';
+    }
+
+    return null;
+  }
+
+  private demoCheckinTriggersSafeMode(checkin: DemoCheckin): boolean {
+    return checkin.illness.sick
+      || Object.keys(checkin.illness).some(key => key !== 'sick')
+      || checkin.energy <= 2
+      || (checkin.sleep?.recovery ?? 5) <= 2;
   }
 
   private tile(label: string, metric: MetricAggregate, lowerIsBetter: boolean) {
