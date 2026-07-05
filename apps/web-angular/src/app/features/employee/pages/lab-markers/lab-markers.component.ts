@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { EmployeeService } from '../../services/employee.service';
 import { LabMarker } from '../../models/lab-marker.model';
+import { LAB_MARKER_EXPLANATIONS, LabMarkerExplanation } from '../../data/lab-marker-catalog';
 
 type LabGroupKey = 'blutbild' | 'immun' | 'mikro';
 
@@ -112,7 +113,39 @@ const MEASURE_CARDS = [
                 <article class="flex flex-col rounded-[20px] border border-slate-100 bg-white p-[22px]">
                   <div class="flex items-start justify-between gap-3">
                     <div>
-                      <h2 class="text-[17px] font-semibold text-slate-800">{{ marker.name }}</h2>
+                      <div class="flex items-center gap-1.5">
+                        <h2 class="text-[17px] font-semibold text-slate-800">{{ marker.name }}</h2>
+                        @if (markerExplanation(marker.markerKey); as explanation) {
+                          <span class="relative inline-flex"
+                                (mouseenter)="openMarkerExplanation(popoverKey(marker, 'highlight'))"
+                                (mouseleave)="closeMarkerExplanation(popoverKey(marker, 'highlight'))">
+                            <button type="button"
+                                    class="-my-2 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-500 transition hover:text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+                                    aria-label="Was beschreibt dieser Marker?"
+                                    [attr.aria-expanded]="isExplanationOpen(popoverKey(marker, 'highlight'))"
+                                    [attr.aria-controls]="popoverId(marker, 'highlight')"
+                                    (focus)="openMarkerExplanation(popoverKey(marker, 'highlight'))"
+                                    (click)="openMarkerExplanation(popoverKey(marker, 'highlight'))"
+                                    (keydown.escape)="closeMarkerExplanation(popoverKey(marker, 'highlight'))">
+                              <span class="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-bold">i</span>
+                            </button>
+                            @if (isExplanationOpen(popoverKey(marker, 'highlight'))) {
+                              <div [id]="popoverId(marker, 'highlight')" role="dialog" [attr.aria-label]="explanation.title" class="absolute left-0 top-full z-30 mt-2 w-[min(20rem,calc(100vw-3rem))] rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-lg">
+                                <div class="flex items-start justify-between gap-3">
+                                  <p class="text-sm font-semibold text-slate-800">{{ explanation.title }}</p>
+                                  <button type="button"
+                                          class="-mr-1 -mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+                                          aria-label="Erklärung schließen"
+                                          (click)="closeMarkerExplanation(popoverKey(marker, 'highlight'))">x</button>
+                                </div>
+                                <p class="mt-2 text-sm leading-6 text-slate-600">{{ explanation.shortExplanation }}</p>
+                                <p class="mt-2 text-sm leading-6 text-slate-500">{{ explanation.contextNote }}</p>
+                                <p class="mt-3 rounded-xl bg-teal-50 px-3 py-2 text-sm leading-5 text-teal-800">{{ explanation.safetyNote }}</p>
+                              </div>
+                            }
+                          </span>
+                        }
+                      </div>
                       <p class="mt-1 text-[13px] text-slate-500">{{ rangeLabel(marker) }}</p>
                     </div>
                     <span class="shrink-0 rounded-full px-3 py-1.5 text-xs font-bold" [ngClass]="statusClass(marker.status)">{{ marker.status }}</span>
@@ -194,7 +227,39 @@ const MEASURE_CARDS = [
                   @for (marker of group.markers; track marker.markerKey) {
                     <div class="space-y-2">
                       <div class="flex items-baseline justify-between gap-2">
-                        <span class="text-sm font-semibold text-slate-700">{{ marker.name }}</span>
+                        <span class="flex items-center gap-1.5">
+                          <span class="text-sm font-semibold text-slate-700">{{ marker.name }}</span>
+                          @if (markerExplanation(marker.markerKey); as explanation) {
+                            <span class="relative inline-flex"
+                                  (mouseenter)="openMarkerExplanation(popoverKey(marker, 'overview'))"
+                                  (mouseleave)="closeMarkerExplanation(popoverKey(marker, 'overview'))">
+                              <button type="button"
+                                      class="-my-2 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-500 transition hover:text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+                                      aria-label="Was beschreibt dieser Marker?"
+                                      [attr.aria-expanded]="isExplanationOpen(popoverKey(marker, 'overview'))"
+                                      [attr.aria-controls]="popoverId(marker, 'overview')"
+                                      (focus)="openMarkerExplanation(popoverKey(marker, 'overview'))"
+                                      (click)="openMarkerExplanation(popoverKey(marker, 'overview'))"
+                                      (keydown.escape)="closeMarkerExplanation(popoverKey(marker, 'overview'))">
+                                <span class="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-bold">i</span>
+                              </button>
+                              @if (isExplanationOpen(popoverKey(marker, 'overview'))) {
+                                <div [id]="popoverId(marker, 'overview')" role="dialog" [attr.aria-label]="explanation.title" class="absolute left-0 top-full z-30 mt-2 w-[min(20rem,calc(100vw-3rem))] rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-lg">
+                                  <div class="flex items-start justify-between gap-3">
+                                    <p class="text-sm font-semibold text-slate-800">{{ explanation.title }}</p>
+                                    <button type="button"
+                                            class="-mr-1 -mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+                                            aria-label="Erklärung schließen"
+                                            (click)="closeMarkerExplanation(popoverKey(marker, 'overview'))">x</button>
+                                  </div>
+                                  <p class="mt-2 text-sm leading-6 text-slate-600">{{ explanation.shortExplanation }}</p>
+                                  <p class="mt-2 text-sm leading-6 text-slate-500">{{ explanation.contextNote }}</p>
+                                  <p class="mt-3 rounded-xl bg-teal-50 px-3 py-2 text-sm leading-5 text-teal-800">{{ explanation.safetyNote }}</p>
+                                </div>
+                              }
+                            </span>
+                          }
+                        </span>
                         <span class="text-[13px] text-slate-500"><span class="font-bold text-slate-800">{{ formatValue(marker.value) }}</span> {{ marker.unit }}</span>
                       </div>
                       <div class="relative h-2 overflow-hidden rounded-full bg-slate-100">
@@ -269,6 +334,7 @@ export class EmployeeLabMarkersComponent implements OnInit {
   markers = signal<LabMarker[]>([]);
   loading = signal(true);
   error = signal(false);
+  activeExplanationKey = signal<string | null>(null);
 
   focusRoutines = FOCUS_ROUTINES;
   measureCards = MEASURE_CARDS;
@@ -298,6 +364,32 @@ export class EmployeeLabMarkersComponent implements OnInit {
     return this.highlightedMarkers().length > 0
       ? 'Kleine präventive Routinen für die kommende Woche.'
       : 'Weiter so. Halte deine Routinen und behalte deine Werte in Ruhe im Blick.';
+  }
+
+  markerExplanation(markerKey: string): LabMarkerExplanation | null {
+    return LAB_MARKER_EXPLANATIONS[markerKey] ?? null;
+  }
+
+  popoverKey(marker: LabMarker, placement: 'highlight' | 'overview'): string {
+    return `${placement}-${marker.markerKey}`;
+  }
+
+  popoverId(marker: LabMarker, placement: 'highlight' | 'overview'): string {
+    return `lab-marker-explanation-${this.popoverKey(marker, placement)}`;
+  }
+
+  isExplanationOpen(key: string): boolean {
+    return this.activeExplanationKey() === key;
+  }
+
+  openMarkerExplanation(key: string): void {
+    this.activeExplanationKey.set(key);
+  }
+
+  closeMarkerExplanation(key: string): void {
+    if (this.activeExplanationKey() === key) {
+      this.activeExplanationKey.set(null);
+    }
   }
 
   rangeLabel(marker: LabMarker): string {
