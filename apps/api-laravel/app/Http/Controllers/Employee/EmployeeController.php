@@ -154,12 +154,18 @@ class EmployeeController extends Controller
 
     public function history(Request $request): JsonResponse
     {
-        $limit = $request->query('limit', 20);
+        $limit = (int) $request->query('limit', 20);
         $entries = $request->user()->wellbeingEntries()
             ->where('company_id', $request->user()->company_id)
-            ->orderBy('created_at', 'asc')
+            // Daily check-ins only — weekly aggregate rows are not history items.
+            ->where('period_key', 'like', '____-__-__')
+            ->orderByDesc('period_key')
             ->take($limit)
-            ->get();
+            ->get()
+            ->reverse()
+            ->values();
+
+        $entries = $this->wellbeingService->shiftEntriesToPresent($entries);
 
         return response()->json([
             'entries' => WellbeingEntryResource::collection($entries),

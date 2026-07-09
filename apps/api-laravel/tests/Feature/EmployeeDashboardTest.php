@@ -134,6 +134,24 @@ class EmployeeDashboardTest extends TestCase
             ->assertJsonPath('levers', null);
     }
 
+    public function test_dashboard_aggregates_stay_visible_when_data_is_weeks_old(): void
+    {
+        config(['elyo.data_mode' => 'prod']);
+        $this->seedDailyEntries();
+
+        // Weeks later, the week split anchors on the newest entry, so the last
+        // two recorded weeks are still reported as current/previous.
+        $this->travelTo(Carbon::parse('2026-08-19 12:00:00'));
+
+        $response = $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/dashboard');
+
+        $response->assertStatus(200);
+        $this->assertEquals(4.0, $response->json('wellbeing.current'));
+        $this->assertEquals(3.0, $response->json('wellbeing.previous'));
+        $this->assertEquals(1.0, $response->json('wellbeing.delta'));
+    }
+
     public function test_dashboard_aggregates_are_null_without_daily_entries(): void
     {
         config(['elyo.data_mode' => 'prod']);

@@ -18,22 +18,32 @@ class EmployeeDashboardService
      */
     public function weeklyAggregates(User $user): ?array
     {
-        $since = Carbon::now()->startOfWeek()->subWeek();
-
         $entries = WellbeingEntry::query()
             ->where('user_id', $user->id)
             ->where('company_id', $user->company_id)
             // Daily keys only — weekly aggregate rows (2026-W27) are ignored.
             ->where('period_key', 'like', '____-__-__')
-            ->where('period_key', '>=', $since->toDateString())
             ->orderBy('period_key')
-            ->get();
+            ->get()
+            // The LIKE pattern lets malformed keys (2026-99-99) through.
+            ->filter(fn (WellbeingEntry $entry) => $this->isValidDailyKey($entry->period_key))
+            ->values();
 
         if ($entries->isEmpty()) {
             return null;
         }
 
-        $weekStart = Carbon::now()->startOfWeek()->toDateString();
+        // Anchor the week split on the newest entry instead of the real clock,
+        // so the last two recorded weeks stay visible no matter how long ago
+        // the (demo) data was written.
+        $anchor = Carbon::parse($entries->last()->period_key);
+        $weekStart = $anchor->copy()->startOfWeek()->toDateString();
+        $since = $anchor->copy()->startOfWeek()->subWeek()->toDateString();
+
+        $entries = $entries
+            ->filter(fn (WellbeingEntry $entry) => $entry->period_key >= $since)
+            ->values();
+
         $currentWeek = $entries->filter(fn (WellbeingEntry $entry) => $entry->period_key >= $weekStart);
         $previousWeek = $entries->filter(fn (WellbeingEntry $entry) => $entry->period_key < $weekStart);
 
@@ -90,6 +100,13 @@ class EmployeeDashboardService
             'previous' => $previous,
             'delta' => $this->delta($current, $previous),
         ];
+    }
+
+    private function isValidDailyKey(string $periodKey): bool
+    {
+        $date = \DateTime::createFromFormat('Y-m-d', $periodKey);
+
+        return $date instanceof \DateTime && $date->format('Y-m-d') === $periodKey;
     }
 
     private function delta(?float $current, ?float $previous): ?float

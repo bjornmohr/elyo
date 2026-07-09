@@ -475,22 +475,82 @@ class EmployeeTest extends TestCase
 
     public function test_employee_can_get_history()
     {
+        config(['elyo.data_mode' => 'prod']);
+
         WellbeingEntry::factory()->create([
             'user_id' => $this->employee->id,
             'company_id' => $this->company->id,
-            'period_key' => '2024-W01',
+            'period_key' => '2026-05-20',
         ]);
         WellbeingEntry::factory()->create([
             'user_id' => $this->employee->id,
             'company_id' => $this->company->id,
-            'period_key' => '2024-W02',
+            'period_key' => '2026-05-21',
+        ]);
+        // Weekly aggregate rows are not history items.
+        WellbeingEntry::factory()->create([
+            'user_id' => $this->employee->id,
+            'company_id' => $this->company->id,
+            'period_key' => '2026-W21',
         ]);
 
         $response = $this->actingAs($this->employee, 'sanctum')
             ->getJson('/api/employee/history?limit=10');
 
         $response->assertStatus(200)
-            ->assertJsonCount(2, 'entries');
+            ->assertJsonCount(2, 'entries')
+            ->assertJsonPath('entries.0.periodKey', '2026-05-20')
+            ->assertJsonPath('entries.1.periodKey', '2026-05-21');
+    }
+
+    public function test_history_demo_mode_shifts_stale_entries_to_end_yesterday()
+    {
+        config(['elyo.data_mode' => 'demo']);
+        $this->travelTo(Carbon::parse('2026-07-09 10:00:00'));
+
+        // Seeded weeks ago — would otherwise fall out of the 14-day UI window.
+        WellbeingEntry::factory()->create([
+            'user_id' => $this->employee->id,
+            'company_id' => $this->company->id,
+            'period_key' => '2026-05-20',
+            'created_at' => Carbon::parse('2026-05-20 08:30:00'),
+        ]);
+        WellbeingEntry::factory()->create([
+            'user_id' => $this->employee->id,
+            'company_id' => $this->company->id,
+            'period_key' => '2026-05-21',
+            'created_at' => Carbon::parse('2026-05-21 08:30:00'),
+        ]);
+
+        $response = $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/history?limit=10');
+
+        // Newest entry lands on yesterday; day gaps are preserved.
+        $response->assertStatus(200)
+            ->assertJsonCount(2, 'entries')
+            ->assertJsonPath('entries.0.periodKey', '2026-07-07')
+            ->assertJsonPath('entries.1.periodKey', '2026-07-08');
+
+        // Presentation only — the database keeps the original dates.
+        $this->assertDatabaseHas('wellbeing_entries', ['period_key' => '2026-05-20']);
+        $this->assertDatabaseMissing('wellbeing_entries', ['period_key' => '2026-07-08']);
+    }
+
+    public function test_history_prod_mode_keeps_original_dates()
+    {
+        config(['elyo.data_mode' => 'prod']);
+        $this->travelTo(Carbon::parse('2026-07-09 10:00:00'));
+
+        WellbeingEntry::factory()->create([
+            'user_id' => $this->employee->id,
+            'company_id' => $this->company->id,
+            'period_key' => '2026-05-20',
+        ]);
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/history?limit=10')
+            ->assertStatus(200)
+            ->assertJsonPath('entries.0.periodKey', '2026-05-20');
     }
 
     public function test_employee_can_update_profile()
