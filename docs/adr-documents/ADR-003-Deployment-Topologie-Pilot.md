@@ -87,7 +87,7 @@ Jede Entscheidung D1–D10 ist wortgleich aus dem Ausführungsplan übernommen; 
 
 > Mapping table field-encrypted with dedicated key (`MAPPING_ENCRYPTION_KEY`), HMAC lookup column; KMS deferred per ADR-001.
 
-- **Begründung:** Die Mapping-Tabelle wird feldverschlüsselt mit einem dedizierten Schlüssel (`MAPPING_ENCRYPTION_KEY`); eine HMAC-Spalte ermöglicht deterministische Lookups ohne Klartext. Ein KMS/Secret Manager ist per ADR-001 bewusst vertagt.
+- **Begründung:** Die Mapping-Tabelle wird feldverschlüsselt mit einem dedizierten Schlüssel (`MAPPING_ENCRYPTION_KEY`); eine HMAC-Spalte ermöglicht deterministische Lookups ohne Klartext. Für die nach DB-übergreifenden Teilfehlern geforderte Adoption eines verwaisten Health Subjects leitet ausschließlich die Mapping-Domäne dessen opaque ULID deterministisch aus `user_id` und einem dritten, unabhängigen Secret (`MAPPING_SUBJECT_DERIVATION_KEY`) ab. Es wird keine zusätzliche Verknüpfung in der Health-Datenbank gespeichert; ohne dieses Mapping-Domänen-Secret ist die Ableitung nicht möglich, und eine Offenlegung des Lookup-Schlüssels allein reicht nicht zur Berechnung von Health-IDs. Das Secret darf weder `MAPPING_HMAC_KEY` noch `APP_KEY` wiederverwenden. Ein KMS/Secret Manager ist per ADR-001 bewusst vertagt.
 - **ADR-001-Bezug:** Konkretisiert §2.9 (Feldverschlüsselung nur für die Mapping-Tabelle mit eigenem Schlüssel); KMS bleibt gemäß §3 (bewusst vertagt) offen.
 
 ## 3. Konsequenzen
