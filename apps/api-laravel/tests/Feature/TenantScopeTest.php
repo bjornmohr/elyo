@@ -13,12 +13,10 @@ use App\Models\SurveyQuestion;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\WellbeingEntry;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class TenantScopeTest extends TestCase
 {
-    use RefreshDatabase;
 
     public function test_employee_forged_user_and_company_ids_are_ignored_on_checkin(): void
     {

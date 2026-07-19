@@ -8,13 +8,11 @@ use App\Models\SystemMeasureTemplate;
 use App\Models\SystemMeasureTemplateExercise;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class AdminSystemMeasureTemplateTest extends TestCase
 {
-    use RefreshDatabase;
 
     protected User $platformAdmin;
 

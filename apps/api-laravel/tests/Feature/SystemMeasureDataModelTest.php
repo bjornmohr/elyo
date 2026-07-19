@@ -14,12 +14,10 @@ use App\Models\UserSystemMeasureExercise;
 use App\Models\UserSystemMeasureExerciseCompletion;
 use Database\Seeders\SystemExerciseSeeder;
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class SystemMeasureDataModelTest extends TestCase
 {
-    use RefreshDatabase;
 
     // ── SystemExercise ──
 

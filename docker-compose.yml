@@ -41,6 +41,9 @@ services:
       - DB_AUDIT_DATABASE=elyo_audit
       - DB_AUDIT_USERNAME=elyo_employee_rt
       - DB_AUDIT_PASSWORD=${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
+      # Migrator role: owns the schema, runs all DDL (php artisan elyo:migrate-fresh).
+      - DB_MIGRATOR_USERNAME=elyo_migrator
+      - DB_MIGRATOR_PASSWORD=${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
       - REDIS_HOST=redis
       - MAIL_MAILER=smtp
       - MAIL_HOST=mailpit

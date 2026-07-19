@@ -8,12 +8,10 @@ use App\Models\Measure;
 use App\Models\MeasureParticipation;
 use App\Models\Team;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class MeasureParticipationSummaryTest extends TestCase
 {
-    use RefreshDatabase;
 
     public function test_company_admin_can_fetch_measure_participation_summary(): void
     {
