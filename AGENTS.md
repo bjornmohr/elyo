@@ -120,6 +120,7 @@ The health domain is separated from identity by design (ADR-001, ADR-003). Enfor
 - Every other new documentation file goes into `docs/further_docs/`.
 - Existing documentation files are edited in place; do not relocate them as part of an unrelated task.
 - The established roles of `docs/ai-tasks/`, `docs/ai-context/`, and `docs/api/` are unchanged — keep using them for their existing purposes.
+- `docs/agents/` stores engineering-skill configuration for issue tracking, triage labels, and domain-document discovery.
 
 ## OpenAPI Contract Rule
 
@@ -233,3 +234,17 @@ Default process:
 5. Create handoff files.
 6. Review diff before commit.
 7. Do not mix unrelated cleanup into feature/refactor commits.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs live in GitHub Issues; external PRs are not a request surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical triage roles use their default label names. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+ELYO uses a single-context layout with ADRs in `docs/adr-documents/`. See `docs/agents/domain.md`.
