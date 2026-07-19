@@ -35,6 +35,9 @@ services:
       - DB_MAPPING_DATABASE=elyo_subject_mapping
       - DB_MAPPING_USERNAME=elyo_mapping_svc
       - DB_MAPPING_PASSWORD=${ELYO_MAPPING_SVC_PASSWORD:-mapping_svc_dev}
+      - MAPPING_ENCRYPTION_KEY=${MAPPING_ENCRYPTION_KEY:-}
+      - MAPPING_HMAC_KEY=${MAPPING_HMAC_KEY:-}
+      - MAPPING_SUBJECT_DERIVATION_KEY=${MAPPING_SUBJECT_DERIVATION_KEY:-}
       - DB_HEALTH_DATABASE=elyo_health
       - DB_HEALTH_USERNAME=elyo_employee_rt
       - DB_HEALTH_PASSWORD=${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}

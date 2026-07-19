@@ -18,7 +18,7 @@ Background:
 
 - Every user gets one global, employer-independent `health_subject_id` (ULID). The user_id↔subject link exists ONLY in `subject_mappings`.
 - Pilot implements `provisionOwnSubject`, `resolveOwnSubject`, `revokeSubjectLink`; `resolveReportingCohort` and `resolveForDataSubjectRequest` exist on the interface but throw a dedicated `OperationNotAvailableException`.
-- Field encryption with dedicated key `MAPPING_ENCRYPTION_KEY` (not APP_KEY). Lookups need a deterministic `user_id_hmac` column (HMAC-SHA256 with a dedicated `MAPPING_HMAC_KEY`), while `user_id` itself is stored encrypted.
+- Field encryption uses `MAPPING_ENCRYPTION_KEY` (not APP_KEY). Lookups use `MAPPING_HMAC_KEY`; orphan recovery uses the independent `MAPPING_SUBJECT_DERIVATION_KEY`. `user_id` itself is stored encrypted.
 
 ## Scope
 
@@ -30,7 +30,7 @@ Change only:
 - New: `app/Services/Privacy/AuditLoggerContract.php` + `NullAuditLogger` binding (real writer comes in prompt 07)
 - config/services or dedicated `config/privacy.php` for keys
 - tests/Feature/Privacy/, tests/Unit/Privacy/
-- .env.example (two new keys)
+- .env.example (three independent mapping-domain keys)
 
 Do not change:
 
@@ -39,12 +39,12 @@ Do not change:
 
 ## Requirements
 
-1. `PurposeCode` enum (backed string): `PROVISIONING`, `HEALTH_SELF_READ`, `HEALTH_SELF_WRITE`, `REVOCATION` (extensible). Every MappingService method requires one; invalid purpose for an operation throws.
+1. `PurposeCode` enum (backed string): `PROVISIONING`, `HEALTH_SELF_READ`, `HEALTH_SELF_WRITE`, `REVOCATION`, `REPORTING`, `DSR` (extensible). Every MappingService method requires one; invalid purpose for an operation throws before any unavailable-operation guard.
 2. `provisionOwnSubject(int $userId, PurposeCode $purpose): string` — all-or-nothing order: create HealthSubject first (health DB), then mapping row; idempotent (existing ACTIVE mapping returns existing subject id); repeatable after partial failure (orphan subject without mapping is adopted, not duplicated).
 3. `resolveOwnSubject(int $userId, PurposeCode $purpose): string` — HMAC lookup; throws `MappingNotFoundException` (mapping absent) and `MappingRevokedException` (tombstone) as distinct types.
 4. `revokeSubjectLink(int $userId, PurposeCode $purpose): void` — sets REVOKED + `revoked_at`, keeps the row as tombstone; final (no re-activation path).
 5. Both remaining interface methods present, typed, throwing `OperationNotAvailableException` with reference to ADR-003 D5.
-6. Every operation calls the AuditLoggerContract with: operation, purpose, actor context, subject reference — never user_id and health_subject_id in the same audit payload (pass a one-way subject reference; design detail documented in code).
+6. Every operation calls the AuditLoggerContract with: typed operation, purpose, runtime-correct typed actor context, subject reference — never user_id and health_subject_id in the same audit payload (pass a one-way subject reference; design detail documented in code).
 7. Models: pinned `$connection`, no Eloquent relationship crossing domains, mass assignment locked down.
 8. Tests: unit (HMAC determinism, encryption round-trip, purpose validation) + feature against the Postgres test databases (provision idempotency, orphan-adoption, resolve/revoke flows, distinct exceptions). Grant-level assertions stay in prompt 06's boundary suite.
 
