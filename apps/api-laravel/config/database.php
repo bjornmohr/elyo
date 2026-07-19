@@ -152,6 +152,77 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
+        /*
+        | Migrator connections (ELYO-104 / prompt 03).
+        |
+        | Schema DDL runs as the `elyo_migrator` role, which owns each database
+        | and whose ALTER DEFAULT PRIVILEGES grants tables to the runtime roles
+        | (see infra/postgres/initdb). Runtime traffic uses the *_rt / *_svc
+        | roles above; migrations use these. Each targets the SAME physical
+        | database as its runtime counterpart (identical `DB_*_DATABASE`), only
+        | the login role differs. `php artisan elyo:migrate-fresh` drives them.
+        */
+
+        'identity_migrator' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_IDENTITY_DATABASE', 'elyo_identity'),
+            'username' => env('DB_MIGRATOR_USERNAME', 'elyo_migrator'),
+            'password' => env('DB_MIGRATOR_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
+        'mapping_migrator' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_MAPPING_DATABASE', 'elyo_subject_mapping'),
+            'username' => env('DB_MIGRATOR_USERNAME', 'elyo_migrator'),
+            'password' => env('DB_MIGRATOR_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
+        'health_migrator' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_HEALTH_DATABASE', 'elyo_health'),
+            'username' => env('DB_MIGRATOR_USERNAME', 'elyo_migrator'),
+            'password' => env('DB_MIGRATOR_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
+        'audit_migrator' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_AUDIT_DATABASE', 'elyo_audit'),
+            'username' => env('DB_MIGRATOR_USERNAME', 'elyo_migrator'),
+            'password' => env('DB_MIGRATOR_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
         // Legacy alias: pre-split code referencing `pgsql` keeps working by
         // resolving to the identity connection. Do not add new usages.
         'pgsql' => [

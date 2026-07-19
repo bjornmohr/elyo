@@ -18,12 +18,10 @@ use App\Models\UserRole;
 use App\Models\WellbeingEntry;
 use App\Services\MeasureCheckinTokenService;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class CompanyTest extends TestCase
 {
-    use RefreshDatabase;
 
     protected $company;
 
@@ -856,10 +854,6 @@ class CompanyTest extends TestCase
 
     public function test_active_token_uniqueness_guaranteed_by_database_constraint(): void
     {
-        if (config('database.default') === 'sqlite') {
-            $this->markTestSkipped('SQLite does not support partial unique indexes with WHERE NULL in the same way as PostgreSQL.');
-        }
-
         $measure = Measure::factory()->create(['verification_requirement' => 'QR_CODE']);
 
         MeasureCheckinToken::create([

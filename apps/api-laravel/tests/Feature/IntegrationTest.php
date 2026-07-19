@@ -6,12 +6,10 @@ use App\Enums\PartnerVerificationStatus;
 use App\Enums\Role;
 use App\Models\Partner;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class IntegrationTest extends TestCase
 {
-    use RefreshDatabase;
 
     public function test_partner_registration_and_login()
     {

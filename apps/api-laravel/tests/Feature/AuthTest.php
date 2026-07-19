@@ -8,12 +8,10 @@ use App\Models\InviteToken;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\UserRole;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
 {
-    use RefreshDatabase;
 
     private function createUserWithRole(Role $role, ?int $companyId = null): User
     {

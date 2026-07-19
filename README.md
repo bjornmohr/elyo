@@ -162,7 +162,9 @@ Equivalent helper:
 make install
 ```
 
-The helper installs dependencies and generates the Laravel app key. Check `apps/api-laravel/.env` afterward because the default Laravel example file uses SQLite and may need to be changed to PostgreSQL as shown above.
+The helper installs dependencies and generates the Laravel app key. The checked-in
+Laravel example environment is PostgreSQL-only and already matches the supported
+Docker test and development path shown above.
 
 ## Start the Docker Setup
 

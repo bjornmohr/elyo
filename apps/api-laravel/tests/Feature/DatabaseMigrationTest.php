@@ -8,13 +8,11 @@ use App\Models\User;
 use App\Models\WellbeingEntry;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class DatabaseMigrationTest extends TestCase
 {
-    use RefreshDatabase;
 
     public function test_migrations_run_successfully(): void
     {

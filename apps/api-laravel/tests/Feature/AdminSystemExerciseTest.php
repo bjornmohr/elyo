@@ -8,12 +8,10 @@ use App\Models\SystemExerciseTag;
 use App\Models\SystemMeasureTemplate;
 use App\Models\SystemMeasureTemplateExercise;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class AdminSystemExerciseTest extends TestCase
 {
-    use RefreshDatabase;
 
     protected User $platformAdmin;
 

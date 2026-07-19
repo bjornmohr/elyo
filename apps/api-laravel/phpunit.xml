@@ -23,9 +23,23 @@
         <env name="BCRYPT_ROUNDS" value="4" force="true"/>
         <env name="BROADCAST_CONNECTION" value="null" force="true"/>
         <env name="CACHE_STORE" value="array" force="true"/>
-        <env name="DB_CONNECTION" value="sqlite" force="true"/>
-        <env name="DB_DATABASE" value=":memory:" force="true"/>
-        <env name="DB_URL" value="" force="true"/>
+        <!-- D9 (Postgres-only): the suite runs against the elyo_*_test databases
+             in the docker Postgres container. Each runtime connection is pointed
+             at its *_test database with forced runtime/migrator role names;
+             passwords come from the container environment (.env / docker-compose).
+             Schema is built with the migrator role via the *_migrator connections;
+             queries run with the runtime roles so grants are exercised. Requires docker:
+             `docker compose exec api php artisan test`. -->
+        <env name="DB_CONNECTION" value="identity" force="true"/>
+        <env name="DB_IDENTITY_DATABASE" value="elyo_identity_test" force="true"/>
+        <env name="DB_IDENTITY_USERNAME" value="elyo_identity_rt" force="true"/>
+        <env name="DB_MAPPING_DATABASE" value="elyo_subject_mapping_test" force="true"/>
+        <env name="DB_MAPPING_USERNAME" value="elyo_mapping_svc" force="true"/>
+        <env name="DB_HEALTH_DATABASE" value="elyo_health_test" force="true"/>
+        <env name="DB_HEALTH_USERNAME" value="elyo_employee_rt" force="true"/>
+        <env name="DB_AUDIT_DATABASE" value="elyo_audit_test" force="true"/>
+        <env name="DB_AUDIT_USERNAME" value="elyo_employee_rt" force="true"/>
+        <env name="DB_MIGRATOR_USERNAME" value="elyo_migrator" force="true"/>
         <env name="MAIL_MAILER" value="array" force="true"/>
         <env name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="SESSION_DRIVER" value="array" force="true"/>

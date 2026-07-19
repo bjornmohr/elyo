@@ -8,13 +8,11 @@ use App\Models\MeasureParticipation;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class MeasureParticipationPersistenceTest extends TestCase
 {
-    use RefreshDatabase;
 
     public function test_factory_defaults_create_tenant_consistent_company_wide_participation(): void
     {

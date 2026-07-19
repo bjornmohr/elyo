@@ -21,7 +21,6 @@ use App\Models\WellbeingEntry;
 use App\Services\WellbeingService;
 use App\Services\MeasureCheckinTokenService;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -29,7 +28,6 @@ use Tests\TestCase;
 
 class EmployeeTest extends TestCase
 {
-    use RefreshDatabase;
 
     protected User $employee;
 
@@ -1385,18 +1383,20 @@ class EmployeeTest extends TestCase
     public function test_foreign_company_token_masks_lifecycle_state(): void
     {
         $foreignCompany = Company::factory()->create();
-        $foreignMeasure = Measure::factory()->create([
-            'company_id' => $foreignCompany->id,
-            'team_id' => null,
-            'status' => 'ACTIVE',
-            'verification_requirement' => 'QR_CODE',
-        ]);
         $creator = User::factory()->create(['company_id' => $foreignCompany->id]);
 
-        $makeToken = function (array $attrs) use ($foreignMeasure, $foreignCompany, $creator): string {
+        // One measure per token: the DB enforces at most one active (non-revoked)
+        // token per measure, so each lifecycle variant needs its own measure.
+        $makeToken = function (array $attrs) use ($foreignCompany, $creator): string {
+            $measure = Measure::factory()->create([
+                'company_id' => $foreignCompany->id,
+                'team_id' => null,
+                'status' => 'ACTIVE',
+                'verification_requirement' => 'QR_CODE',
+            ]);
             $raw = bin2hex(random_bytes(32));
             MeasureCheckinToken::create(array_merge([
-                'measure_id' => $foreignMeasure->id,
+                'measure_id' => $measure->id,
                 'company_id' => $foreignCompany->id,
                 'token_hash' => MeasureCheckinTokenService::hashToken($raw),
                 'created_by_user_id' => $creator->id,
@@ -1427,15 +1427,15 @@ class EmployeeTest extends TestCase
         $otherTeam = Team::factory()->create(['company_id' => $this->company->id]);
         $this->employee->update(['team_id' => $myTeam->id]);
 
-        $teamMeasure = Measure::factory()->create([
-            'company_id' => $this->company->id,
-            'team_id' => $otherTeam->id,
-            'status' => 'ACTIVE',
-            'verification_requirement' => 'QR_CODE',
-        ]);
         $creator = User::factory()->create(['company_id' => $this->company->id]);
 
-        $makeToken = function (array $attrs) use ($teamMeasure, $creator): string {
+        $makeToken = function (array $attrs) use ($otherTeam, $creator): string {
+            $teamMeasure = Measure::factory()->create([
+                'company_id' => $this->company->id,
+                'team_id' => $otherTeam->id,
+                'status' => 'ACTIVE',
+                'verification_requirement' => 'QR_CODE',
+            ]);
             $raw = bin2hex(random_bytes(32));
             MeasureCheckinToken::create(array_merge([
                 'measure_id' => $teamMeasure->id,
