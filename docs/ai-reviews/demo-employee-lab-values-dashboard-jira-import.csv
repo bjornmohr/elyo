@@ -1,0 +1,1688 @@
+Vorgangs-ID,Vorgangstyp,Zusammenfassung,Beschreibung,Startdatum,Fälligkeitsdatum,Priorität,Stichwort,Übergeordnet
+ELYO-90,Epic,Privacy Foundation & Produktionsentscheidungen,"Kontext & Ziel:
+Grundsatzentscheidungen für den produktiven Neuaufbau der im Demo-Branch gezeigten Fähigkeiten: Scope je Feature (demo-only vs. produktiver Neuaufbau vs. blockiert), Privacy-Zielarchitektur (Identity-/Health-Domänen-Trennung), API-Contract-Entscheidungen und DSFA-Vorprüfung. Verbindliche Festlegung: Der Demo-Branch ist funktionale/visuelle Referenz, nicht die technische Grundlage der Produktion.
+
+Warum relevant:
+Der Demo-Branch zeigt persistierte Laborwerte mit direkter user_id-Verknüpfung (lab_markers), demo-only Check-in-Daten im localStorage und Company-Insights auf synthetischen Daten. Ohne dokumentierte Entscheidungen und ohne klare Referenz-Rolle des Demo-Codes droht Demo-Verhalten unkontrolliert zur technischen Basis der Produktion zu werden.
+
+Scope:
+- In Scope: Entscheidungsdokumente, Zielarchitektur, DSFA-Vorprüfung, Contract-Entscheidungen, Insights-Scope, Festlegung der Demo-Referenz-Rolle.
+- Out of Scope: Implementierung von Datenmodell, API oder UI.
+
+Enthaltene Issues:
+- ELYO-99, ELYO-100, ELYO-101, ELYO-102, ELYO-103.
+
+Sprint-Vorschlag:
+Sprint 1; abgeschlossen vor Start von Sprint 2.
+
+Abhängigkeiten:
+Keine direkten Abhängigkeiten.
+
+Akzeptanzkriterien:
+- Für jedes Demo-Feature existiert eine dokumentierte Entscheidung: demo-only, produktiver Neuaufbau oder blockiert.
+- Die Rolle des Demo-Codes ist verbindlich festgelegt: funktionale/visuelle Referenz, keine Produktions-Codebasis.
+- Die Privacy-Zielarchitektur (health_subject_id, Mapping-Domäne) ist dokumentiert und abgenommen.
+- Alle Kind-Issues sind über Übergeordnet verknüpft.
+- Produktions-Blocker sind explizit benannt (lab_markers auf user_id, Freitext, fehlendes Audit/Retention).
+- Demo-Verhalten ist klar von Produktions-Scope unterscheidbar.
+
+Technische Hinweise:
+- Referenz (nicht Grundlage): apps/api-laravel (Models, Migrations, Insights-Provider, config/elyo.php ELYO_DATA_MODE), apps/web-angular Employee/Company-Portale, docs/api/openapi.yaml (Entwurf).
+- Bestehende Anonymitäts-Schwelle (AnonymityService) als fachlicher Input für Suppression-Regeln.
+
+Privacy/Health-Data:
+Gesundheitsdaten betroffen (Laborwerte, Check-in-Daten). Epic definiert die Anforderungen an health_subject_id, Aggregat-Only-Zugriff, Suppression und Mapping-Schutz. Produktive Laborwert-Persistenz ist bis Abschluss von ELYO-91 blockiert.",,,Höchste,sprint-1 demo-gap privacy-hardening health-data,
+ELYO-91,Epic,Health Data Model Hardening,"Kontext & Ziel:
+Produktive Health-Domäne mit strikter Trennung von Identitäts- und Gesundheitsdaten neu aufbauen: health_subject_id, geschützte Mapping-Domäne (user_id ↔ health_subject_id), produktives Laborwert-Datenmodell, Audit-Logging, Retention- und Freitext-Konzept. Das Demo-Datenmodell (lab_markers auf user_id) ist keine Produktionsgrundlage und wird nicht weiterentwickelt.
+
+Warum relevant:
+Der Demo-Branch persistiert Laborwerte mit direktem user_id-FK (Migration 2026_07_05_010000_create_lab_markers_table.php, Model App\Models\LabMarker, Relation User::labMarkers()). Es existiert keine Pseudonymisierung, kein Audit, keine Retention. Das Demo-Schema belegt den fachlichen Bedarf, taugt aber nicht als technisches Fundament — die produktive Health-Domäne muss aus der Zielarchitektur neu entworfen werden.
+
+Scope:
+- In Scope: Mapping-Domäne, produktives Health-Datenmodell (neu), Zugriffsschutz, Audit-Konzept, Retention, Freitext-Minimierung.
+- Out of Scope: UI-Arbeit, neue Fach-Features, Weiterentwicklung des Demo-Schemas, Alt-Datenmigration bestehender wellbeing_entries (nur Bewertung).
+
+Enthaltene Issues:
+- ELYO-104, ELYO-105, ELYO-106, ELYO-107, ELYO-108, ELYO-109, ELYO-110, ELYO-111.
+
+Sprint-Vorschlag:
+Sprint 2; Privacy-Regressionstests (ELYO-111) laufen bis Sprint 5 weiter.
+
+Abhängigkeiten:
+ELYO-100 (Zielarchitektur), ELYO-101 (DSFA-Vorprüfung).
+
+Akzeptanzkriterien:
+- Produktive Health-Features referenzieren health_subject_id; kein neues Health-Datum wird gegen user_id modelliert.
+- Das Mapping ist nicht durch normalen Applikationscode trivial joinbar (Service-Boundary, getrennte DB-Rollen/Schemata).
+- Das Demo-Schema lab_markers ist explizit als demo-only klassifiziert und nicht Teil des Produktionspfads.
+- Alle Kind-Issues sind über Übergeordnet verknüpft.
+- Audit-, Retention- und Freitext-Regeln sind dokumentiert und umgesetzt.
+- Produktions-Blocker sind ausgeräumt oder explizit offen benannt.
+
+Technische Hinweise:
+- Neuentwurf in apps/api-laravel (Health-Domäne, Mapping-Service, DB-Rollen); Demo-Migrationen/Models nur als Scope-Referenz lesen.
+- Reines Ersetzen von user_id durch eine andere ID genügt nicht, wenn das Mapping frei joinbar bleibt.
+
+Privacy/Health-Data:
+Gesundheitsdaten direkt betroffen. Erfordert health_subject_id, Mapping-Schutz, Audit und Retention. Bis Abschluss: Produktions-Blocker für Laborwert- und Check-in-Persistenz mit echten Daten.",,,Höchste,sprint-2 health-data privacy-hardening data-model production-blocker privacy-blocker,
+ELYO-92,Epic,API Contract & Backend Integration Laborwerte & Dashboard,"Kontext & Ziel:
+Finale, produktive Backend-Verträge und Endpunkte für Employee-Laborwerte und Dashboard-Blöcke API-first neu aufbauen: Contract aus Domänenmodell und Privacy-Entscheidungen ableiten, produktive Endpunkte auf der neuen Health-Domäne implementieren, Autorisierung, Fehler-/Empty-States, Wertverlauf. Demo-Endpoint und Demo-Spec-Entwurf sind Scope-Referenz, nicht Grundlage.
+
+Warum relevant:
+Der Demo-Branch zeigt GET /api/employee/lab-markers (LabMarkerController, Inline-Array auf Demo-Datenmodell) und einen erweiterten Dashboard-Payload aus Demo-Providern. Diese Artefakte belegen den fachlichen Bedarf und die gewünschte UX; ihr Response-Format und ihre Implementierung sind für die Produktion nicht bindend.
+
+Scope:
+- In Scope: finaler OpenAPI-Contract, produktive lab-markers API (neu), Verlauf/Historie, Response-Modelle, Guards, Empty/Error-States, produktive Dashboard-Datenquellen.
+- Out of Scope: UI-Umsetzung (ELYO-93), Datenmodell-Aufbau (ELYO-91), Weiterentwicklung des Demo-Controllers.
+
+Enthaltene Issues:
+- ELYO-112, ELYO-113, ELYO-114, ELYO-115, ELYO-116, ELYO-117, ELYO-118.
+
+Sprint-Vorschlag:
+Sprint 3.
+
+Abhängigkeiten:
+ELYO-91 (produktives Datenmodell), ELYO-102 (Contract-Entscheidungen).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Alle produktiven Endpunkte sind API-first in OpenAPI spezifiziert und dagegen implementiert.
+- Kein produktiver Endpoint übernimmt Demo-Response-Formate ungeprüft; Formate folgen dem finalen Contract.
+- Company/Admin-Rollen erhalten keinerlei individuelle Laborwerte (403/404).
+- Empty- und Fehlerzustände sind im Contract definiert und getestet.
+- Alle Kind-Issues sind über Übergeordnet verknüpft.
+- Demo-Provider-Verhalten ist vom Produktionsverhalten klar getrennt (ELYO_DATA_MODE).
+
+Technische Hinweise:
+- Neuimplementierung in apps/api-laravel (Controller/Resources/Routes) auf der Health-Domäne; docs/api/openapi.yaml wird finalisiert (Demo-Entwurf nur Input).
+- Demo-Tests zeigen erwartete Autorisierungsfälle; produktive Tests validieren den finalen Contract.
+
+Privacy/Health-Data:
+Gesundheitsdaten betroffen (Laborwerte). Endpunkte setzen auf health_subject-Modell auf; strikt Employee-only; keine Aggregation Richtung Company ohne Suppression-Konzept.",,,Hoch,sprint-3 backend-gap lab-values openapi depends-on-health-data-hardening,
+ELYO-93,Epic,Demo Lab Values Dashboard Gap – Neuimplementierung Employee UI,"Kontext & Ziel:
+Das Employee-Laborwerte-Dashboard als neues produktives UI-Feature aufbauen: Karten/Grid, Erklärungskomponente, Zustände, Responsivität, nicht-diagnostisches Wording. Die Demo-Seite (lab-markers.component.ts) dient ausschließlich als UX-Referenz für User Journey, Informationshierarchie und Interaktionsmuster.
+
+Warum relevant:
+In main existiert kein Laborwerte-UI. Der Demo-Branch validiert die UX (gruppierte Karten, Hervorhebung auffälliger Werte, Privacy-Banner, Erklärungs-Popover), enthält aber hardcodierte Inhalte, Demo-Response-Formate und keine produktive Contract-Bindung. Die Produktion wird API-first gegen den finalen OpenAPI-Contract neu implementiert.
+
+Scope:
+- In Scope: produktive Neuimplementierung der Laborwerte-Seite inkl. Zustände, Wording und typisierter Datenzugriffsschicht.
+- Out of Scope: Backend/Datenmodell (ELYO-91/92), Empfehlungs-Flächen (ELYO-95), Erklärungs-Content-Modell (ELYO-94), Weiterentwicklung der Demo-Komponente.
+
+Enthaltene Issues:
+- ELYO-119, ELYO-120, ELYO-121, ELYO-122, ELYO-123, ELYO-124.
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-92 (API-Contract), ELYO-114 (OpenAPI).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Die produktive Seite ist API-first gegen den finalen Contract implementiert.
+- Kein produktiver UI-Code hängt technisch von Demo-Komponenten, Demo-Providern, Demo-Seeds oder Demo-Response-Formaten ab.
+- Keine Erklärungs-, Marker- oder Empfehlungsinhalte sind im produktiven Frontend hardcodiert.
+- Loading-, Empty-, Error-, Berechtigungs- und Nichtverfügbarkeits-Zustände sind produktiv definiert und getestet.
+- Nicht-diagnostisches Wording ist geprüft (nur 'unter Bereich' / 'im Orientierungsbereich' / 'über Bereich').
+- Alle Kind-Issues sind über Übergeordnet verknüpft.
+
+Technische Hinweise:
+- Neuaufbau unter apps/web-angular features/employee (Komponenten, View-Models, Service-Schicht); Demo-Seite nur als UX-Referenz lesen.
+- Frontend-Typography-Guideline (docs/ai-context/frontend-typography-guideline.md) beachten.
+
+Privacy/Health-Data:
+Gesundheitsdaten betroffen (Anzeige individueller Laborwerte). Nur Employee-Portal; Privacy-Hinweisbanner bleibt Pflicht; keine Company/Admin-Sicht.",,,Hoch,sprint-4 employee-dashboard lab-values frontend-gap ui-first depends-on-api-contract,
+ELYO-94,Epic,Knowledge Base / Laborwert-Erklärungen,"Kontext & Ziel:
+Erklärungsinhalte für Labormarker produktiv als versioniertes Backend-Content-Modell mit Quellen-Metadaten und Freigabeprozess neu aufbauen. Der hardcodierte Demo-Katalog (lab-marker-catalog.ts) dient nur als inhaltliche und strukturelle Referenz und wird nicht Teil des Produktionspfads.
+
+Warum relevant:
+Der Demo-Branch pflegt Marker-Erklärungen (12 Marker, inkl. Sicherheitshinweis 'Diese Erklärung ersetzt keine ärztliche Einordnung.') als TypeScript-Konstante im Frontend. Der eigene TODO im Demo-Code benennt bereits die Zielrichtung: versionierter Backend-Katalog mit fachlicher Freigabe. In main existiert nichts Vergleichbares.
+
+Scope:
+- In Scope: produktives Content-Modell, Quellen-/Referenz-Metadaten, Freigabeprozess, produktive Auslieferung an das Frontend.
+- Out of Scope: medizinische Interpretation, diagnostische Aussagen, personalisierte Inhalte, Weiterpflege des Frontend-Demo-Katalogs.
+
+Enthaltene Issues:
+- ELYO-125, ELYO-126, ELYO-127, ELYO-128.
+
+Sprint-Vorschlag:
+Sprint 4; Content-Modell-Design kann in Sprint 3 beginnen.
+
+Abhängigkeiten:
+ELYO-92 (API-Contract-Rahmen).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Erklärungsinhalte kommen ausschließlich versioniert aus dem Backend; nichts ist im produktiven Frontend hardcodiert.
+- Jeder Inhalt trägt Quellen-/Referenz-Metadaten und Freigabestatus.
+- Alle Kind-Issues sind über Übergeordnet verknüpft.
+- Nicht-diagnostisches Wording ist für alle Inhalte geprüft.
+- Der Demo-Katalog ist als demo-only klassifiziert und nicht im Produktionspfad enthalten.
+
+Technische Hinweise:
+- Neues Backend-Content-Modell, docs/api/openapi.yaml (finaler Contract), produktive Frontend-Anbindung; Demo-Katalog nur als Referenz für Inhaltsstruktur.
+
+Privacy/Health-Data:
+Keine personenbezogenen Gesundheitsdaten im Content selbst; Risiko liegt im Wording (keine Diagnose-Implikation). Kein health_subject_id-Bezug nötig.",,,Mittel,sprint-4 knowledge-base lab-values demo-gap depends-on-api-contract,
+ELYO-95,Epic,Measures Hub & Empfehlungs-Verknüpfung,"Kontext & Ziel:
+Produktive Maßnahmen-Erfahrung im Employee-Portal sauber aufbauen und die im Demo-UI angedeutete Verknüpfung Laborwert → Empfehlung regelbasiert, präventiv und nicht-diagnostisch neu konzipieren — oder bewusst weglassen. Die hardcodierten Demo-Flächen (FOCUS_ROUTINES/MEASURE_CARDS) sind reine Scope-Illustration und vom Produktionspfad ausgeschlossen.
+
+Warum relevant:
+Der Demo-Branch zeigt einen produktnahen Measures-Hub (UserSystemMeasureController, MeasureExecutionService, Katalogfelder, Piktogramme) sowie statische Empfehlungs-Karten im Laborwerte-UI, die eine Marker-zu-Maßnahme-Logik suggerieren, die nicht existiert. Der Hub-Backend-Teil wird gegen den finalen Contract verifiziert; die Empfehlungs-Verknüpfung wird — falls beauftragt — als neues Feature in der Health-Domäne entworfen.
+
+Scope:
+- In Scope: Ausschluss der Demo-Flächen aus dem Produktionspfad, Empfehlungs-Copy-Review, Employee-only-Kontext, regelbasierte Verknüpfung (später, Neuentwurf).
+- Out of Scope: neue Maßnahmen-Inhalte, Wearables, medizinische Triage, Übernahme der Demo-Karten.
+
+Enthaltene Issues:
+- ELYO-129, ELYO-130, ELYO-131, ELYO-132.
+
+Sprint-Vorschlag:
+Sprint 4 für Absicherung; regelbasierte Verknüpfung (ELYO-129) Later.
+
+Abhängigkeiten:
+ELYO-91 (für abgeleitete Gesundheitsdaten), ELYO-123 (Wording-Basis).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Der Produktionspfad enthält keine hardcodierten Pseudo-Empfehlungen.
+- Empfehlungen erscheinen ausschließlich im Employee-Kontext.
+- Alle Kind-Issues sind über Übergeordnet verknüpft.
+- Empfehlungs-Copy ist präventiv formuliert (Bewegung, Mobilität, Ergonomie, Wissen) ohne Diagnose-Implikation.
+- Produktions-Blocker (Ableitung aus Markerstatus vor Hardening) ist benannt.
+
+Technische Hinweise:
+- Referenz (nicht Grundlage): apps/web-angular lab-markers.component.ts (FOCUS_ROUTINES, MEASURE_CARDS), features/employee/pages/measure-*; Backend-Verifikation gegen finalen Contract.
+
+Privacy/Health-Data:
+Verknüpfung Markerstatus → Empfehlung erzeugt abgeleitete Gesundheitsdaten; erfordert health_subject-Modell und Employee-only-Zugriff. Company/Admin dürfen keine individuellen Empfehlungs-Zuordnungen sehen.",,,Mittel,sprint-4 measures-hub lab-values demo-gap depends-on-health-data-hardening,
+ELYO-96,Epic,Employee Dashboard & Check-in Neuimplementierung,"Kontext & Ziel:
+Erweitertes Employee-Dashboard (Wochen-Aggregate, Schlaf/Body-Signals/Health-Flag, Schonmodus) und adaptiven Check-in (Stepper/Chat) als produktive Features neu aufbauen. Die Demo-Umsetzungen — insbesondere die localStorage-Persistenz und die Demo-Provider-Blöcke — sind UX- und Scope-Referenz, nicht technisches Fundament.
+
+Warum relevant:
+Wellbeing-Aggregate existieren bereits als reale Berechnung (EmployeeDashboardService, Skala 1-5). Schlaf/Body-Signals/Health-Flag/Levers kommen aus Demo-JSON (in prod: null). Der adaptive Check-in persistiert ausschließlich in localStorage (elyo.demo.checkin.*) inkl. Symptomen und Krankheitstypen — bewusst demo-only. Produktive Persistenz und Dashboard-Blöcke werden API-first auf der Health-Domäne neu entworfen.
+
+Scope:
+- In Scope: produktiver Check-in-Contract und -Implementierung, Demo-Isolation, Skalen-Einführung, Schonmodus-Regelwerk (neu), produktive History-Timeline, Badges-Entscheidung.
+- Out of Scope: Mental-Health-Interpretation, Wearables, prädiktive Auswertung, Weiterentwicklung der Demo-Storage-Services.
+
+Enthaltene Issues:
+- ELYO-133, ELYO-134, ELYO-135, ELYO-136, ELYO-137, ELYO-138.
+
+Sprint-Vorschlag:
+Start Sprint 3 (Contracts/Verifikation), UI-Teile Sprint 4; Badges Later.
+
+Abhängigkeiten:
+ELYO-91 (vor Persistenz von Symptom-/Krankheitsdaten), ELYO-102.
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Produktive Check-in-Persistenz ist als finaler Contract definiert; keine echten Gesundheitsdaten vor Abschluss des Hardenings.
+- Kein produktiver Code hängt von CheckinDemoStorageService oder Demo-JSON-Providern ab.
+- Demo-localStorage-Daten sind klar als demo-only isoliert.
+- Alle Kind-Issues sind über Übergeordnet verknüpft.
+- Schonmodus-Regeln sind dokumentiert, präventiv und regelbasiert.
+- Produktions-Blocker sind benannt (Symptomdaten vor ELYO-91).
+
+Technische Hinweise:
+- Referenz (nicht Grundlage): apps/web-angular checkin-stepper/chat, checkin-demo-storage.service.ts, dashboard.component.ts, history.component.ts; produktiver Neuaufbau gegen finalen Contract.
+- Real nutzbar: EmployeeDashboardService-Aggregatlogik als fachliche Spezifikationsreferenz.
+
+Privacy/Health-Data:
+Gesundheitsdaten betroffen (Stimmung, Energie, Stress, Schlaf, Symptome, Krankheit). Produktive Persistenz erfordert health_subject_id und Freitext-Minimierung; Company/Admin sehen ausschließlich Aggregate über Suppression.",,,Hoch,sprint-3 employee-dashboard health-data demo-gap depends-on-health-data-hardening,
+ELYO-97,Epic,Company Insights Demo-Suite Absicherung,"Kontext & Ziel:
+Company-Insights aus dem Demo-Branch (Executive Summary, Risk Landscape, Usage Funnel, Infection Radar, Measure Impact/Statistics) absichern: Demo/Prod-Isolation verifizieren, produktive Aggregations- und Suppression-Regeln eigenständig spezifizieren, Infection Radar für das MVP blockiert halten. Demo-Aggregationen und Demo-JSON sind keine Produktionsgrundlage.
+
+Warum relevant:
+Der Demo-Branch führt eine Provider-Architektur ein (InsightsServiceProvider: Demo-JSON vs. Null-Provider/DB-Provider, Feature-Flags aus ELYO_DATA_MODE). Produktive Company-Statistiken müssen aus explizit spezifizierten Aggregations-, Mindestgruppen- und Suppression-Regeln aufgebaut werden — der vorhandene DbMeasureStatisticsProvider wird gegen diese Spezifikation geprüft, nicht ungeprüft übernommen. Infection Radar ist gesundheitsnah und liegt außerhalb des MVP-Scopes.
+
+Scope:
+- In Scope: Isolation-Verifikation, Spezifikation und Verifikation der Suppression-Regeln, Scope-Blockierung Infection Radar, Testfix.
+- Out of Scope: Produktivierung von Risk Landscape/Usage Funnel/Infection Radar, Übernahme von Demo-Aggregationen in die Produktion.
+
+Enthaltene Issues:
+- ELYO-139, ELYO-140, ELYO-141, ELYO-147.
+
+Sprint-Vorschlag:
+Verifikationen Sprint 3; Infection Radar bleibt Later/Blocked; Testfix sofort (Sprint 1).
+
+Abhängigkeiten:
+ELYO-103 (Scope-Entscheidung Insights).
+
+Akzeptanzkriterien:
+- In prod-Mode liefern alle Konzept-Endpoints keine Demo-Daten und die Flags sind aus.
+- Produktive Aggregations-/Suppression-Regeln (inkl. Mindestgruppengrößen) sind eigenständig spezifiziert, dokumentiert und getestet.
+- Keine Demo-Aggregation und kein Demo-JSON wird Teil des Produktionspfads.
+- Alle Kind-Issues sind über Übergeordnet verknüpft.
+- Infection Radar ist explizit als blockiert markiert.
+- Kein Company/Admin-Pfad liefert individuelle Gesundheitsdaten.
+
+Technische Hinweise:
+- Betroffen: apps/api-laravel Services/Insights/*, FeatureFlagService, config/elyo.php, InsightsController, MeasureImpactController, MeasureStatisticsController; apps/web-angular company pages + featureFlagGuard.
+
+Privacy/Health-Data:
+Aggregierte gesundheitsnahe Daten betroffen. Aggregate-only-Zugriff und Suppression sind Pflicht; Re-Identifikation kleiner Kohorten muss durch Schwellen verhindert werden. Infection Radar bleibt bis Privacy-Review blockiert.",,,Hoch,later demo-gap backend-gap privacy-hardening needs-decision,
+ELYO-98,Epic,"Testing, QA & Pilot Readiness","Kontext & Ziel:
+Testabdeckung und Qualitätssicherung für die produktiv neu aufgebauten Features: Laravel-Feature-Tests, Angular-Component-Tests, Privacy-Regressionstests, OpenAPI-Contract-Validierung, manuelle QA und Pilot-Readiness-Checkliste. Tests validieren produktive Akzeptanzkriterien, finale API-Contracts, Privacy-Regeln und die Demo/Produktions-Trennung — nicht das Demo-Verhalten.
+
+Warum relevant:
+Der Demo-Branch bringt Tests mit (u.a. EmployeeLabMarkersTest mit Privacy-Assertions), die die erwarteten Schutzregeln illustrieren. Für die Produktion braucht es eine eigenständige Testbasis gegen die finalen Contracts, eine systematische Privacy-Regression, OpenAPI-Validierung im CI und eine Pilot-Checkliste. 3 Tests in MeasureImpactAccessTest schlagen im Demo-Branch fehl (ELYO-147).
+
+Scope:
+- In Scope: produktiver Testausbau, Privacy-Regression, Contract-Validierung, manuelle QA, Pilot-Checkliste.
+- Out of Scope: Feature-Implementierung, Tests, die primär Demo-Verhalten konservieren.
+
+Enthaltene Issues:
+- ELYO-142, ELYO-143, ELYO-144, ELYO-145, ELYO-146.
+
+Sprint-Vorschlag:
+Sprint 5; Privacy-Regression startet bereits mit ELYO-111 in Sprint 2.
+
+Abhängigkeiten:
+ELYO-92, ELYO-93, ELYO-96 (Implementierungen müssen vorliegen).
+
+Akzeptanzkriterien:
+- Alle produktiven Endpunkte und UI-Flows sind durch automatisierte Tests gegen die finalen Contracts abgedeckt.
+- Tests validieren produktive Akzeptanzkriterien, Fehler- und Randfälle — nicht Demo-Implementierungsdetails.
+- Privacy-Regressionstests verhindern Company/Admin-Zugriff auf individuelle Gesundheitsdaten dauerhaft.
+- Die Demo/Produktions-Trennung (Flags, Provider, Storage) ist testseitig absichert.
+- Alle Kind-Issues sind über Übergeordnet verknüpft.
+- OpenAPI-Validierung läuft reproduzierbar (lokal/CI); Pilot-Readiness-Checkliste ist abgenommen.
+
+Technische Hinweise:
+- Betroffen: apps/api-laravel/tests/Feature/*, apps/web-angular *.spec.ts, docs/api/openapi.yaml, CI-Konfiguration.
+
+Privacy/Health-Data:
+Tests decken Gesundheitsdaten-Zugriffspfade ab; Testdaten bleiben synthetisch.",,,Hoch,sprint-5 tests pilot-readiness depends-on-implementation,
+ELYO-99,Task,Scope-Entscheidung je Demo-Feature: demo-only vs. produktiver Neuaufbau,"Kontext & Ziel:
+Für jedes Feature des Demo-Branches (Laborwerte-Dashboard, Marker-Erklärungen, adaptiver Check-in, Badges, History, Measures Hub, Company Insights) eine dokumentierte Entscheidung treffen: bleibt demo-only (reine Referenz), wird als produktives Feature neu aufgebaut, oder wird blockiert. Grundsatz: Demo-Code ist Referenz, keine Produktionsbasis.
+
+Umsetzungshinweise:
+- Grundlage: docs/ai-reviews/demo-employee-lab-values-dashboard-gap-analysis.md (Feature Gap Overview).
+- Ergebnis als Entscheidungsdokument unter docs/ referenzierbar ablegen.
+- Je Feature Klassifikation: UI-only/demo-only, produktiver Neuaufbau mit Backend-Contract, Health-Data-Hardening nötig, Privacy-Review nötig, blockiert.
+
+Sprint-Vorschlag:
+Sprint 1.
+
+Abhängigkeiten:
+Keine direkten Abhängigkeiten.
+
+Akzeptanzkriterien:
+- Jedes Feature aus der Gap-Analyse hat genau eine dokumentierte Scope-Entscheidung.
+- Für jedes produktiv beauftragte Feature ist festgehalten: Neuaufbau aus Zielarchitektur, Demo nur als UX-/Scope-Referenz.
+- Blockierte Features (z.B. Infection Radar) sind mit Begründung markiert.
+- Die Entscheidung ist mit Product/Privacy abgestimmt.
+
+Validierung:
+- Review des Entscheidungsdokuments durch Product Owner und Privacy-Verantwortliche.
+- Keine automatisierte Validierung möglich; manuelles Review.
+
+Privacy/Health-Data:
+Betrifft die Einstufung von Gesundheitsdaten-Features; selbst keine Datenverarbeitung.",,,Hoch,sprint-1 demo-gap needs-decision,ELYO-90
+ELYO-100,Task,Privacy-Zielarchitektur Identity/Health-Trennung dokumentieren,"Kontext & Ziel:
+Zielarchitektur für die Trennung von Identitäts- und Gesundheitsdaten festlegen: Identity-Domäne (users/companies/teams/roles), Mapping-Domäne (user_id ↔ health_subject_id, geschützt, minimiert, auditiert), Health-Domäne (health_subject_id), Reporting-Domäne (nur Aggregate mit Suppression). Diese Architektur ist die Grundlage des produktiven Neuaufbaus — nicht das Demo-Schema.
+
+Umsetzungshinweise:
+- Entscheidung: gleiche DB mit getrennten Schemata/DB-Rollen vs. separater Service.
+- Festlegen, wie das Mapping vor trivialem Join durch normalen Applikationscode geschützt wird (eigene DB-Rolle, Service-Boundary, kein Eloquent-Zugriff aus Company/Admin-Kontext).
+- Bestandsstrukturen als Risiko-Inventar benennen: demo lab_markers, wellbeing_entries, user_documents, anamnesis.
+
+Sprint-Vorschlag:
+Sprint 1.
+
+Abhängigkeiten:
+Keine direkten Abhängigkeiten.
+
+Akzeptanzkriterien:
+- Architektur-Dokument beschreibt alle vier Domänen inkl. Zugriffswegen.
+- Der Mapping-Schutz ist technisch konkret spezifiziert (nicht nur ID-Ersatz).
+- Das Dokument legt fest, dass das produktive Laborwert-Modell neu entworfen wird und das Demo-Schema nicht fortgeführt wird.
+- Abnahme durch Tech-Lead und Privacy-Verantwortliche liegt vor.
+
+Validierung:
+- Architektur-Review-Termin mit Abnahmeprotokoll.
+- Manuelle Prüfung: kein vorgeschlagener Zugriffsweg erlaubt Identity-Health-Join im normalen App-Code.
+
+Privacy/Health-Data:
+Kernstück der Gesundheitsdaten-Trennung; definiert health_subject_id, Mapping-Schutz, Audit-Anforderungen.",,,Höchste,sprint-1 privacy-hardening health-data data-model production-blocker,ELYO-90
+ELYO-101,Task,DSFA-Vorprüfung / Datenschutz-Review Laborwerte & Check-in,"Kontext & Ziel:
+Technische Vorprüfung für die Datenschutz-Folgenabschätzung: Datenkategorien, Zweck, Speicherorte, Zugriffe und Risiken der geplanten produktiven Laborwerte- und Check-in-Verarbeitung dokumentieren als Zuarbeit für die DSFA (keine Rechtsberatung). Der Demo-Branch dient als Anschauungsmaterial für die geplanten Datenkategorien.
+
+Umsetzungshinweise:
+- Datenflüsse der Zielarchitektur dokumentieren; Demo-Befunde als Risiko-Inventar: lab_markers (user_id, Markerwert, Status), Check-in (mood/energy/stress/note), localStorage-Demo-Daten, Demo-Seeder.
+- Risikoklassifikation aus der Gap-Analyse übernehmen (Health Data Separation Review).
+- Offene Fragen an DSB/extern übergeben.
+
+Sprint-Vorschlag:
+Sprint 1.
+
+Abhängigkeiten:
+Keine direkten Abhängigkeiten.
+
+Akzeptanzkriterien:
+- Technisches Datenfluss-Dokument für die geplante produktive Laborwerte- und Check-in-Verarbeitung liegt vor.
+- Risiken sind klassifiziert (Low/Medium/High/Blocker) mit Dateireferenzen.
+- Übergabe an Datenschutz-Verantwortliche ist erfolgt.
+
+Validierung:
+- Review durch Datenschutz-Verantwortliche.
+- Manuelle Vollständigkeitsprüfung gegen die Gap-Analyse.
+
+Privacy/Health-Data:
+Direkt gesundheitsdatenbezogen; Ergebnis steuert Blocker-Status von ELYO-91-Arbeiten.",,,Höchste,sprint-1 privacy-hardening health-data,ELYO-90
+ELYO-102,Task,API-Contract-Entscheidungen Laborwerte & Dashboard-Blöcke (API-first),"Kontext & Ziel:
+Verbindliche, API-first getroffene Contract-Entscheidungen für die Produktions-APIs: lab-markers (Read, Verlauf, Schreibpfad ja/nein), erweiterter Dashboard-Payload (wellbeing/metrics/sleep/bodySignals/healthFlag/levers), Check-in-Persistenz. Contracts werden aus Domänenmodell und Privacy-Entscheidungen abgeleitet; Demo-Response-Formate sind nicht bindend.
+
+Umsetzungshinweise:
+- Offene Frage klären: Gibt es einen Schreib-/Importpfad für Laborwerte (manuelle Eingabe, Dokumentenimport)? Demo zeigt nur Seed + Read.
+- Der OpenAPI-Entwurf des Demo-Branches (docs/api/openapi.yaml) dient als Referenz-Input, nicht als Grundlage.
+- Route-Semantik /employee/measures vs. /employee/company-measures produktiv sauber entscheiden (Breaking-Change-Bewertung gegenüber main).
+
+Sprint-Vorschlag:
+Sprint 1.
+
+Abhängigkeiten:
+ELYO-99 (Scope-Entscheidungen).
+
+Akzeptanzkriterien:
+- Für jeden produktiven Endpoint existiert eine Contract-Entscheidung (Felder, Zustände, Autorisierung), abgeleitet aus Domänenmodell und Privacy-Entscheidungen.
+- Der Schreibpfad für Laborwerte ist entschieden und dokumentiert.
+- Abweichungen vom Demo-Format sind erlaubt und dort dokumentiert, wo sie fachlich geboten sind.
+- Breaking Changes gegenüber main sind identifiziert.
+- Entscheidungen sind als Input für ELYO-114 (finaler OpenAPI-Contract) referenzierbar.
+
+Validierung:
+- Review der Contract-Entscheidungen mit Frontend- und Backend-Verantwortlichen.
+- Abgleich mit den fachlichen Anforderungen aus der Gap-Analyse (nicht mit dem Demo-Code).
+
+Privacy/Health-Data:
+Gesundheitsdaten betroffen (Contract-Ebene); Contracts müssen zum health_subject-Zielmodell kompatibel sein.",,,Hoch,sprint-1 openapi backend-gap lab-values,ELYO-90
+ELYO-103,Task,"Scope-Entscheidung Company Insights (Infection Radar, Risk Landscape, Usage Funnel)","Kontext & Ziel:
+Entscheiden, welche Company-Insights-Module im MVP-Scope bleiben (demo-gated Referenz), welche als produktive Aggregationen eigenständig neu spezifiziert und gebaut werden dürfen (nur mit Suppression und Mindestgruppengrößen) und welche blockiert werden (Infection Radar: gesundheitsnah, Nähe zu prädiktiver Abwesenheitsanalytik).
+
+Umsetzungshinweise:
+- Module: Executive Summary, Risk Landscape, Usage Funnel, Infection Radar, Measure Impact, Measure Statistics.
+- Referenz: FeatureFlagService (Flags aus ELYO_DATA_MODE), InsightsServiceProvider (Null-Provider in prod), AnonymityService-Schwelle als fachlicher Input.
+- MVP-Regel: prädiktive Analytik und klinische Deutung sind out of scope.
+- Festhalten: Demo-Aggregationen und Demo-JSON sind keine Produktionsgrundlage.
+
+Sprint-Vorschlag:
+Sprint 1.
+
+Abhängigkeiten:
+Keine direkten Abhängigkeiten.
+
+Akzeptanzkriterien:
+- Je Insights-Modul liegt eine Entscheidung vor: demo-only, produktiver Neuaufbau mit Auflagen, blockiert.
+- Infection Radar ist explizit entschieden (Empfehlung: blockiert bis Privacy-Review).
+- Auflagen (Suppression, Mindestkohorten) sind je produktivierbarem Modul benannt.
+- Es ist dokumentiert, dass produktive Aggregationen eigenständig spezifiziert werden und keine Demo-Aggregation übernommen wird.
+
+Validierung:
+- Entscheidungsdokument-Review mit Product und Privacy.
+- Abgleich gegen MVP-Scope-Regeln (keine prädiktive Analytik, keine Diagnostik).
+
+Privacy/Health-Data:
+Aggregierte gesundheitsnahe Daten; Entscheidung definiert Aggregate-only- und Suppression-Auflagen.",,,Hoch,sprint-1 demo-gap needs-decision backend-gap,ELYO-90
+ELYO-104,Story,health_subject_id und geschützte Mapping-Domäne einführen,"User Story:
+Als Plattform-Betreiber möchte ich Gesundheitsdaten nur über eine geschützte health_subject_id referenzieren, damit Identität und Gesundheitsdaten nicht durch normalen Applikationscode verknüpfbar sind.
+
+Kontext & Ziel:
+Aufbau einer health_subjects-Struktur und einer Mapping-Tabelle user_id ↔ health_subject_id in einer eigenen, zugriffsbeschränkten Domäne gemäß Zielarchitektur (ELYO-100). Zugriff auf das Mapping nur über einen dedizierten, auditierten Service. Kompletter Neuaufbau — es existiert keinerlei Vorlage im Bestand.
+
+Demo-Gap:
+main und Demo-Branch kennen keinerlei Pseudonymisierung; das Demo-Schema lab_markers hängt direkt an users (Migration 2026_07_05_010000) und belegt damit das Risiko, nicht die Lösung.
+
+Sprint-Vorschlag:
+Sprint 2.
+
+Abhängigkeiten:
+ELYO-100 (Zielarchitektur), ELYO-101 (DSFA-Vorprüfung).
+
+Akzeptanzkriterien:
+- Mapping-Tabelle existiert in getrenntem Schema oder mit eigener DB-Rolle, nicht frei joinbar aus Standard-App-Verbindungen.
+- Auflösung user_id → health_subject_id ist nur über den Mapping-Service möglich; Company/Admin-Kontexte haben keinen Zugriffspfad.
+- Jeder Mapping-Zugriff ist auditierbar (Basis für ELYO-107).
+- Erfolgs- und Fehlerpfade (fehlendes Mapping) sind definiert und getestet.
+- Bestehendes Verhalten (main-Features) bleibt unverändert.
+
+Technische Hinweise:
+- Neue Migrationen, Mapping-Service (z.B. app/Services/Privacy/), DB-Rollen/Schema-Konfiguration, Feature-Tests.
+- OpenAPI unberührt (interne Struktur).
+
+Privacy/Health-Data:
+Kernmaßnahme der Trennung: health_subject_id, Mapping-Schutz, Audit-Pflicht. user_id in Health-Tabellen ist damit ausgeschlossen.",,,Höchste,sprint-2 health-data privacy-hardening data-model production-blocker,ELYO-91
+ELYO-105,Task,Produktives Laborwert-Datenmodell in der Health-Domäne neu aufbauen,"Kontext & Ziel:
+Das produktive Datenmodell für Laborwerte in der Health-Domäne neu entwerfen und aufbauen: health_subject_id-Referenz, Verlaufstauglichkeit (Messzeitpunkt, mehrere Werte je Marker, vgl. ELYO-113), Provenance-Entscheidung. Die Demo-Tabelle lab_markers (direkter user_id-FK, unique(user_id, marker_key), cascadeOnDelete) ist demo-only, dient nur als Scope-Referenz für die benötigten Fachfelder und wird nicht migriert oder weiterentwickelt.
+
+Umsetzungshinweise:
+- Schema neu entwerfen: health_subject_id, marker_key, Wert, Status, Messzeitpunkt, optional Herkunft; Constraints aus fachlichen Regeln ableiten.
+- Marker-Metadaten (Name, Einheit, Orientierungsbereiche, Gruppen) produktiv modellieren; die hardcodierte LabMarkerRegistry des Demo-Branches ist nur inhaltliche Referenz.
+- Demo-Tabelle und Demo-Seeder bleiben im Demo-Pfad; produktive Seeds/Fixtures werden eigenständig definiert.
+- Löschverhalten gemäß Retention-Konzept (ELYO-108) statt cascadeOnDelete auf users.
+
+Sprint-Vorschlag:
+Sprint 2.
+
+Abhängigkeiten:
+ELYO-104 (Mapping-Domäne).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Das produktive Laborwert-Schema referenziert ausschließlich health_subject_id; keine user_id-Spalte.
+- Das Schema ist verlaufstauglich (mehrere Werte je Marker mit Messzeitpunkt).
+- Kein produktiver Code liest oder schreibt die Demo-Tabelle lab_markers oder nutzt Demo-Seeds.
+- Kein Eloquent-Pfad erlaubt Join Health-Daten → users im Standard-App-Kontext.
+- Feature-Tests decken das neue Modell ab (Anlage, Abfrage über Mapping-Service, Fehlerfälle).
+
+Validierung:
+- php artisan test für die neuen Feature-Tests.
+- Migrationslauf auf frischer Test-DB.
+- Statische Suche: kein produktiver Bezug auf App\Models\LabMarker/user_id-Laborwert-Pfade.
+
+Privacy/Health-Data:
+Direkte Gesundheitsdaten (Laborwerte). Safeguards: health_subject_id, Mapping nur über Service, Retention-konformes Löschverhalten.",,,Höchste,sprint-2 health-data lab-values data-model privacy-hardening production-blocker depends-on-privacy-review,ELYO-91
+ELYO-106,Task,Mapping-Zugriffsschutz und Service-Boundary durchsetzen,"Kontext & Ziel:
+Technische Durchsetzung, dass das user↔health_subject-Mapping nicht durch normalen Applikationscode joinbar ist: getrennte DB-Rollen/Schemata, dedizierter Service, statische Prüfregeln.
+
+Umsetzungshinweise:
+- DB-Rolle der Standard-App-Verbindung ohne Rechte auf die Mapping-Tabelle.
+- Zugriff nur über dedizierten Service mit engem Interface (resolve für den authentifizierten Employee-Kontext).
+- Architektur-Test/statische Analyse: kein Import des Mapping-Models außerhalb der Privacy-Domäne.
+
+Sprint-Vorschlag:
+Sprint 2.
+
+Abhängigkeiten:
+ELYO-104.
+
+Akzeptanzkriterien:
+- Standard-DB-Verbindung kann die Mapping-Tabelle nachweislich nicht lesen (Test).
+- Statische Regel schlägt fehl, wenn Mapping-Zugriff außerhalb der Privacy-Domäne eingeführt wird.
+- Company/Admin-HTTP-Pfade haben keinen Codepfad zum Mapping.
+- Bestehendes Verhalten bleibt stabil.
+
+Validierung:
+- Feature-Test: Query auf Mapping-Tabelle über Standard-Verbindung schlägt fehl.
+- Architektur-Test (z.B. PHPArkitect/Deptrac falls vorhanden; sonst Grep-basierte CI-Prüfung dokumentieren).
+
+Privacy/Health-Data:
+Schützt das Herzstück der Pseudonymisierung; ohne diese Maßnahme ist ID-Ersatz wirkungslos.",,,Höchste,sprint-2 privacy-hardening health-data data-model production-blocker,ELYO-91
+ELYO-107,Task,Audit-Logging-Konzept für Mapping- und Health-Zugriffe,"Kontext & Ziel:
+Konzept und Basis-Implementierung für Audit-Logging: jeder Zugriff auf das Mapping und jeder lesende/schreibende Zugriff auf Health-Tabellen außerhalb des Employee-Selbstzugriffs wird protokolliert.
+
+Umsetzungshinweise:
+- Log-Inhalte: wer (Service/Kontext), wann, welcher Zweck, welches Subject (pseudonymisiert).
+- Speicherung getrennt von Applikationslogs; Manipulationsschutz bewerten.
+- Alerting-Idee für ungewöhnliche Zugriffe skizzieren.
+
+Sprint-Vorschlag:
+Sprint 2.
+
+Abhängigkeiten:
+ELYO-104, ELYO-106.
+
+Akzeptanzkriterien:
+- Audit-Konzept ist dokumentiert und abgenommen.
+- Mapping-Service schreibt Audit-Einträge für jede Auflösung.
+- Audit-Einträge enthalten keine Klartext-Gesundheitswerte.
+- Bestehende Performance bleibt akzeptabel (kein N+1-Logging).
+
+Validierung:
+- Feature-Test: Mapping-Auflösung erzeugt Audit-Eintrag.
+- Manuelles Review des Konzepts durch Privacy-Verantwortliche.
+
+Privacy/Health-Data:
+Auditierung ist Auflage der Mapping-Domäne; Logs selbst dürfen keine Gesundheitsdaten leaken.",,,Hoch,sprint-2 privacy-hardening health-data,ELYO-91
+ELYO-108,Task,Retention- und Löschkonzept für Gesundheitsdaten,"Kontext & Ziel:
+Aufbewahrungs- und Löschregeln für Health-Einträge definieren und technisch verankern: Laborwerte, Check-in-/Wellbeing-Einträge, künftige Symptomdaten; Löschverhalten bei User-Löschung für die neue Health-Domäne definieren (das cascadeOnDelete des Demo-Schemas ist keine Vorgabe).
+
+Umsetzungshinweise:
+- Retention-Fristen je Datenkategorie vorschlagen (fachliche/rechtliche Abstimmung außerhalb dieses Tasks).
+- Löschpfad: User-Löschung → Mapping-Löschung → Health-Daten löschen oder irreversibel verwaisen lassen (Entscheidung dokumentieren).
+- Automatisierte Löschjobs skizzieren.
+
+Sprint-Vorschlag:
+Sprint 2.
+
+Abhängigkeiten:
+ELYO-104, ELYO-100.
+
+Akzeptanzkriterien:
+- Retention-Matrix je Health-Datenkategorie liegt vor.
+- Löschverhalten bei User-Löschung ist definiert, implementiert oder als Folge-Task eingeplant.
+- Kein Health-Datensatz bleibt ohne definierte Aufbewahrungsregel.
+- Bestehende Löschpfade (users cascade) sind für das neue Modell bewusst entschieden.
+
+Validierung:
+- Test: User-Löschung führt zum spezifizierten Verhalten der Health-Daten.
+- Manuelles Review der Retention-Matrix.
+
+Privacy/Health-Data:
+Direkt gesundheitsdatenbezogen; verhindert unbegrenzte Speicherung sensibler Werte.",,,Hoch,sprint-2 privacy-hardening health-data data-model,ELYO-91
+ELYO-109,Task,Freitext-Minimierung Check-in note-Feld,"Kontext & Ziel:
+Das Freitextfeld note im bestehenden Check-in (CheckinRequest, nullable, max 2000 Zeichen, direkt an user_id via wellbeing_entries) minimieren und für den produktiven Check-in-Neuaufbau (ELYO-133) ausschließen oder in die Health-Domäne verlagern.
+
+Umsetzungshinweise:
+- Optionen bewerten: (a) Feld entfernen, (b) strukturierte Auswahl statt Freitext, (c) Beibehalten nur in Health-Domäne mit health_subject_id.
+- Der produktive Check-in-Contract (ELYO-133) übernimmt kein unminimiertes Freitextfeld.
+- Bestandsdaten-Umgang definieren.
+
+Sprint-Vorschlag:
+Sprint 2.
+
+Abhängigkeiten:
+ELYO-100 (Zielarchitektur-Entscheidung).
+
+Akzeptanzkriterien:
+- Entscheidung zur Freitext-Behandlung ist dokumentiert und umgesetzt.
+- Kein neues Freitext-Gesundheitsdatum wird gegen user_id gespeichert.
+- Der produktive Check-in-Contract enthält kein unminimiertes Freitextfeld.
+- Validierung und OpenAPI sind konsistent angepasst; bestehende Check-ins funktionieren weiter (Regressionstest).
+
+Validierung:
+- php artisan test --filter=EmployeeTest (Check-in-Pfade).
+- OpenAPI-Abgleich des Check-in-Schemas.
+
+Privacy/Health-Data:
+Freitext kann beliebige Gesundheits-/Krankheitsangaben enthalten — aktuell direkt user-verknüpft; hohes Minimierungspotenzial.",,,Hoch,sprint-2 privacy-hardening health-data data-model,ELYO-91
+ELYO-110,Task,Bewertung wellbeing_entries für health_subject-Anbindung,"Kontext & Ziel:
+Bewerten und entscheiden, ob und wann die bestehende wellbeing_entries-Tabelle (mood/energy/stress/score an user_id, company_id) auf das health_subject-Modell überführt wird; Migrationspfad skizzieren.
+
+Umsetzungshinweise:
+- Bestandsanalyse: Nutzung durch EmployeeDashboardService, WellbeingService, PointsService, Company-Aggregate.
+- Aufwand/Risiko einer Überführung vs. Übergangsregel 'neue Health-Features nur noch auf health_subject_id' dokumentieren.
+- Empfehlung mit Zeitpunkt abgeben.
+
+Sprint-Vorschlag:
+Sprint 2.
+
+Abhängigkeiten:
+ELYO-104.
+
+Akzeptanzkriterien:
+- Bewertungsdokument mit klarer Empfehlung liegt vor.
+- Auswirkungen auf Aggregations- und Streak-Logik sind benannt.
+- Folge-Issues sind angelegt oder bewusst zurückgestellt (dokumentiert).
+
+Validierung:
+- Review durch Backend-Lead.
+- Kein Codechange in diesem Task erforderlich; falls doch, Tests der betroffenen Services grün.
+
+Privacy/Health-Data:
+Wellbeing-Daten sind Gesundheitsdaten; Task klärt den Härtungs-Fahrplan für den Bestand.",,,Mittel,sprint-2 health-data data-model privacy-hardening,ELYO-91
+ELYO-111,Task,Privacy-Regression-Testsuite (Grundgerüst),"Kontext & Ziel:
+Automatisierte Privacy-Regressionstests aufsetzen, die dauerhaft die produktiven Privacy-Regeln validieren: kein Company/Admin-Endpoint liefert individuelle Gesundheitsdaten; Demo-Provider liefern in prod-Mode nichts; Mapping ist nicht joinbar.
+
+Umsetzungshinweise:
+- Testfälle aus der Zielarchitektur und den Privacy-Entscheidungen ableiten (nicht aus dem Demo-Verhalten); die Demo-Assertions (EmployeeLabMarkersTest: Company/Admin → 403/404) illustrieren die erwarteten Regeln.
+- Testfälle: alle /company- und /admin-Routen gegen Health-Payload-Muster prüfen; ELYO_DATA_MODE=prod-Verhalten der Insights-Endpoints; Demo/Prod-Trennung.
+- Als eigene Testsuite/Marker organisieren, damit sie in CI separat läuft.
+
+Sprint-Vorschlag:
+Sprint 2 (Start); Vervollständigung in Sprint 5 (ELYO-144).
+
+Abhängigkeiten:
+ELYO-104, ELYO-106.
+
+Akzeptanzkriterien:
+- Suite existiert und läuft in CI.
+- Mindestens: Laborwert-Zugriffsverbote, prod-Mode-Nullverhalten, Mapping-Zugriffsverbot, Demo/Prod-Trennung sind abgedeckt.
+- Suite schlägt fehl, wenn ein neuer Company-Endpoint individuelle Health-Felder ausliefert (Pattern-basiert dokumentiert).
+- Die Suite validiert produktive Privacy-Regeln, nicht Demo-Implementierungsdetails.
+- Bestehende Tests bleiben grün.
+
+Validierung:
+- php artisan test --testsuite=privacy (oder gewählter Mechanismus).
+- CI-Lauf verifizieren.
+
+Privacy/Health-Data:
+Testet Gesundheitsdaten-Schutzpfade; verwendet ausschließlich synthetische Seeds.",,,Hoch,sprint-2 tests privacy-hardening health-data,ELYO-91
+ELYO-112,Story,Produktive Employee Lab-Markers API neu implementieren (API-first),"User Story:
+Als Employee möchte ich meine Laborwerte über eine stabile, ausschließlich mir zugängliche API abrufen, damit das Laborwerte-Dashboard zuverlässig und datenschutzkonform funktioniert.
+
+Kontext & Ziel:
+Den produktiven Employee-Lab-Markers-Endpoint gemäß finalem OpenAPI-Contract (ELYO-114) auf der neuen Health-Domäne (ELYO-105) implementieren: Auflösung über den Mapping-Service, produktive Response-Modelle, definierte Empty-/Fehlerzustände, strikte Employee-only-Autorisierung. Der Demo-Endpoint (LabMarkerController) wird nicht weiterentwickelt; sein Response-Format ist nicht bindend.
+
+Demo-Gap:
+main: Endpoint existiert nicht. Demo: LabMarkerController liefert Inline-Array aus dem Demo-Schema mit Metadaten aus der hardcodierten LabMarkerRegistry — nützlich als Scope-Referenz (welche Felder braucht die UX), nicht als Implementierungsgrundlage.
+
+Sprint-Vorschlag:
+Sprint 3.
+
+Abhängigkeiten:
+ELYO-104, ELYO-105 (Health-Domäne), ELYO-102 (Contract), ELYO-114 (finale Spec).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Der Endpoint ist gegen den finalen OpenAPI-Contract implementiert (Schema-Assertions im Test).
+- Erfolgspfad: Employee erhält eigene Marker mit Metadaten (Name, Einheit, Orientierungsbereich, Gruppe, Status).
+- Empty-State: Employee ohne Werte erhält definierte leere Antwort (kein Fehler).
+- Company/Admin/unauthentifiziert: 403/404/401 gemäß Portal-Guards.
+- Fehlerpfad (fehlendes Mapping, unbekannter Marker) ist im Contract definiert und getestet.
+- Kein Codepfad nutzt das Demo-Schema, Demo-Seeds oder user_id-basierte Abfragen.
+
+Technische Hinweise:
+- Neuer Controller/Service auf der Health-Domäne; produktive Resource (ELYO-115); routes/api.php.
+- Tests über ELYO-142 gegen den finalen Contract.
+
+Privacy/Health-Data:
+Direkte Gesundheitsdaten; health_subject_id über Mapping-Service; keinerlei Company/Admin-Aggregation ohne separates Suppression-Konzept.",,,Hoch,sprint-3 backend-gap lab-values health-data depends-on-health-data-hardening,ELYO-92
+ELYO-113,Story,Laborwert-Verlauf von Beginn an im produktiven Modell verankern,"User Story:
+Als Employee möchte ich die Entwicklung meiner Laborwerte über die Zeit sehen können, damit ich Veränderungen zur persönlichen Orientierung nachvollziehen kann.
+
+Kontext & Ziel:
+Verlaufstauglichkeit (mehrere Werte je Marker, Messzeitpunkt, optionale Herkunft) als Anforderung an das neue produktive Datenmodell (ELYO-105) und den finalen API-Contract (ELYO-114) verankern. Das Demo-Schema zeigt mit unique(user_id, marker_key) genau die Einschränkung, die die Produktion vermeiden muss.
+
+Demo-Gap:
+main: kein Laborwert-Modell. Demo: Ein-Wert-pro-Marker-Schema ohne Messdatum (nur created_at/updated_at), Seed-only-Befüllung — als Negativ-Referenz dokumentiert.
+
+Sprint-Vorschlag:
+Sprint 3.
+
+Abhängigkeiten:
+ELYO-105 (Modell), ELYO-102 (Contract-Entscheidung Schreibpfad).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Das produktive Modell erlaubt mehrere Werte je Marker mit Messzeitpunkt (kein Ein-Wert-Constraint).
+- Der API-Contract für Verlauf ist definiert (auch wenn die UI zunächst nur den letzten Wert zeigt).
+- Herkunft/Provenance-Feld ist entschieden (Import, manuelle Eingabe, unbekannt).
+- Empty-/Einzelwert-/Mehrwert-Fälle sind getestet.
+- Keine Übernahme des Demo-Constraints oder der Demo-Seeds in den Produktionspfad.
+
+Technische Hinweise:
+- Anforderung fließt in ELYO-105 (Schema) und ELYO-114 (Contract); produktive Fixtures eigenständig definieren.
+
+Privacy/Health-Data:
+Direkte Gesundheitsdaten; Verlauf erhöht Sensibilität (Trends) — Zugriff bleibt strikt Employee-only auf health_subject_id-Basis.",,,Mittel,sprint-3 data-model lab-values backend-gap depends-on-health-data-hardening,ELYO-92
+ELYO-114,Task,Finalen OpenAPI-Contract Laborwerte & Dashboard erstellen (API-first),"Kontext & Ziel:
+Den finalen, verbindlichen OpenAPI-Contract für die produktiven Employee-Endpunkte API-first erstellen: aus Domänenmodell, Privacy-Entscheidungen und Contract-Entscheidungen (ELYO-102) abgeleitet. Der Spec-Entwurf des Demo-Branches (docs/api/openapi.yaml, +910 Zeilen) ist Referenz-Input und wird kritisch geprüft, nicht fortgeschrieben.
+
+Umsetzungshinweise:
+- Endpunkte: /employee/lab-markers (inkl. Verlauf gemäß ELYO-113), erweiterter Dashboard-Payload (nullable-Semantik je Block), /employee/measures/{id}.
+- Fehler-/Empty-Antworten und Autorisierungsanforderungen vollständig spezifizieren.
+- Abweichungen vom Demo-Entwurf dokumentieren; kein Feld nur deshalb übernehmen, weil die Demo es liefert.
+- Versionierung/Änderungshistorie im Spec-Header pflegen.
+
+Sprint-Vorschlag:
+Sprint 3.
+
+Abhängigkeiten:
+ELYO-102 (Contract-Entscheidungen).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Alle produktiven Employee-Endpoints sind vollständig spezifiziert (Parameter, Responses, Fehlerfälle, Security).
+- Der Contract ist aus Domänenmodell und Privacy-Entscheidungen abgeleitet; Demo-Übernahmen sind bewusst entschieden und dokumentiert.
+- Nullable-Semantik der Dashboard-Blöcke ist spezifiziert.
+- Die Spec validiert fehlerfrei mit dem in ELYO-145 gewählten Validator.
+- Implementierung (ELYO-112/117) referenziert diese Spec als einzige Quelle.
+
+Validierung:
+- OpenAPI-Validator-Lauf (Tooling gemäß ELYO-145; falls noch nicht vorhanden: swagger-cli/redocly lokal dokumentieren).
+- Review der Abweichungsliste Demo-Entwurf vs. finaler Contract.
+
+Privacy/Health-Data:
+Contract beschreibt Gesundheitsdaten-Endpunkte; Spec markiert Employee-only-Sicherheitsanforderungen (Security Schemes/Beschreibung).",,,Hoch,sprint-3 openapi backend-gap depends-on-api-contract,ELYO-92
+ELYO-115,Task,Produktive Response-Modelle (Resources) definieren,"Kontext & Ziel:
+Produktive API-Response-Modelle für Laborwerte und Dashboard-Blöcke neu definieren (Laravel JsonResources), abgeleitet aus dem finalen OpenAPI-Contract. Das Inline-Array-Format des Demo-Controllers wird nicht übernommen; Kompatibilität zum Demo-Frontend ist kein Ziel.
+
+Umsetzungshinweise:
+- app/Http/Resources/Employee/LabMarkerResource gemäß finalem Contract (markerKey, name, unit, value, status, isHighlighted, low, high, group — soweit der Contract sie bestätigt).
+- Sortier-/Gruppierungsregeln fachlich definieren (nicht aus der Demo-Registry-Reihenfolge ableiten, sondern dort bestätigen oder ändern).
+- Einheitliches Resource-Muster für Dashboard-Blöcke.
+
+Sprint-Vorschlag:
+Sprint 3.
+
+Abhängigkeiten:
+ELYO-114 (finaler Contract), ELYO-112 (gleiche Baustelle; als Teil-Lieferung).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Resource-Klassen existieren und werden von den produktiven Controllern verwendet.
+- Response-Format entspricht exakt dem finalen OpenAPI-Contract (Schema-Assertions).
+- Keine internen IDs (user_id/health_subject_id) im Payload.
+- Tests validieren das Contract-Format, nicht das Demo-Format.
+
+Validierung:
+- php artisan test (Schema-Assertions der neuen Endpunkte).
+- Contract-Abgleich Resource ↔ OpenAPI.
+
+Privacy/Health-Data:
+Gesundheitsdaten im Payload; Resources stellen sicher, dass keine internen Identifikatoren ausgeliefert werden.",,,Mittel,sprint-3 backend-gap lab-values depends-on-api-contract,ELYO-92
+ELYO-116,Task,Autorisierung & Portal-Guards für produktive Endpunkte absichern,"Kontext & Ziel:
+Autorisierungsmatrix für alle produktiven Endpunkte aus der Zielarchitektur ableiten und technisch durchsetzen: Employee-Routen (lab-markers, measures/{id}), Company-Routen (statistics, impact, insights), inkl. Team-Scoping.
+
+Umsetzungshinweise:
+- Matrix erstellen: Route × Rolle (Employee, Company-Admin, Company-Manager, Admin, unauthentifiziert) — aus den Privacy-Entscheidungen abgeleitet.
+- Die Demo-Tests (EmployeeLabMarkersTest, MeasureImpactAccessTest nach Fix ELYO-147, TenantScopeTest) illustrieren erwartete Fälle; produktive Tests validieren die Matrix eigenständig.
+- Lücken mit Tests + Implementierung schließen; besonders: kein Company-Pfad erreicht individuelle Laborwerte.
+
+Sprint-Vorschlag:
+Sprint 3.
+
+Abhängigkeiten:
+ELYO-147 (Testfix), ELYO-112.
+
+Akzeptanzkriterien:
+- Autorisierungsmatrix ist dokumentiert und vollständig durch produktive Tests abgedeckt.
+- Jede Rolle erhält je Route exakt das spezifizierte Verhalten (200/403/404/401).
+- Tenant-/Team-Scoping ist für Measure-Statistiken/Impact nachgewiesen.
+- Keine Regression in bestehenden Guards.
+
+Validierung:
+- php artisan test für die Autorisierungs-Testsuite.
+- Review der Matrix gegen die Privacy-Entscheidungen.
+
+Privacy/Health-Data:
+Schützt Gesundheits- und Aggregatdaten; Company/Admin-Rollen technisch von Individualdaten ferngehalten.",,,Hoch,sprint-3 backend-gap tests privacy-hardening depends-on-implementation,ELYO-92
+ELYO-117,Story,Employee-Dashboard-Blöcke produktiv neu aufbauen (API-first),"User Story:
+Als Employee möchte ich auf meinem Dashboard reale, aktuelle Kennzahlen (Wohlbefinden, Schlaf, Körpersignale, Schonmodus-Hinweis) sehen, damit die Anzeige meinem tatsächlichen Check-in-Verhalten entspricht.
+
+Kontext & Ziel:
+Je Dashboard-Block eine produktive Entscheidung treffen und umsetzen: produktive Datenquelle aus der Health-Domäne neu aufbauen, Block nicht ausliefern, oder explizit demo-only belassen. Der produktive Dashboard-Payload wird gegen den finalen Contract implementiert; die Demo-Provider-Blöcke (DemoEmployeeDashboardProvider, Demo-JSON) zeigen nur die angestrebte UX und sind kein Bestandteil des Produktionspfads.
+
+Demo-Gap:
+main: einfaches Dashboard (Einträge, Streak, Punkte). Demo: erweiterter Payload — wellbeing/metrics real berechnet (EmployeeDashboardService als fachliche Referenz), sleep/bodySignals/healthFlag/levers aus Demo-JSON mit Null-Fallbacks in prod; Lever-Auflösung auf zugewiesene Maßnahmen (resolveLevers) als Scope-Referenz.
+
+Sprint-Vorschlag:
+Sprint 3.
+
+Abhängigkeiten:
+ELYO-91 (für Symptom-/Schlafquellen), ELYO-133 (Check-in-Persistenz), ELYO-102, ELYO-114.
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Je Dashboard-Block existiert eine dokumentierte, umgesetzte Entscheidung (produktive Quelle / entfällt / demo-only).
+- Der produktive Payload entspricht dem finalen OpenAPI-Contract (Schema-Assertions).
+- Kein produktiver Codepfad hängt von Demo-Providern oder Demo-JSON ab.
+- Prod-Mode liefert keine Demo-Inhalte; nicht verfügbare Blöcke haben definierte Empty-Semantik im Contract.
+- Lever-/Empfehlungsdaten referenzieren ausschließlich eigene Maßnahmen des Users (Test).
+- Dashboard bleibt Employee-only (Autorisierungstest).
+
+Technische Hinweise:
+- Produktiver Aufbau in apps/api-laravel (Dashboard-Service auf Health-Domäne); EmployeeDashboardService-Aggregatlogik als fachliche Spezifikationsreferenz; OpenAPI via ELYO-114; Tests via ELYO-142.
+
+Privacy/Health-Data:
+healthFlag/bodySignals sind individuelle Gesundheitsdaten, sobald real: nur über health_subject-Modell; kein user_id-Neubau.",,,Hoch,sprint-3 employee-dashboard backend-gap health-data depends-on-health-data-hardening,ELYO-92
+ELYO-118,Task,Fehler- und Empty-State-Verhalten der produktiven APIs definieren,"Kontext & Ziel:
+Einheitliches Fehler-/Empty-State-Verhalten für die produktiven Endpunkte (lab-markers, Dashboard-Blöcke, Employee-Measures) im finalen Contract definieren und implementieren: leere Daten, fehlendes Mapping, unbekannte Marker, deaktivierte Module.
+
+Umsetzungshinweise:
+- Konventionen festlegen: leeres data-Array vs. null-Blöcke vs. 404; Fehlerformat konsistent zum Bestand.
+- Verhalten deaktivierter Konzept-Module: definierte Antwort, niemals Demo-Daten.
+- Im finalen OpenAPI-Contract (ELYO-114) dokumentieren.
+
+Sprint-Vorschlag:
+Sprint 3.
+
+Abhängigkeiten:
+ELYO-112, ELYO-114.
+
+Akzeptanzkriterien:
+- Für jeden produktiven Endpoint sind Empty- und Fehlerfälle im Contract spezifiziert, implementiert und getestet.
+- Frontend kann alle Zustände deterministisch unterscheiden.
+- Verhalten ist in OpenAPI dokumentiert.
+- Zustände sind aus Akzeptanzkriterien abgeleitet, nicht aus dem Demo-Verhalten.
+
+Validierung:
+- Feature-Tests für Empty-/Fehlerfälle (Teil von ELYO-142).
+- Manueller Smoke-Test mit leerem Test-Account.
+
+Privacy/Health-Data:
+Empty-States dürfen keine Rückschlüsse auf Gesundheitsdaten Dritter erlauben; ansonsten keine neuen Datenflüsse.",,,Mittel,sprint-3 backend-gap depends-on-api-contract,ELYO-92
+ELYO-119,Feature,Employee Laborwerte-Dashboard als neues produktives UI-Feature,"Kontext & Ziel:
+Neues produktives Employee-Dashboard 'Laborwerte & Marker' aufbauen: gruppierte Wertekarten (Blutbild & Sauerstofftransport, Immun-/Entzündungssignale, Mikronährstoffe & Speicher), Hervorhebung auffälliger Werte, weiche Statuslabels, Privacy-Banner, Erklärungskomponente. Implementierung API-first gegen den finalen OpenAPI-Contract mit typisierten View-Models und klarer Service-Schicht.
+
+Nutzerwert:
+Employees sehen freiwillig hinterlegte Laborwerte verständlich eingeordnet — zur persönlichen Orientierung, ohne Diagnostik. Stärkt den präventiven Produktkern.
+
+Demo-Gap:
+main hat kein Laborwerte-UI. Der Demo-Branch validiert User Journey, Informationshierarchie und Interaktionsmuster (lab-markers.component.ts) — mit hardcodierten Inhalten, Demo-Response-Formaten und Demo-Datenmodell. Diese UX-Erkenntnisse fließen als Referenz ein; der Code wird nicht übernommen.
+
+Scope:
+- In Scope: produktive Werte-Anzeige, Gruppierung, Status, Highlight-Logik, Privacy-Banner, Anbindung der Erklärungskomponente, alle UI-Zustände.
+- Out of Scope: Empfehlungs-Flächen (ELYO-95), Erklärungs-Content-Backend (ELYO-94), Schreibpfad für Werte, Weiterentwicklung der Demo-Komponente.
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-112 (API), ELYO-114 (OpenAPI), ELYO-105 (Datenmodell), ELYO-124 (Datenzugriffsschicht).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Die Seite ist API-first gegen den finalen OpenAPI-Contract implementiert (typisierte View-Models, Service-Schicht aus ELYO-124).
+- Kein produktiver UI-Code hängt von Demo-Komponenten, Demo-Providern, Demo-Seeds oder Demo-Response-Formaten ab.
+- Keine Marker-, Erklärungs- oder Empfehlungsinhalte sind im Frontend hardcodiert.
+- Auffällige Werte erscheinen zuerst und sind visuell unterscheidbar.
+- Loading-, Empty-, Error-, Berechtigungs- und Nichtverfügbarkeits-Zustände sind implementiert und getestet.
+- Privacy-Banner ('nur für dich sichtbar', 'ersetzt keine ärztliche Diagnose') ist immer sichtbar.
+- Nur die Statuslabels 'unter Bereich', 'im Orientierungsbereich', 'über Bereich' werden verwendet.
+- Responsive Verhalten (mobil bis Desktop) ist verifiziert.
+
+Technische Hinweise:
+- Neuaufbau unter apps/web-angular features/employee; Demo-Seite nur als UX-Referenz.
+- Backend/OpenAPI/Tests über ELYO-92/98.
+
+Privacy/Health-Data:
+Zeigt individuelle Gesundheitsdaten; strikt Employee-Portal; Trennung über health_subject-Modell im Backend.",,,Hoch,sprint-4 employee-dashboard lab-values frontend-gap ui-first depends-on-api-contract,ELYO-93
+ELYO-120,Story,Produktives responsives Karten-/Grid-Layout Laborwerte entwerfen und implementieren,"User Story:
+Als Employee möchte ich meine Laborwerte in einem übersichtlichen, auch mobil nutzbaren Karten-Grid sehen, damit ich Werte schnell erfassen kann.
+
+Kontext & Ziel:
+Das produktive Karten-/Grid-Layout aus der Typografie-Guideline und den Design-Vorgaben neu entwerfen und implementieren: definierte Breakpoints, Gruppen-Sektionen, Highlight-Bereich, Touch-Tauglichkeit. Das Demo-Grid (auto-fit minmax, Akzentfarben) ist ausschließlich visuelle Referenz für die Informationshierarchie.
+
+Demo-Gap:
+main: nicht vorhanden. Demo: Grid vorhanden, aber Desktop-orientiert, ohne definierte Breakpoint-Strategie und ohne geklärtes Touch-Verhalten — als visuelle Referenz dokumentiert.
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-119 (Feature-Rahmen).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Das Layout ist aus Guideline/Design-Vorgaben abgeleitet und dokumentiert (Breakpoint-Strategie).
+- Grid bricht auf definierten Breakpoints korrekt um (mobil, Tablet, Desktop).
+- Gruppen-Reihenfolge und Highlight-Sektion bleiben auf allen Größen konsistent.
+- Touch-Geräte erreichen alle Informationen ohne Hover.
+- Kein produktiver Layout-Code wird aus der Demo-Komponente kopiert oder importiert.
+- Component-Tests decken Rendering der Gruppen, Highlight-Logik und Breakpoint-Verhalten ab.
+
+Technische Hinweise:
+- Neue Komponentenstruktur (z.B. wiederverwendbare Card-Komponente) unter features/employee; Typografie gemäß docs/ai-context/frontend-typography-guideline.md.
+- Tests via ELYO-143.
+
+Privacy/Health-Data:
+Anzeige von Gesundheitsdaten; keine zusätzlichen Datenflüsse; Employee-only bleibt unberührt.",,,Mittel,sprint-4 frontend-gap lab-values employee-dashboard depends-on-api-contract,ELYO-93
+ELYO-121,Story,Neue barrierefreie Erklärungskomponente für Labormarker,"User Story:
+Als Employee möchte ich zu jedem Labormarker eine kurze, verständliche Erklärung öffnen können, damit ich die Werte ohne Fachwissen einordnen kann.
+
+Kontext & Ziel:
+Eine neue, barrierefreie Erklärungskomponente entwerfen und implementieren mit definiertem Verhalten für Desktop (Klick, optional Hover), Touch/Mobile (Modal/Sheet) und Tastatur (Enter/Space, Escape, Fokus-Management). Inhalte kommen ausschließlich aus dem Backend-Katalog (ELYO-125/128) — nichts ist im Frontend hardcodiert. Das Demo-Popover ist nur Referenz für Platzierung und Informationsumfang.
+
+Demo-Gap:
+main: nicht vorhanden. Demo: Hover-basiertes Popover mit Titel, Kurz-Erklärung, Kontext- und Sicherheitshinweis aus hardcodiertem Frontend-Katalog; mobile und Tastatur-Bedienung ungeklärt — als Interaktionsreferenz dokumentiert.
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-119, ELYO-125/ELYO-128 (Backend-Inhalte).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Erklärung öffnet per Klick/Tap und Tastatur (Enter/Space), nicht nur Hover.
+- Mobil erscheint eine als Modal/Sheet nutzbare Darstellung.
+- Fokus-Management, ARIA-Attribute und Escape-Schließen funktionieren (a11y-Test).
+- Inhalte werden ausschließlich aus dem Backend-Katalog geladen; kein Erklärungstext ist im Frontend hardcodiert.
+- Sicherheitshinweis ('ersetzt keine ärztliche Einordnung') ist immer Teil der Anzeige.
+- Fehlende Erklärung für einen Marker führt zu definiertem Fallback (kein leeres Popover).
+- Kein produktiver Code importiert die Demo-Popover-Logik oder den Demo-Katalog.
+
+Technische Hinweise:
+- Neue eigenständige Komponente unter features/employee oder shared; Anbindung über die Datenzugriffsschicht (ELYO-124).
+- Component-Tests via ELYO-143.
+
+Privacy/Health-Data:
+Erklärungstexte sind nicht personenbezogen; Kontext (welcher Marker geöffnet) bleibt clientseitig; nicht-diagnostisches Wording Pflicht.",,,Mittel,sprint-4 frontend-gap lab-values knowledge-base depends-on-api-contract,ELYO-93
+ELYO-122,Story,Produktive UI-Zustände der Laborwerte-Seite (Loading/Empty/Error/Berechtigung),"User Story:
+Als Employee ohne hinterlegte Laborwerte möchte ich eine verständliche leere Ansicht mit Erklärung sehen, damit ich weiß, warum keine Werte erscheinen und was ich tun kann.
+
+Kontext & Ziel:
+Alle UI-Zustände der produktiven Laborwerte-Seite aus den Akzeptanzkriterien und dem finalen Contract ableiten und implementieren: Loading, Empty (keine Werte), Error, fehlende Berechtigung, Modul nicht verfügbar. Beobachtung aus der Demo: dort existieren nur Loading/Error, Demo-Accounts haben immer Werte — der Empty-State muss produktiv neu gestaltet werden.
+
+Demo-Gap:
+main: nicht vorhanden. Demo: kein Empty-Design (Seeder liefert immer Werte); Zustandslogik nicht contract-gebunden.
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-118 (Contract-Empty-Verhalten), ELYO-119.
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Alle Zustände (Loading, Empty, Error, Berechtigung, nicht verfügbar) sind implementiert, unterscheidbar und getestet.
+- Der Empty-State erklärt die Freiwilligkeit nicht-diagnostisch.
+- Zustände sind aus dem finalen Contract abgeleitet (deterministisches Mapping API-Antwort → UI-Zustand).
+- In Demo-Umgebungen sind synthetische Werte als solche gekennzeichnet, falls das Employee-Portal im Demo-Modus läuft.
+- Component-Tests decken alle Zustände ab.
+
+Technische Hinweise:
+- Zustandslogik in der neuen Seite; Abstimmung mit ELYO-118; keine Übernahme der Demo-Zustandslogik.
+
+Privacy/Health-Data:
+Verhindert Verwechslung synthetischer und echter Gesundheitsdaten; keine neuen Datenflüsse.",,,Mittel,sprint-4 frontend-gap lab-values demo-only depends-on-api-contract,ELYO-93
+ELYO-123,Task,Nicht-diagnostisches Wording-Review aller produktiven Laborwert-Texte,"Kontext & Ziel:
+Systematisches Wording-Review aller produktiven Texte der Laborwerte-Erfahrung: Statuslabels, Seitentexte, Backend-Erklärungsinhalte, Empty-States, Schonmodus-Bezüge — keine Diagnose-, Therapie- oder Dringlichkeitssprache.
+
+Umsetzungshinweise:
+- Prüfliste aufbauen (verbotene Begriffe: Diagnose, krank, Mangel, behandeln, dringend etc.; erlaubt: Orientierung, Einordnung, besprechen).
+- Gegenstand: die produktiven Texte (neue UI, Backend-Katalog, Contract-Beschreibungen); die Demo-Texte dienen als Ausgangsmaterial für die Prüfliste.
+- Wiederholbaren Wording-Check (Grep-basiert) für CI/Review dokumentieren.
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-119 (produktiver Textbestand), ELYO-125 (Backend-Inhalte).
+
+Akzeptanzkriterien:
+- Alle produktiven Texte sind gegen die Prüfliste geprüft; Befunde sind behoben.
+- Statuslabels bleiben ausschließlich die drei weichen Formulierungen.
+- Prüfliste + Wording-Check sind dokumentiert und wiederholbar.
+- Sicherheitshinweise sind an allen Erklärungsstellen vorhanden.
+
+Validierung:
+- Dokumentierter Wording-Check-Lauf über die produktiven Frontend- und Content-Quellen.
+- Redaktionelles Review-Protokoll.
+
+Privacy/Health-Data:
+Reduziert Risiko medizinischer Fehlinterpretation; keine Datenflüsse.",,,Hoch,sprint-4 lab-values frontend-gap knowledge-base depends-on-implementation,ELYO-93
+ELYO-124,Task,Neue typisierte Datenzugriffsschicht Laborwerte & Dashboard (API-first),"Kontext & Ziel:
+Eine neue typisierte Datenzugriffsschicht im Angular-Frontend aufbauen: Service + View-Models gegen den finalen OpenAPI-Contract für lab-markers und Dashboard-Blöcke. Kein Ausbau des bestehenden Demo-Service-Codes; Typen idealerweise aus der OpenAPI-Spec generiert oder dagegen verifiziert.
+
+Umsetzungshinweise:
+- Eigenständige Service-Schicht (z.B. LabMarkersApiService) mit typisierten Requests/Responses gemäß Spec.
+- View-Model-Mapping von Contract-Typen auf UI-Modelle; keine Demo-Modelle importieren.
+- Fehlerklassifikation (401/403 vs. 5xx vs. Netzwerk) mit definierten UI-Zuständen (ELYO-122).
+- Typgenerierung aus OpenAPI evaluieren (z.B. openapi-typescript); Entscheidung dokumentieren.
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-114 (finale Spec), ELYO-115 (Response-Modelle), ELYO-118 (Fehlerverhalten).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Service-Typen entsprechen dem finalen OpenAPI-Schema (generiert oder verifiziert).
+- Kein produktiver Service-Code hängt von Demo-Services, Demo-Modellen oder Demo-Response-Formaten ab.
+- Alle Fehlerklassen führen zu definiertem UI-Verhalten; kein stilles Verschlucken von Fehlern.
+- Unit-Tests validieren Mapping und Fehlerklassifikation gegen Contract-Mocks.
+
+Validierung:
+- ng test (neue Service-Specs mit Contract-basierten Mocks).
+- Manueller Test gegen lokalen Backend-Stack (docker compose up, ohne destruktive Kommandos).
+
+Privacy/Health-Data:
+Transport individueller Gesundheitsdaten; HTTPS/Auth vorausgesetzt; keine Zwischenspeicherung über die Session hinaus.",,,Mittel,sprint-4 frontend-gap lab-values depends-on-api-contract,ELYO-93
+ELYO-125,Story,Versionierter Backend-Katalog für Marker-Erklärungen (Neuaufbau),"User Story:
+Als Content-Verantwortliche möchte ich Marker-Erklärungen zentral, versioniert und freigebbar im Backend pflegen, damit Inhalte konsistent, prüfbar und ohne Frontend-Deployment aktualisierbar sind.
+
+Kontext & Ziel:
+Produktives Content-Modell neu aufbauen (Marker-Key, Titel, Kurz-Erklärung, Kontexthinweis, Sicherheitshinweis, Version, Freigabestatus, Quellen) plus Read-API gemäß finalem Contract. Der Demo-TODO in lab-marker-catalog.ts benennt die Zielrichtung; die 12 Demo-Erklärungen dienen als inhaltliche Referenz für die Erstbefüllung nach redaktioneller Prüfung.
+
+Demo-Gap:
+main: nichts. Demo: 12 Erklärungen hardcodiert im Frontend, Marker-Metadaten hardcodiert im Backend (LabMarkerRegistry) — beides demo-only.
+
+Sprint-Vorschlag:
+Sprint 4 (Design ab Sprint 3 möglich).
+
+Abhängigkeiten:
+ELYO-102 (Contract-Rahmen), ELYO-114.
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Erklärungen liegen im Backend mit Version und Freigabestatus; nichts ist im produktiven Frontend hardcodiert.
+- Nur freigegebene Inhalte werden ausgeliefert.
+- Read-Endpoint ist im finalen OpenAPI-Contract spezifiziert und dagegen getestet.
+- Marker-Metadaten und Erklärungs-Content sind konsistent verknüpft (marker_key).
+- Empty-Fall (Marker ohne Erklärung) ist im Contract definiert.
+- Demo-Inhalte werden nur nach redaktioneller Prüfung (ELYO-127) übernommen.
+
+Technische Hinweise:
+- Neues Model/Migration/produktive Seeds, Controller/Resource, OpenAPI; Frontend-Anbindung über ELYO-128.
+
+Privacy/Health-Data:
+Kein Personenbezug im Content; Freigabeprozess sichert nicht-diagnostisches Wording (ELYO-127).",,,Mittel,sprint-4 knowledge-base backend-gap data-model depends-on-api-contract,ELYO-94
+ELYO-126,Task,Quellen-/Referenz-Metadaten für Erklärungsinhalte,"Kontext & Ziel:
+Erklärungsinhalte um Quellen-/Referenz-Metadaten erweitern (Quelle, Stand/Datum, interne Verantwortlichkeit), damit Herkunft und Aktualität jeder Aussage nachvollziehbar sind.
+
+Umsetzungshinweise:
+- Felder am produktiven Content-Modell (ELYO-125) ergänzen.
+- UI-Entscheidung: Quellen einblenden oder nur intern führen (mit Product klären).
+- Erstbefüllung: jede übernommene Erklärung erhält geprüfte Quelle und Stand.
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-125.
+
+Akzeptanzkriterien:
+- Jeder freigegebene Inhalt trägt Quelle und Stand.
+- Inhalte ohne Quelle können nicht freigegeben werden (Validierung).
+- Entscheidung zur UI-Sichtbarkeit ist dokumentiert.
+
+Validierung:
+- Feature-Test: Freigabe ohne Quelle schlägt fehl.
+- Redaktions-Review der Quellen.
+
+Privacy/Health-Data:
+Kein Personenbezug; erhöht Verlässlichkeit gesundheitsbezogener Aussagen.",,,Niedrig,sprint-4 knowledge-base data-model depends-on-implementation,ELYO-94
+ELYO-127,Task,Redaktions- und Freigabeprozess für Gesundheits-Erklärungen,"Kontext & Ziel:
+Prozess für Erstellung, fachliche Prüfung und Freigabe von Erklärungsinhalten definieren (Rollen, Prüfschritte inkl. Wording-Checkliste aus ELYO-123, Turnus für Re-Review). Gilt auch für die Erstübernahme der Demo-Referenzinhalte.
+
+Umsetzungshinweise:
+- Prozessdokument erstellen; Verantwortliche benennen.
+- Freigabestatus-Workflow im Content-Modell nutzen (Entwurf → geprüft → freigegeben).
+- Wartungs-Turnus (z.B. jährliches Re-Review) festlegen.
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-125, ELYO-123 (Checkliste).
+
+Akzeptanzkriterien:
+- Prozessdokument mit Rollen und Prüfschritten liegt vor und ist abgenommen.
+- Kein Inhalt erreicht 'freigegeben' ohne dokumentierte Prüfung — auch keine Demo-Referenzinhalte.
+- Re-Review-Turnus ist definiert.
+
+Validierung:
+- Prozess-Review mit Product/Fachverantwortlichen.
+- Stichprobe: ein Inhalt durchläuft den Workflow testweise.
+
+Privacy/Health-Data:
+Sichert nicht-diagnostische Qualität gesundheitsbezogener Inhalte; keine personenbezogenen Daten.",,,Niedrig,sprint-4 knowledge-base demo-gap depends-on-implementation,ELYO-94
+ELYO-128,Task,Produktive Erklärungsanzeige ausschließlich aus Backend-Katalog,"Kontext & Ziel:
+Die produktive Erklärungskomponente (ELYO-121) ausschließlich an den Backend-Katalog (ELYO-125) anbinden: Abruf über die typisierte Datenzugriffsschicht, Caching-Strategie, Fallback bei fehlendem Inhalt. Der Frontend-Demo-Katalog (lab-marker-catalog.ts) ist demo-only und wird nicht Teil des Produktionspfads.
+
+Umsetzungshinweise:
+- Service-Methode für Erklärungs-Abruf in der Datenzugriffsschicht (ELYO-124) ergänzen (einmalig pro Seite laden, clientseitig cachen).
+- Fallback: Marker ohne freigegebene Erklärung zeigt kein Info-Icon.
+- Statische Sicherung: kein produktiver Import von LAB_MARKER_EXPLANATIONS (Lint-/Grep-Regel dokumentieren).
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-125, ELYO-121, ELYO-124.
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Der produktive Bundle-/Importgraph enthält keine hardcodierten Erklärungsinhalte.
+- Die Komponente zeigt ausschließlich Backend-Inhalte inkl. Sicherheitshinweis.
+- Fallback-Verhalten ist getestet.
+- Component-Tests validieren die Contract-Anbindung (Mocks aus OpenAPI-Schema).
+
+Validierung:
+- ng test (Erklärungskomponenten-Specs).
+- Grep/Lint: kein produktiver Import von LAB_MARKER_EXPLANATIONS.
+
+Privacy/Health-Data:
+Kein Personenbezug; Konsistenz der gesundheitsbezogenen Texte wird zentral gesichert.",,,Mittel,sprint-4 knowledge-base frontend-gap depends-on-implementation,ELYO-94
+ELYO-129,Story,"Regelbasierte, präventive Empfehlungen aus Markerstatus (später, Neuentwurf)","User Story:
+Als Employee möchte ich zu auffälligen Laborwerten passende präventive Routinen (Bewegung, Ernährungswissen, Tageslicht) vorgeschlagen bekommen, damit ich ohne Diagnostik ins Handeln komme.
+
+Kontext & Ziel:
+Regelwerk von Grund auf definieren (Markerstatus → präventive, nicht-diagnostische Maßnahmen-Kategorien), als neue Backend-Logik in der Health-Domäne umsetzen und im Employee-Kontext ausspielen. Ausdrücklich erst nach Health-Data-Hardening und Wording-Review. Die statischen Demo-Karten illustrieren nur die UX-Idee; es existiert keine übernehmbare Logik.
+
+Demo-Gap:
+main: nichts. Demo: rein visuelle Suggestion über hardcodierte FOCUS_ROUTINES/MEASURE_CARDS ohne Logik — reine Scope-Illustration.
+
+Sprint-Vorschlag:
+Later (nach Sprint 5); bewusst nicht in Sprint 1-5 eingeplant.
+
+Abhängigkeiten:
+ELYO-91 (Hardening, Blocker), ELYO-131 (Copy-Regeln), ELYO-130 (Ausschluss der Demo-Karten).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Regelwerk ist dokumentiert, präventiv und ohne Diagnose-Implikation (Review-Protokoll).
+- Zuordnung Markerstatus → Empfehlung wird in der Health-Domäne berechnet (health_subject_id).
+- Empfehlungen erscheinen ausschließlich im Employee-Portal.
+- Kein Company/Admin-Endpoint kann individuelle Zuordnungen abfragen (Privacy-Regressionstest).
+- Empty-Fall (keine Regel trifft) ist definiert.
+- Keine technische Abhängigkeit von Demo-Karten oder Demo-Inhalten.
+
+Technische Hinweise:
+- Neuer Service in der Health-Domäne, Verknüpfung zu system_measure_templates, OpenAPI-Erweiterung, Tests.
+
+Privacy/Health-Data:
+Abgeleitete Gesundheitsdaten (Empfehlung verrät Markerstatus): health_subject_id Pflicht, Employee-only, Mapping-Schutz zwingend. Produktion bis ELYO-91-Abschluss blockiert.",,,Mittel,later measures-hub lab-values health-data privacy-blocker depends-on-health-data-hardening,ELYO-95
+ELYO-130,Task,Demo-Empfehlungsflächen (FOCUS_ROUTINES/MEASURE_CARDS) vom Produktionspfad ausschließen,"Kontext & Ziel:
+Sicherstellen, dass die statischen Empfehlungs-Arrays der Demo-Seite (FOCUS_ROUTINES, MEASURE_CARDS in lab-markers.component.ts) nicht in die produktive Laborwerte-Seite gelangen. Die produktive Seite zeigt entweder echte, dem User zugewiesene Maßnahmen über die produktive API — ohne markerbezogene Suggestion — oder keine Empfehlungsfläche.
+
+Umsetzungshinweise:
+- Entscheidung aus ELYO-99 umsetzen: keine Empfehlungsfläche vs. generische Anzeige zugewiesener Maßnahmen (produktive API, ELYO-124).
+- Markerbezogene Logik ausdrücklich erst mit ELYO-129 (Neuentwurf).
+- Statische Sicherung: kein produktiver Import der Demo-Arrays (Lint-/Grep-Regel).
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-99 (Scope-Entscheidung), ELYO-119.
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Der produktive Bundle-/Importgraph enthält keine hardcodierten Empfehlungs-Karten.
+- Falls Maßnahmen gezeigt werden: sie stammen aus der produktiven Zuweisungs-API des Users, ohne Marker-Bezug.
+- Kein Text suggeriert eine Marker-zu-Maßnahme-Logik, die nicht existiert.
+- Component-Tests validieren das produktive Verhalten.
+
+Validierung:
+- ng test (produktive Laborwerte-Specs).
+- Grep/Lint: FOCUS_ROUTINES/MEASURE_CARDS nicht im Produktionspfad.
+
+Privacy/Health-Data:
+Verhindert irreführende gesundheitsbezogene Suggestionen; reduziert Fehlinterpretations-Risiko.",,,Hoch,sprint-4 measures-hub frontend-gap demo-only depends-on-implementation,ELYO-95
+ELYO-131,Task,Nicht-diagnostisches Review der Empfehlungs-Copy,"Kontext & Ziel:
+Alle produktiven Empfehlungs- und Maßnahmen-Texte im Employee-Kontext (Measures Hub, Laborwerte-Umfeld, Schonmodus-Hinweise) auf präventives, nicht-diagnostisches Wording prüfen; Fokus Bewegung, Mobilität, Ergonomie, Wissen.
+
+Umsetzungshinweise:
+- Wording-Checkliste aus ELYO-123 wiederverwenden.
+- Gegenstand: produktive Texte (Maßnahmen-Katalog, künftige Empfehlungslogik, Schonmodus); Demo-Texte nur als Ausgangsmaterial.
+- Befunde beheben; Grenzfälle mit Product klären.
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-123 (Checkliste).
+
+Akzeptanzkriterien:
+- Alle produktiven Empfehlungs-Texte sind geprüft; Befunde behoben.
+- Kein Text impliziert Diagnose, Therapie oder medizinische Dringlichkeit.
+- Review-Protokoll liegt vor.
+
+Validierung:
+- Dokumentierter Wording-Check-Lauf.
+- Stichproben-Review durch zweite Person.
+
+Privacy/Health-Data:
+Text-Review; keine Datenflüsse; senkt Risiko klinischer Fehlwirkung.",,,Mittel,sprint-4 measures-hub knowledge-base depends-on-implementation,ELYO-95
+ELYO-132,Task,Empfehlungen technisch auf Employee-Kontext beschraenken,"Kontext & Ziel:
+Technisch absichern, dass Maßnahmen-Zuweisungen und (künftige) Empfehlungen ausschließlich im Employee-Kontext lesbar sind: Route-Guards, Policies und Privacy-Regressionstests für /employee/measures*.
+
+Umsetzungshinweise:
+- Autorisierungsmatrix (ELYO-116) um Empfehlungs-/Zuweisungsrouten erweitern.
+- Testfälle: Company/Admin erhalten 403/404 auf UserSystemMeasure-Detailrouten.
+- Sicherstellen, dass Company-Statistiken (Measure-Ebene) keine Einzelzuordnungen enthalten.
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-116, ELYO-111.
+
+Akzeptanzkriterien:
+- Company/Admin-Zugriff auf individuelle Zuweisungen ist getestet ausgeschlossen.
+- Statistik-Endpunkte liefern nur Aggregate oberhalb der spezifizierten Schwelle.
+- Tests laufen in der Privacy-Regressionssuite mit und validieren produktive Regeln.
+
+Validierung:
+- php artisan test --filter='EmployeeAssignedMeasuresTest|MeasureStatisticsTest'.
+- Privacy-Suite-Lauf (ELYO-111).
+
+Privacy/Health-Data:
+Zuweisungen sind gesundheitsnah (verraten Interventionsbedarf); Aggregate-only für Company bleibt Pflicht.",,,Mittel,sprint-4 measures-hub privacy-hardening tests depends-on-implementation,ELYO-95
+ELYO-133,Story,Produktiven Check-in API-first neu implementieren,"User Story:
+Als Employee möchte ich, dass meine täglichen Check-ins zuverlässig gespeichert werden, damit Verlauf und Dashboard auf allen Geräten stimmen.
+
+Kontext & Ziel:
+Den produktiven Check-in als neues Feature API-first aufbauen: finaler Contract (Ort, Stimmung/Energie/Stress 1-5, Schlaf nach Entscheidung; Symptome/Krankheit nur nach Hardening), produktive Persistenz in der Health-Domäne, neue UI-Umsetzung. Demo-Stepper und Demo-Chat sind UX-Referenz für den Ablauf; CheckinDemoStorageService und die localStorage-Persistenz sind demo-only und vom Produktionspfad ausgeschlossen.
+
+Demo-Gap:
+main: einfacher Check-in mit API-Write (mood/stress/energy/note). Demo: reicher Check-in ausschließlich in localStorage (elyo.demo.checkin.*), bewusst ohne API-Writes — Ablauf und Fragenlogik als UX-Referenz dokumentiert.
+
+Sprint-Vorschlag:
+Sprint 3 (Contract + produktive Persistenz der unkritischen Felder); Symptomdaten-Persistenz blockiert bis ELYO-91.
+
+Abhängigkeiten:
+ELYO-91 (für Symptome/Krankheit), ELYO-102, ELYO-109 (Freitext), ELYO-114.
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Der Contract unterscheidet klar: sofort persistierbare Felder vs. hardening-pflichtige Felder (Symptome, Krankheit).
+- Der produktive Check-in speichert per API gemäß finalem Contract; Verlauf/Dashboard konsumieren dieselbe Quelle.
+- Kein produktiver Code hängt von CheckinDemoStorageService oder localStorage-Persistenz ab.
+- Kein strukturiertes Symptom-/Krankheitsdatum wird vor ELYO-91-Abschluss serverseitig gespeichert (expliziter Test/Guard).
+- Doppelte Tages-Check-ins werden konsistent behandelt.
+- Speicherfehler sind für den User sichtbar (kein stilles Fallback).
+
+Technische Hinweise:
+- Produktiver Contract + Backend in apps/api-laravel (Health-Domäne); neue UI-Umsetzung des Check-in-Ablaufs; Demo-Komponenten nur als UX-Referenz.
+
+Privacy/Health-Data:
+Symptom-/Krankheitsdaten sind hochsensibel: health_subject_id zwingend; direkter user_id-Neubau verboten; Freitext minimiert (ELYO-109).",,,Hoch,sprint-3 health-data backend-gap employee-dashboard depends-on-health-data-hardening,ELYO-96
+ELYO-134,Task,Demo-localStorage-Gesundheitsdaten isolieren und kennzeichnen,"Kontext & Ziel:
+Die localStorage-Demo-Persistenz des Check-ins (elyo.demo.checkin.*, inkl. Symptome/Krankheitstypen) strikt auf den Demo-Modus begrenzen: klar gekennzeichnet, löschbar, im Prod-Modus vollständig inaktiv. Die Demo-Flows bleiben reine Referenz und werden nie Produktionsgrundlage.
+
+Umsetzungshinweise:
+- Aktivierung an Feature-Flag/Umgebung binden (analog featureFlagGuard-Muster).
+- UI-Kennzeichnung 'Demo-Daten, nur lokal auf diesem Gerät'.
+- Lösch-Funktion (clear) für Demo-Daten anbieten; Risiko geteilter Geräte dokumentieren.
+- Statische Sicherung: produktiver Check-in-Pfad importiert keine Demo-Storage-Services.
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-99 (Scope-Entscheidung), ELYO-133 (produktiver Pfad).
+
+Akzeptanzkriterien:
+- Im Prod-Modus wird kein Check-in-Datum in localStorage geschrieben (Test).
+- Demo-Daten sind als solche gekennzeichnet und löschbar.
+- Keine Vermischung von Demo- und API-Daten in History/Dashboard im Prod-Modus.
+- Der produktive Importgraph enthält keine Demo-Storage-Services.
+- Bestehende Demo-Erfahrung bleibt funktionsfähig.
+
+Validierung:
+- ng test (checkin-demo-storage Specs vorhanden).
+- Manueller Test: Prod-Modus-Build schreibt keine elyo.demo.*-Keys.
+
+Privacy/Health-Data:
+Gesundheitsdaten im Browser-Speicher (Symptome/Krankheit) — auf geteilten Geräten einsehbar; Isolation und Löschbarkeit sind die Safeguards.",,,Hoch,sprint-4 health-data demo-only frontend-gap depends-on-implementation,ELYO-96
+ELYO-135,Story,Kanonische Wellbeing-Skala 1-5 produktiv einführen und verifizieren,"User Story:
+Als Plattform-Betreiber möchte ich die kanonische 1-5-Skala konsistent über Datenbestand, Validierung, API und UI eingeführt und abgesichert haben, damit Auswertungen und Verläufe korrekt bleiben.
+
+Kontext & Ziel:
+Die Skalenumstellung 1-10 → 1-5 produktiv einführen: eigenständig geprüfte Migration für den Produktionsbestand autorisieren, Validierung und Contract konsistent definieren, Aggregat-Korrektheit verifizieren. Die Migration des Demo-Branches (2026_07_05_000000) und die Factory-Anpassungen dienen als fachliche Referenz für die Mapping-Semantik, werden aber vor Übernahme eigenständig geprüft.
+
+Demo-Gap:
+main: Skala 1-10. Demo: Skala 1-5 inkl. Datenmigration und verschärfter Validierung — als Referenz für die produktive Einführung dokumentiert.
+
+Sprint-Vorschlag:
+Sprint 3.
+
+Abhängigkeiten:
+Keine direkten Abhängigkeiten.
+
+Akzeptanzkriterien:
+- Die produktive Migration ist eigenständig geprüft (Mapping-Semantik 1-10 → 1-5 dokumentiert) und auf produktionsähnlichem Bestand verifiziert.
+- API lehnt Werte außerhalb 1-5 ab (Test).
+- Aggregate (Wochen-Durchschnitte, Sparkline, Streak) sind nach Migration korrekt (Tests).
+- Der finale OpenAPI-Contract dokumentiert die Skala.
+- Company-Aggregate auf Wellbeing-Basis bleiben konsistent.
+
+Technische Hinweise:
+- Referenz: Migration 2026_07_05_000000_migrate_wellbeing_entries_to_scale_1_5.php, CheckinRequest, EmployeeDashboardService; produktive Übernahme nur nach Review.
+
+Privacy/Health-Data:
+Wellbeing-Daten sind Gesundheitsdaten; Migration verändert Bestandswerte — Nachvollziehbarkeit dokumentieren; kein neuer user_id-Datenfluss.",,,Mittel,sprint-3 data-model backend-gap health-data,ELYO-96
+ELYO-136,Story,Schonmodus als produktives Regelwerk neu definieren und implementieren,"User Story:
+Als Employee mit belastenden Körpersignalen möchte ich, dass mir die App vorübergehend schonende Varianten vorschlägt, damit ich mich nicht überfordere.
+
+Kontext & Ziel:
+Den Schonmodus produktiv neu aufbauen: regelbasierte, präventive Auslöser aus echten Check-in-Daten von Grund auf definieren, Gating-Verhalten im produktiven Dashboard implementieren, Wording prüfen. Demo-Banner und Demo-Gating (healthFlag aus Demo-JSON, LeverSafeModeState) sind UX-Referenz für Platzierung und Verhalten — die Demo kennt keine echte Regel-Logik.
+
+Demo-Gap:
+main: nicht vorhanden. Demo: Banner und Gating visuell implementiert (dashboard.component.ts), Auslöser rein synthetisch; Doku in docs/ai-tasks/2026-07-05-employee-dashboard-safe-mode-gating.md — als UX-Referenz dokumentiert.
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-117 (produktiver Dashboard-Aufbau), ELYO-133 (Check-in-Daten), ELYO-131 (Wording).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Schonmodus-Regeln sind von Grund auf dokumentiert, rein präventiv und regelbasiert (keine medizinische Interpretation).
+- Auslösung erfolgt aus realen Check-in-Daten der Health-Domäne, oder das Feature bleibt explizit demo-only (Entscheidung dokumentiert).
+- Die produktive Umsetzung hängt nicht von Demo-Providern oder Demo-JSON ab.
+- Banner-Wording ist nicht-diagnostisch geprüft.
+- Gating beeinflusst nur die Empfehlungs-Anzeige, nie den Datenzugriff.
+- Kein-Flag-/Empty-Zustand rendert ohne Banner (Test).
+
+Technische Hinweise:
+- Regelwerk-Doku + produktive Implementierung im neuen Dashboard; Demo-Banner nur als UX-Referenz.
+
+Privacy/Health-Data:
+healthFlag ist ein individuelles Gesundheitssignal: produktiv nur über health_subject-Modell; Employee-only; nie an Company aggregiert ohne separates Konzept.",,,Mittel,sprint-4 employee-dashboard health-data frontend-gap depends-on-health-data-hardening,ELYO-96
+ELYO-137,Task,"Badges/Gamification demo-only isolieren, LAB-Badge-Privacy pruefen","Kontext & Ziel:
+Die frontend-only Badge-Erfahrung (employee-badges-demo.service.ts, badges.component.ts, Dashboard-Integration) als demo-only isolieren; Produktentscheidung vorbereiten; prüfen, ob LAB-Kategorie-Badges Markerstatus-Semantik leaken. Eine etwaige produktive Badge-Funktion würde als neues Feature mit eigenem Backend-Modell entworfen — nicht auf dem Demo-Service aufgebaut.
+
+Umsetzungshinweise:
+- Demo-Kennzeichnung + Flag-Gating der Badge-Flächen.
+- Privacy-Prüfung: Badge-Titel/Fortschritt dürfen keinen Rückschluss auf konkrete Laborwerte erlauben (Kategorie 'Labor').
+- Produktentscheidungs-Vorlage für produktive Badges (neues Backend-Modell) vorbereiten — nicht umsetzen.
+- Hinweis: Untracked Spec-Dateien im Working Tree (dashboard-badges.component.spec.ts u.a.) schlagen gegen Branch-Code fehl (Mock ohne getLabMarkers) — beim Commit der Specs beheben.
+
+Sprint-Vorschlag:
+Later; Isolation kann in Sprint 4 miterledigt werden.
+
+Abhängigkeiten:
+ELYO-99 (Produktentscheidung).
+
+Akzeptanzkriterien:
+- Badges erscheinen nur im Demo-Modus.
+- LAB-Badge-Prüfung ist dokumentiert; problematische Badges sind angepasst oder entfernt.
+- Produktentscheidungs-Vorlage liegt vor und benennt den Neuaufbau-Ansatz.
+- Keine Badge-Logik schreibt oder liest echte Gesundheitsdaten.
+
+Validierung:
+- ng test nach Spec-Bereinigung.
+- Manueller Check: Prod-Modus zeigt keine Badge-Flächen.
+
+Privacy/Health-Data:
+Indirektes Leak-Risiko über LAB-Badges (Badge verrät Existenz/Status von Laborwerten); Safeguard: neutrale Badge-Semantik oder Entfernen.",,,Niedrig,later demo-only frontend-gap needs-decision health-data,ELYO-96
+ELYO-138,Task,Produktive Check-in-History-Timeline neu implementieren,"Kontext & Ziel:
+Die Check-in-History als produktives Timeline-Feature neu aufbauen: ausschließlich auf den finalen Backend-Contracts (produktive Check-in-Persistenz aus ELYO-133), mit Empty-State für neue User und definierten Fehlzuständen. Die Demo-Timeline (history.component.ts, +585 Zeilen, Blending aus API- und localStorage-Daten) ist UX-Referenz für Aufbau und Informationsdichte — das Demo-Blending wird nicht übernommen.
+
+Umsetzungshinweise:
+- Neue Timeline-Komponente gegen die typisierte Datenzugriffsschicht (ELYO-124-Muster).
+- Symptom-/Krankheitsdetails erst anzeigen, wenn der produktive Contract sie liefert.
+- Demo-Blending bleibt im Demo-Pfad; statische Sicherung gegen Import in den Produktionspfad.
+
+Sprint-Vorschlag:
+Sprint 4.
+
+Abhängigkeiten:
+ELYO-133 (Persistenz), ELYO-134 (Demo-Isolation).
+
+Architektur-Prinzip:
+Die Demo-Implementierung ist nicht als Produktions-Codebasis freigegeben. Sie dient ausschließlich als funktionale und visuelle Referenz für User Journey, Informationshierarchie und Interaktionsmuster. Die produktive Implementierung wird auf Basis der finalen Zielarchitektur, des finalen OpenAPI-Contracts, der Privacy-Entscheidungen und der Akzeptanzkriterien neu aufgebaut. Keine direkte technische Abhängigkeit von Demo-Komponenten, Demo-Providern, Demo-localStorage-Services, Demo-Seeds oder Demo-Response-Formaten.
+
+Akzeptanzkriterien:
+- Der Prod-Modus rendert ausschließlich API-Daten gemäß finalem Contract.
+- Kein produktiver Code importiert Demo-Storage oder Demo-Blending-Logik.
+- Empty-State existiert und ist getestet.
+- Fehler- und Loading-Zustände sind definiert und getestet.
+- Bestehende History-Funktionalität aus main bleibt fachlich erhalten.
+
+Validierung:
+- ng test (neue History-Specs).
+- Manueller Vergleich Demo-/Prod-Modus.
+
+Privacy/Health-Data:
+Zeigt individuelle Gesundheitsverläufe; Employee-only; Datenquelle folgt der Health-Domäne.",,,Mittel,sprint-4 frontend-gap employee-dashboard health-data depends-on-implementation,ELYO-96
+ELYO-139,Story,Infection Radar: blockiert bis Privacy-Review (out of MVP),"User Story:
+Als Product Owner möchte ich den Infection Radar explizit als blockiert führen, damit kein gesundheitsnahes Company-Feature ohne Privacy-Review und Scope-Freigabe produktiv wird.
+
+Kontext & Ziel:
+Der Demo-Infection-Radar (company-infection-radar.component.ts, DemoInfectionRadarProvider, /company/infection-radar, respiratory-warning-Logik) aggregiert Krankheits-/Symptomsignale auf Company-Ebene — Nähe zu prädiktiver Abwesenheitsanalytik, laut MVP-Regeln out of scope. Er bleibt demo-flag-gated und wird formal blockiert. Eine etwaige spätere Produktivierung wäre ein Neuentwurf mit eigenem Suppression-Konzept, keine Übernahme der Demo-Aggregation.
+
+Demo-Gap:
+main: nicht vorhanden. Demo: vollständige Demo-Implementierung hinter infectionRadarEnabled-Flag (in prod aus, Null-Provider) — reine Konzept-Demonstration.
+
+Sprint-Vorschlag:
+Blocked; Re-Evaluation frühestens nach ELYO-91 und Privacy-Review.
+
+Abhängigkeiten:
+ELYO-103 (Scope-Entscheidung), ELYO-101 (DSFA-Vorprüfung).
+
+Akzeptanzkriterien:
+- Blockier-Status ist im Backlog und im Code (Kommentar/Flag-Doku) dokumentiert.
+- infectionRadarEnabled bleibt in prod aus; Test sichert das Verhalten.
+- Re-Evaluations-Kriterien sind definiert (eigenständiges Suppression-Konzept, Mindestkohorten, DSFA) und schließen die Übernahme der Demo-Aggregation aus.
+- Kein Company-Rollout ohne erneute Freigabe.
+
+Technische Hinweise:
+- FeatureFlagService, InsightsServiceProvider (Null-Binding), InsightsEndpointsTest (prod-Verhalten).
+
+Privacy/Health-Data:
+Aggregierte Krankheitssignale; Re-Identifikationsrisiko in kleinen Teams; bleibt blockiert bis Suppression + Privacy-Review vorliegen.",,,Hoch,blocked demo-only health-data privacy-blocker needs-decision depends-on-privacy-review,ELYO-97
+ELYO-140,Task,Produktive Aggregations- und Suppression-Regeln spezifizieren und verifizieren,"Kontext & Ziel:
+Die produktiven Aggregations- und Suppression-Regeln für Company-Statistiken eigenständig spezifizieren (Kennzahlen, Mindestgruppengrößen, Suppression-Verhalten, Team-Scoping) und die vorhandene prod-Mode-Implementierung (DbMeasureStatisticsProvider mit AnonymityService, anonymity_threshold, isAboveThreshold) gegen diese Spezifikation prüfen — nicht ungeprüft übernehmen.
+
+Umsetzungshinweise:
+- Spezifikation zuerst: welche Kennzahlen, welche Schwellen, welches Anzeige-Verhalten bei Suppression.
+- Grenzfälle testen: Kohorte unter/genau auf/über Schwelle; leere Company; Team-Scoping.
+- Default-Schwelle (AnonymityService::DEFAULT_THRESHOLD) fachlich bestätigen oder ändern.
+- Abweichungen der bestehenden Implementierung von der Spezifikation als Findings beheben.
+
+Sprint-Vorschlag:
+Sprint 3.
+
+Abhängigkeiten:
+ELYO-103 (Scope-Auflagen).
+
+Akzeptanzkriterien:
+- Die Aggregations-/Suppression-Spezifikation liegt eigenständig dokumentiert vor (inkl. Mindestgruppengrößen).
+- Die prod-Implementierung entspricht nachweislich der Spezifikation (Grenzfall-Tests grün).
+- Keine Kennzahl unterhalb der Schwelle wird ausgeliefert.
+- Frontend-Anzeigeverhalten bei Suppression ist definiert.
+- Schwellen-Konfiguration je Company ist getestet.
+
+Validierung:
+- php artisan test --filter=MeasureStatisticsTest (erweitert um Grenzfälle).
+- Review Spezifikation vs. Implementierung.
+
+Privacy/Health-Data:
+Aggregat-Schutz gegen Re-Identifikation; zentraler Safeguard für Company-Reporting.",,,Hoch,sprint-3 privacy-hardening backend-gap tests depends-on-privacy-review,ELYO-97
+ELYO-141,Task,Demo-Provider-Isolation und Flag-Verhalten verifizieren,"Kontext & Ziel:
+Systematisch verifizieren, dass im prod-Mode (ELYO_DATA_MODE=prod) keine Demo-Daten ausgeliefert werden und keine Demo-Aggregation in den Produktionspfad gelangt: Null-Provider-Bindings, Feature-Flags im Auth-Payload, Angular featureFlagGuard, Verhalten aller Konzept-Endpoints.
+
+Umsetzungshinweise:
+- Testmatrix: jeder Insights-Endpoint × Modus (demo/prod).
+- Auth-Payload-Flags in prod = alle false (FeatureFlagService).
+- Angular-Routen mit featureFlagGuard verweigern Zugriff bei deaktiviertem Flag.
+- Demo-JSON (database/demo/*.json) wird in prod nachweislich nicht gelesen.
+
+Sprint-Vorschlag:
+Sprint 3.
+
+Abhängigkeiten:
+Keine direkten Abhängigkeiten.
+
+Akzeptanzkriterien:
+- Prod-Mode liefert für alle Konzept-Endpoints das definierte Null-/Empty-Verhalten (Tests).
+- Flags sind in prod nachweislich aus (Test auf Auth-Payload).
+- Frontend-Guards blockieren geflaggte Routen (Component-/Guard-Test).
+- Kein Demo-JSON-Zugriff im prod-Mode (Test oder statischer Nachweis).
+- Dokumentation des Modus-Mechanismus (config/elyo.php) ist aktuell.
+
+Validierung:
+- php artisan test --filter=InsightsEndpointsTest.
+- ng test (Guard-Spec, falls vorhanden; sonst ergänzen).
+
+Privacy/Health-Data:
+Verhindert versehentliches Ausspielen synthetischer Gesundheits-Aggregate als echt bzw. Demo-Flächen in Produktion.",,,Hoch,sprint-3 tests backend-gap demo-only,ELYO-97
+ELYO-142,Task,Laravel-Feature-Tests gegen produktive Contracts aufbauen,"Kontext & Ziel:
+Backend-Testabdeckung für die produktiv neu aufgebauten Endpunkte erstellen: Lab-Markers (Erfolg, Empty, Mapping-Fehler, Verlauf, Autorisierung), produktiver Dashboard-Payload (Contract-Konformität, Block-Semantik), Check-in-Persistenz gemäß finalem Contract. Tests validieren produktive Akzeptanzkriterien und Contracts — nicht das Verhalten der Demo-Implementierung.
+
+Umsetzungshinweise:
+- Testfälle aus den Akzeptanzkriterien und dem finalen OpenAPI-Contract ableiten (Schema-Assertions).
+- Negative Fälle: fremde IDs, gelöschte Subjects, unbekannte Marker, Berechtigungsfehler.
+- Testdaten ausschließlich über produktive Factories/Fixtures (keine Demo-Seeds im Testpfad der produktiven Features).
+
+Sprint-Vorschlag:
+Sprint 5.
+
+Abhängigkeiten:
+ELYO-112, ELYO-117, ELYO-133 (Implementierungen), ELYO-114 (Contract).
+
+Akzeptanzkriterien:
+- Alle produktiven Endpunkte haben Erfolgs-, Empty-, Fehler- und Autorisierungs-Tests gegen den finalen Contract.
+- Schema-Assertions sichern die Contract-Konformität der Responses.
+- Kein Test konserviert Demo-Response-Formate oder Demo-Verhalten.
+- Testsuite läuft grün in CI; Coverage der neuen Services ist nachvollziehbar (Bericht).
+
+Validierung:
+- php artisan test (vollständig).
+- CI-Lauf.
+
+Privacy/Health-Data:
+Tests berühren synthetische Gesundheitsdaten; keine echten Daten in Fixtures.",,,Mittel,sprint-5 tests backend-gap depends-on-implementation,ELYO-98
+ELYO-143,Task,Angular-Component-Tests für produktive Laborwerte-UI aufbauen,"Kontext & Ziel:
+Component-Tests für die produktiv neu aufgebauten Frontend-Teile erstellen: Laborwerte-Seite (Gruppen, Highlights, alle Zustände), Erklärungskomponente (Öffnen/Schließen/Tastatur/Fallback), Dashboard-Blöcke, History-Timeline. Mocks werden aus dem finalen OpenAPI-Contract abgeleitet; Tests validieren produktive Akzeptanzkriterien, nicht Demo-Verhalten.
+
+Umsetzungshinweise:
+- HTTP-Mocks aus OpenAPI-Schemas typisieren (Anschluss an ELYO-124-Typisierung).
+- Zustands-Tests: Loading/Empty/Error/Berechtigung/nicht verfügbar je Komponente.
+- Interaktions-Tests: Erklärungskomponente per Klick und Tastatur.
+- Separat (Demo-Branch-Hygiene): untracked Working-Tree-Specs (dashboard-badges u.a.) bereinigen oder committen — unabhängig vom produktiven Testaufbau.
+
+Sprint-Vorschlag:
+Sprint 5.
+
+Abhängigkeiten:
+ELYO-119 bis ELYO-124 (UI-Implementierungen), ELYO-114 (Contract).
+
+Akzeptanzkriterien:
+- Alle produktiven Komponenten haben Specs für Erfolgs-, Empty-, Fehler- und Berechtigungszustand.
+- Mocks entsprechen dem finalen Contract (typisiert).
+- Interaktion (Klick/Tastatur) der Erklärungskomponente ist getestet.
+- Kein Test importiert Demo-Services, Demo-Kataloge oder Demo-Komponenten.
+- ng test läuft vollständig grün.
+
+Validierung:
+- ng test --watch=false.
+- CI-Lauf.
+
+Privacy/Health-Data:
+Nur synthetische Mock-Daten in Tests.",,,Mittel,sprint-5 tests frontend-gap depends-on-implementation,ELYO-98
+ELYO-144,Task,Privacy-Regressionstests vervollstaendigen,"Kontext & Ziel:
+Die in ELYO-111 begonnene Privacy-Regressionssuite vervollständigen: alle Company/Admin-Routen gegen Individualdaten-Leaks, prod-Mode-Verhalten, Mapping-Schutz, Suppression-Grenzfälle, Empfehlungs-Endpunkte, Demo/Produktions-Trennung.
+
+Umsetzungshinweise:
+- Routen-Inventar automatisiert erzeugen (route:list) und gegen Testabdeckung abgleichen.
+- Leak-Muster definieren (Feldnamen wie value/status/markerKey in Company-Responses).
+- Demo/Prod-Trennungstests: kein Demo-Provider, kein Demo-JSON, kein Demo-Storage im Prod-Pfad.
+- Suite als Pflicht-Gate in CI verankern.
+
+Sprint-Vorschlag:
+Sprint 5.
+
+Abhängigkeiten:
+ELYO-111 (Grundgerüst), ELYO-116, ELYO-140.
+
+Akzeptanzkriterien:
+- Jede Company/Admin-Route ist durch mindestens einen Privacy-Test abgedeckt oder begründet ausgenommen.
+- Suite bricht CI bei Leak-Verdacht.
+- Suppression-Grenzfälle und Demo/Prod-Trennung sind enthalten.
+- Die Suite validiert produktive Privacy-Regeln, nicht Demo-Implementierungsdetails.
+- Dokumentation der Suite liegt vor.
+
+Validierung:
+- php artisan test (Privacy-Suite).
+- CI-Gate-Konfiguration prüfen.
+
+Privacy/Health-Data:
+Kernabsicherung der Gesundheitsdaten-Trennung im Dauerbetrieb.",,,Höchste,sprint-5 tests privacy-hardening health-data depends-on-implementation,ELYO-98
+ELYO-145,Task,OpenAPI-Contract-Validierung etablieren,"Kontext & Ziel:
+Tooling für OpenAPI-Validierung einführen (derzeit im Repo nicht vorhanden): Spec-Linting plus Contract-Abgleich Spec ↔ produktive Implementierung; in CI verankern.
+
+Umsetzungshinweise:
+- Tool wählen (z.B. redocly lint / spectral für Spec; Response-Schema-Assertions in Feature-Tests).
+- Finalen Contract (ELYO-114) validieren; Findings beheben.
+- CI-Job ergänzen; keine Blind-Installation — Tool-Wahl mit Team abstimmen.
+
+Sprint-Vorschlag:
+Sprint 5.
+
+Abhängigkeiten:
+ELYO-114 (finaler Contract).
+
+Akzeptanzkriterien:
+- Der finale Contract validiert fehlerfrei mit dem gewählten Tool.
+- CI schlägt bei Spec-Fehlern fehl.
+- Mindestens die produktiven Employee-Endpunkte haben Schema-Assertions im Test.
+- Tooling-Entscheidung ist dokumentiert.
+
+Validierung:
+- Validator-Lauf lokal + CI.
+- php artisan test (Schema-Assertions).
+
+Privacy/Health-Data:
+Kein direkter Gesundheitsdaten-Bezug; sichert Contract-Stabilität der Health-Endpunkte.",,,Mittel,sprint-5 openapi tests depends-on-openapi,ELYO-98
+ELYO-146,Task,Manuelle QA-Szenarien und Pilot-Readiness-Checkliste,"Kontext & Ziel:
+Manuelle QA-Szenarienliste und Pilot-Readiness-Checkliste für die produktiven Features erstellen und durchführen: Laborwerte-Flows (mit/ohne Werte, mobil), Check-in-Flows, Schonmodus, Demo/Prod-Modus-Abgrenzung, Privacy-Sichtprüfungen je Rolle.
+
+Umsetzungshinweise:
+- Szenarien je Rolle (Employee, Company-Admin, Company-Manager, Admin) und je Modus (demo/prod) — validiert wird das produktive Verhalten gegen die Akzeptanzkriterien.
+- Pilot-Checkliste: alle Produktions-Blocker aus ELYO-91 geschlossen, Privacy-Suite grün, DSFA-Status, Monitoring/Backups.
+- Ergebnisse protokollieren.
+
+Sprint-Vorschlag:
+Sprint 5.
+
+Abhängigkeiten:
+ELYO-142 bis ELYO-145; faktisch alle Implementierungs-Epics.
+
+Akzeptanzkriterien:
+- QA-Szenarienliste liegt vor und ist vollständig durchlaufen (Protokoll).
+- Pilot-Readiness-Checkliste ist ausgefüllt; offene Punkte sind als Issues erfasst.
+- Rollen-Sichtprüfung bestätigt: keine individuellen Gesundheitsdaten in Company/Admin-Sichten, keine Demo-Inhalte im Prod-Modus.
+- Go/No-Go-Empfehlung ist dokumentiert.
+
+Validierung:
+- Manuelle Durchführung mit Protokoll; keine automatisierte Validierung.
+- Abgleich gegen Privacy-Suite-Ergebnisse.
+
+Privacy/Health-Data:
+Sichtprüfung der Gesundheitsdaten-Abschottung ist expliziter Bestandteil.",,,Mittel,sprint-5 pilot-readiness tests depends-on-implementation,ELYO-98
+ELYO-147,Bug,MeasureImpactAccessTest schlaegt fehl: elyo.data_mode nicht gesetzt,"Fehlerbild:
+3 Tests in apps/api-laravel/tests/Feature/MeasureImpactAccessTest.php schlagen fehl mit 'Failed asserting that null is identical to 1' (assertJsonPath('data.measureId', ...)).
+
+Erwartetes Verhalten:
+Die Tests asserten Demo-Provider-Antworten und müssen — wie tests/Feature/InsightsEndpointsTest.php — config(['elyo.data_mode' => 'demo']) setzen, oder der Endpoint definiert ein explizites prod-Verhalten, das die Tests asserten.
+
+Ist-Verhalten:
+phpunit.xml:23 forciert ELYO_DATA_MODE=prod (force=true); dadurch bindet InsightsServiceProvider NullMeasureImpactProvider, GET /api/company/measures/{id}/impact liefert data=null, Assertions auf measureId schlagen fehl.
+
+Reproduktion:
+- php artisan test --filter=MeasureImpactAccessTest im Branch demo/employee-lab-values-dashboard ausführen.
+- 3 Failures: company admin / company manager (2 Varianten) Zugriffstests.
+
+Sprint-Vorschlag:
+Sofort (Sprint 1); trivialer Testfix im Demo-Branch, blockiert grüne Suite.
+
+Abhängigkeiten:
+Keine direkten Abhängigkeiten.
+
+Akzeptanzkriterien:
+- Alle Tests in MeasureImpactAccessTest laufen grün.
+- Der Test deckt weiterhin die Autorisierungsfälle (Team-Scoping) ab; Zugriffsschutz wird nicht abgeschwächt.
+- Gesamtsuite php artisan test ist grün (abgesehen von unabhängigen Skips).
+- Data-Mode-Abhängigkeit des Tests ist im Test dokumentiert.
+
+Technische Hinweise:
+- Betroffen: tests/Feature/MeasureImpactAccessTest.php; Referenzmuster in InsightsEndpointsTest.php; Bindings in app/Providers/InsightsServiceProvider.php.
+
+Privacy/Health-Data:
+Kein Leak-Risiko: Fehler betrifft Test-Setup, nicht Zugriffsschutz. Fix darf die 403-Assertions (fremdes Team) nicht entfernen.",,,Hoch,sprint-1 tests demo-gap backend-gap,ELYO-97

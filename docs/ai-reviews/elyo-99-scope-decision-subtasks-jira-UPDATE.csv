@@ -1,0 +1,211 @@
+Vorgangs-ID,Beschreibung,Stichwort
+ELYO-149,"Scope-Entscheidung (DRAFT - bitte bestaetigen oder aendern):
+Produktiver Neuaufbau. Demo = reine UX-/Scope-Referenz.
+
+Klassifikation: produktiver Neuaufbau + Backend-Contract | Health-Data-Hardening | Privacy-Review
+
+Kurzbegruendung: Demo speichert Gesundheitswerte mit direktem user_id-FK, ohne Pseudonymisierung/health_subject_id/Audit. Blocker fuer echte Daten bis Health-Domaene (ELYO-91).
+
+-------------------------------------------------------------
+SO REVIEWST DU DIESES FEATURE (bitte durchgehen):
+1. Confluence-Seite oeffnen (Source of Truth, volle Analyse):
+   <CONFLUENCE-ABSCHNITTS-LINK EINFUEGEN>
+2. Abschnitt zu diesem Feature lesen (Kontext, Demo-Referenzwert, Produktions-Target).
+3. Screenshots: aus der Plattform-HTML den passenden Screen aufnehmen und
+   direkt im Confluence-Abschnitt per Strg+V einfuegen.
+4. Feedback: im Confluence-Abschnitt Textstelle markieren und Inline-Kommentar
+   setzen ODER unter 'Reviewer-Feedback' deine Zeile ergaenzen:
+   Zustimmung zur Draft-Entscheidung? ja / nein / Anmerkung.
+5. Danach dieses Ticket auf 'In Review erledigt' (bzw. euren Done-Status) setzen.
+-------------------------------------------------------------
+Hinweis: Diese Beschreibung ist nur die Kurzfassung. Massgeblich ist die
+Confluence-Seite - dort passiert das eigentliche Review, nicht hier im Ticket.",scope-neuaufbau health-data-hardening privacy-review lab-values production-blocker needs-review
+ELYO-150,"Scope-Entscheidung (DRAFT - bitte bestaetigen oder aendern):
+Produktiver Neuaufbau als versionierter Backend-Katalog. Demo-Texte = Content-Kandidaten.
+
+Klassifikation: produktiver Neuaufbau + Backend-Contract | Privacy-Review (Wording-Grenze)
+
+Kurzbegruendung: Inhalt kein Personenbezug; Risiko ist Wording, das in medizinische Interpretation abdriftet. Freigabeprozess noetig.
+
+-------------------------------------------------------------
+SO REVIEWST DU DIESES FEATURE (bitte durchgehen):
+1. Confluence-Seite oeffnen (Source of Truth, volle Analyse):
+   <CONFLUENCE-ABSCHNITTS-LINK EINFUEGEN>
+2. Abschnitt zu diesem Feature lesen (Kontext, Demo-Referenzwert, Produktions-Target).
+3. Screenshots: aus der Plattform-HTML den passenden Screen aufnehmen und
+   direkt im Confluence-Abschnitt per Strg+V einfuegen.
+4. Feedback: im Confluence-Abschnitt Textstelle markieren und Inline-Kommentar
+   setzen ODER unter 'Reviewer-Feedback' deine Zeile ergaenzen:
+   Zustimmung zur Draft-Entscheidung? ja / nein / Anmerkung.
+5. Danach dieses Ticket auf 'In Review erledigt' (bzw. euren Done-Status) setzen.
+-------------------------------------------------------------
+Hinweis: Diese Beschreibung ist nur die Kurzfassung. Massgeblich ist die
+Confluence-Seite - dort passiert das eigentliche Review, nicht hier im Ticket.",scope-neuaufbau privacy-review knowledge-base needs-review
+ELYO-151,"Scope-Entscheidung (DRAFT - bitte bestaetigen oder aendern):
+Karten demo-only, aus Produktionspfad ausgeschlossen. Regelbasierte Verknuepfung = neues Design (Later).
+
+Klassifikation: UI-only / demo-only | bei Beauftragung: Neuaufbau (Later) + Privacy-Review
+
+Kurzbegruendung: Empfehlung aus Markerstatus ist abgeleitete Gesundheitsdatum (High). Hardcodierte Pseudo-Empfehlungen nicht als Produktlogik missverstehen.
+
+-------------------------------------------------------------
+SO REVIEWST DU DIESES FEATURE (bitte durchgehen):
+1. Confluence-Seite oeffnen (Source of Truth, volle Analyse):
+   <CONFLUENCE-ABSCHNITTS-LINK EINFUEGEN>
+2. Abschnitt zu diesem Feature lesen (Kontext, Demo-Referenzwert, Produktions-Target).
+3. Screenshots: aus der Plattform-HTML den passenden Screen aufnehmen und
+   direkt im Confluence-Abschnitt per Strg+V einfuegen.
+4. Feedback: im Confluence-Abschnitt Textstelle markieren und Inline-Kommentar
+   setzen ODER unter 'Reviewer-Feedback' deine Zeile ergaenzen:
+   Zustimmung zur Draft-Entscheidung? ja / nein / Anmerkung.
+5. Danach dieses Ticket auf 'In Review erledigt' (bzw. euren Done-Status) setzen.
+-------------------------------------------------------------
+Hinweis: Diese Beschreibung ist nur die Kurzfassung. Massgeblich ist die
+Confluence-Seite - dort passiert das eigentliche Review, nicht hier im Ticket.",scope-demo-only privacy-review lab-values later needs-review
+ELYO-152,"Scope-Entscheidung (DRAFT - bitte bestaetigen oder aendern):
+Produktiver Neuaufbau pro Block (Produktivquelle / entfaellt / demo-only). Schonmodus-Regelwerk neu.
+
+Klassifikation: produktiver Neuaufbau + Backend-Contract | Health-Data-Hardening | Privacy-Review
+
+Kurzbegruendung: Health-Flag und Body-Signals sind - sobald real - individuelle Gesundheitsdaten (Health-Domaene). Demo-JSON company-keyed & synthetisch: fuer Demo ok.
+
+-------------------------------------------------------------
+SO REVIEWST DU DIESES FEATURE (bitte durchgehen):
+1. Confluence-Seite oeffnen (Source of Truth, volle Analyse):
+   <CONFLUENCE-ABSCHNITTS-LINK EINFUEGEN>
+2. Abschnitt zu diesem Feature lesen (Kontext, Demo-Referenzwert, Produktions-Target).
+3. Screenshots: aus der Plattform-HTML den passenden Screen aufnehmen und
+   direkt im Confluence-Abschnitt per Strg+V einfuegen.
+4. Feedback: im Confluence-Abschnitt Textstelle markieren und Inline-Kommentar
+   setzen ODER unter 'Reviewer-Feedback' deine Zeile ergaenzen:
+   Zustimmung zur Draft-Entscheidung? ja / nein / Anmerkung.
+5. Danach dieses Ticket auf 'In Review erledigt' (bzw. euren Done-Status) setzen.
+-------------------------------------------------------------
+Hinweis: Diese Beschreibung ist nur die Kurzfassung. Massgeblich ist die
+Confluence-Seite - dort passiert das eigentliche Review, nicht hier im Ticket.",scope-neuaufbau health-data-hardening privacy-review employee-dashboard needs-review
+ELYO-153,"Scope-Entscheidung (DRAFT - bitte bestaetigen oder aendern):
+Produktive Einfuehrung der 1-5-Skala ueber eigenstaendig gereviewte Migration. Demo = Mapping-Referenz.
+
+Klassifikation: produktiver Neuaufbau (leicht) | kein Privacy-Blocker
+
+Kurzbegruendung: Bestehende Datenkategorie, niedriges Risiko. Mapping-Semantik auf produktionsaehnlichen Daten verifizieren, im Contract dokumentieren.
+
+-------------------------------------------------------------
+SO REVIEWST DU DIESES FEATURE (bitte durchgehen):
+1. Confluence-Seite oeffnen (Source of Truth, volle Analyse):
+   <CONFLUENCE-ABSCHNITTS-LINK EINFUEGEN>
+2. Abschnitt zu diesem Feature lesen (Kontext, Demo-Referenzwert, Produktions-Target).
+3. Screenshots: aus der Plattform-HTML den passenden Screen aufnehmen und
+   direkt im Confluence-Abschnitt per Strg+V einfuegen.
+4. Feedback: im Confluence-Abschnitt Textstelle markieren und Inline-Kommentar
+   setzen ODER unter 'Reviewer-Feedback' deine Zeile ergaenzen:
+   Zustimmung zur Draft-Entscheidung? ja / nein / Anmerkung.
+5. Danach dieses Ticket auf 'In Review erledigt' (bzw. euren Done-Status) setzen.
+-------------------------------------------------------------
+Hinweis: Diese Beschreibung ist nur die Kurzfassung. Massgeblich ist die
+Confluence-Seite - dort passiert das eigentliche Review, nicht hier im Ticket.",scope-neuaufbau wellbeing needs-review
+ELYO-154,"Scope-Entscheidung (DRAFT - bitte bestaetigen oder aendern):
+Produktiver Neuaufbau, API-first auf der Health-Domaene. Demo-localStorage ausgeschlossen.
+
+Klassifikation: produktiver Neuaufbau + Backend-Contract | Health-Data-Hardening | Privacy-Review
+
+Kurzbegruendung: Gesundheitsdaten im localStorage (High). Strukturierte Symptom-/Krankheitserfassung braucht Produktentscheidung gegen 'keine medizinische Interpretation'.
+
+-------------------------------------------------------------
+SO REVIEWST DU DIESES FEATURE (bitte durchgehen):
+1. Confluence-Seite oeffnen (Source of Truth, volle Analyse):
+   <CONFLUENCE-ABSCHNITTS-LINK EINFUEGEN>
+2. Abschnitt zu diesem Feature lesen (Kontext, Demo-Referenzwert, Produktions-Target).
+3. Screenshots: aus der Plattform-HTML den passenden Screen aufnehmen und
+   direkt im Confluence-Abschnitt per Strg+V einfuegen.
+4. Feedback: im Confluence-Abschnitt Textstelle markieren und Inline-Kommentar
+   setzen ODER unter 'Reviewer-Feedback' deine Zeile ergaenzen:
+   Zustimmung zur Draft-Entscheidung? ja / nein / Anmerkung.
+5. Danach dieses Ticket auf 'In Review erledigt' (bzw. euren Done-Status) setzen.
+-------------------------------------------------------------
+Hinweis: Diese Beschreibung ist nur die Kurzfassung. Massgeblich ist die
+Confluence-Seite - dort passiert das eigentliche Review, nicht hier im Ticket.",scope-neuaufbau health-data-hardening privacy-review checkin needs-review
+ELYO-155,"Scope-Entscheidung (DRAFT - bitte bestaetigen oder aendern):
+Produktiver Neuaufbau auf finalen Backend-Contracts. Kein Demo-Blending im Produktionscode.
+
+Klassifikation: produktiver Neuaufbau + Backend-Contract | Privacy-Review (Gesundheitsdetails clientseitig)
+
+Kurzbegruendung: Rendert Gesundheitsdetails clientseitig (Medium); Quelldaten folgen der Health-Domaene.
+
+-------------------------------------------------------------
+SO REVIEWST DU DIESES FEATURE (bitte durchgehen):
+1. Confluence-Seite oeffnen (Source of Truth, volle Analyse):
+   <CONFLUENCE-ABSCHNITTS-LINK EINFUEGEN>
+2. Abschnitt zu diesem Feature lesen (Kontext, Demo-Referenzwert, Produktions-Target).
+3. Screenshots: aus der Plattform-HTML den passenden Screen aufnehmen und
+   direkt im Confluence-Abschnitt per Strg+V einfuegen.
+4. Feedback: im Confluence-Abschnitt Textstelle markieren und Inline-Kommentar
+   setzen ODER unter 'Reviewer-Feedback' deine Zeile ergaenzen:
+   Zustimmung zur Draft-Entscheidung? ja / nein / Anmerkung.
+5. Danach dieses Ticket auf 'In Review erledigt' (bzw. euren Done-Status) setzen.
+-------------------------------------------------------------
+Hinweis: Diese Beschreibung ist nur die Kurzfassung. Massgeblich ist die
+Confluence-Seite - dort passiert das eigentliche Review, nicht hier im Ticket.",scope-neuaufbau privacy-review checkin-history needs-review
+ELYO-156,"Scope-Entscheidung (DRAFT - bitte bestaetigen oder aendern):
+Demo-only, flag-gated. Produktentscheidung ausstehend (needs-decision).
+
+Klassifikation: UI-only / demo-only | needs-decision | Privacy-Review (LAB-Badge)
+
+Kurzbegruendung: LAB-Badge kann Markerstatus indirekt offenlegen (Medium). Vor Produktion: Produktentscheidung + Privacy-Check.
+
+-------------------------------------------------------------
+SO REVIEWST DU DIESES FEATURE (bitte durchgehen):
+1. Confluence-Seite oeffnen (Source of Truth, volle Analyse):
+   <CONFLUENCE-ABSCHNITTS-LINK EINFUEGEN>
+2. Abschnitt zu diesem Feature lesen (Kontext, Demo-Referenzwert, Produktions-Target).
+3. Screenshots: aus der Plattform-HTML den passenden Screen aufnehmen und
+   direkt im Confluence-Abschnitt per Strg+V einfuegen.
+4. Feedback: im Confluence-Abschnitt Textstelle markieren und Inline-Kommentar
+   setzen ODER unter 'Reviewer-Feedback' deine Zeile ergaenzen:
+   Zustimmung zur Draft-Entscheidung? ja / nein / Anmerkung.
+5. Danach dieses Ticket auf 'In Review erledigt' (bzw. euren Done-Status) setzen.
+-------------------------------------------------------------
+Hinweis: Diese Beschreibung ist nur die Kurzfassung. Massgeblich ist die
+Confluence-Seite - dort passiert das eigentliche Review, nicht hier im Ticket.",scope-demo-only privacy-review gamification needs-decision needs-review
+ELYO-157,"Scope-Entscheidung (DRAFT - bitte bestaetigen oder aendern):
+Produktiv (naechster am Produkt). Verifikation gegen finalen Contract + Autorisierungsmatrix; Route-Semantik bewusst entscheiden.
+
+Klassifikation: produktiver Neuaufbau + Backend-Contract (Verifikation) | niedrig-mittlerer Privacy-Impact
+
+Kurzbegruendung: Uebungs-Completion ist gesundheitsnahe Aktivitaetsdatum (Low-Medium). Route-Aenderung braucht Breaking-Change-Bewertung.
+
+-------------------------------------------------------------
+SO REVIEWST DU DIESES FEATURE (bitte durchgehen):
+1. Confluence-Seite oeffnen (Source of Truth, volle Analyse):
+   <CONFLUENCE-ABSCHNITTS-LINK EINFUEGEN>
+2. Abschnitt zu diesem Feature lesen (Kontext, Demo-Referenzwert, Produktions-Target).
+3. Screenshots: aus der Plattform-HTML den passenden Screen aufnehmen und
+   direkt im Confluence-Abschnitt per Strg+V einfuegen.
+4. Feedback: im Confluence-Abschnitt Textstelle markieren und Inline-Kommentar
+   setzen ODER unter 'Reviewer-Feedback' deine Zeile ergaenzen:
+   Zustimmung zur Draft-Entscheidung? ja / nein / Anmerkung.
+5. Danach dieses Ticket auf 'In Review erledigt' (bzw. euren Done-Status) setzen.
+-------------------------------------------------------------
+Hinweis: Diese Beschreibung ist nur die Kurzfassung. Massgeblich ist die
+Confluence-Seite - dort passiert das eigentliche Review, nicht hier im Ticket.",scope-neuaufbau measures-hub needs-review
+ELYO-158,"Scope-Entscheidung (DRAFT - bitte bestaetigen oder aendern):
+Scope-Entscheidung PRO MODUL. Infection Radar = BLOCKIERT (raus aus MVP). Andere Module: Neuaufbau nur mit Suppression-Spezifikation.
+
+Klassifikation: produktiver Neuaufbau (pro Modul) + Backend-Contract | BLOCKIERT (Infection Radar) | Privacy-Review
+
+Kurzbegruendung: Infection Radar: gesundheitsnah/praediktive-Abwesenheit-Naehe, ausserhalb MVP; bleibt demo-flag-gated; Wiederbelebung = neues Design. Re-Identifikation bei realen Daten ohne Suppression = High.
+
+-------------------------------------------------------------
+SO REVIEWST DU DIESES FEATURE (bitte durchgehen):
+1. Confluence-Seite oeffnen (Source of Truth, volle Analyse):
+   <CONFLUENCE-ABSCHNITTS-LINK EINFUEGEN>
+2. Abschnitt zu diesem Feature lesen (Kontext, Demo-Referenzwert, Produktions-Target).
+3. Screenshots: aus der Plattform-HTML den passenden Screen aufnehmen und
+   direkt im Confluence-Abschnitt per Strg+V einfuegen.
+4. Feedback: im Confluence-Abschnitt Textstelle markieren und Inline-Kommentar
+   setzen ODER unter 'Reviewer-Feedback' deine Zeile ergaenzen:
+   Zustimmung zur Draft-Entscheidung? ja / nein / Anmerkung.
+5. Danach dieses Ticket auf 'In Review erledigt' (bzw. euren Done-Status) setzen.
+-------------------------------------------------------------
+Hinweis: Diese Beschreibung ist nur die Kurzfassung. Massgeblich ist die
+Confluence-Seite - dort passiert das eigentliche Review, nicht hier im Ticket.",scope-neuaufbau scope-blockiert privacy-review company-insights needs-review
