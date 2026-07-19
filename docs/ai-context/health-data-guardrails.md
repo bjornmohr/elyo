@@ -26,6 +26,12 @@ Avoid:
 - medically certain claims
 - individual risk classification for HR
 
+## Health Data Canonical Rules
+
+- Check-in scale is 1–5 (canonical). No other scale range.
+- The free-text `note` field on check-ins is removed (per ELYO-102 B4). Do not reintroduce raw free-text on check-ins.
+- Lab values are never reportable. Company/reporting views must never expose individual lab values or lab-value aggregates (allowlist principle, ADR-001 §2.5).
+
 ## Survey Results
 
 Survey results shown to company users must be aggregated.
