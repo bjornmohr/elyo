@@ -24,12 +24,23 @@ services:
     environment:
       - APP_ENV=local
       - APP_DEBUG=true
-      - DB_CONNECTION=pgsql
+      # Domain-separated connections (ELYO-104). Each carries its own PG role;
+      # the OS/DB boundary — not PHP — enforces access.
+      - DB_CONNECTION=identity
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_DATABASE=${DB_DATABASE:-elyo}
-      - DB_USERNAME=${DB_USERNAME:-elyo}
-      - DB_PASSWORD=${DB_PASSWORD:-elyo_secret}
+      - DB_IDENTITY_DATABASE=elyo_identity
+      - DB_IDENTITY_USERNAME=elyo_identity_rt
+      - DB_IDENTITY_PASSWORD=${ELYO_IDENTITY_RT_PASSWORD:-identity_rt_dev}
+      - DB_MAPPING_DATABASE=elyo_subject_mapping
+      - DB_MAPPING_USERNAME=elyo_mapping_svc
+      - DB_MAPPING_PASSWORD=${ELYO_MAPPING_SVC_PASSWORD:-mapping_svc_dev}
+      - DB_HEALTH_DATABASE=elyo_health
+      - DB_HEALTH_USERNAME=elyo_employee_rt
+      - DB_HEALTH_PASSWORD=${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
+      - DB_AUDIT_DATABASE=elyo_audit
+      - DB_AUDIT_USERNAME=elyo_employee_rt
+      - DB_AUDIT_PASSWORD=${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
       - REDIS_HOST=redis
       - MAIL_MAILER=smtp
       - MAIL_HOST=mailpit
@@ -61,11 +72,20 @@ services:
     ports:
       - "5432:5432"
     environment:
+      # Legacy bootstrap DB/superuser (kept for BC; n8n still uses it).
       - POSTGRES_DB=${DB_DATABASE:-elyo}
       - POSTGRES_USER=${DB_USERNAME:-elyo}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-elyo_secret}
+      # Runtime-role passwords consumed by the initdb script (dev defaults;
+      # override via Docker secrets outside local development).
+      - ELYO_IDENTITY_RT_PASSWORD=${ELYO_IDENTITY_RT_PASSWORD:-identity_rt_dev}
+      - ELYO_EMPLOYEE_RT_PASSWORD=${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
+      - ELYO_COMPANY_RT_PASSWORD=${ELYO_COMPANY_RT_PASSWORD:-company_rt_dev}
+      - ELYO_MAPPING_SVC_PASSWORD=${ELYO_MAPPING_SVC_PASSWORD:-mapping_svc_dev}
+      - ELYO_MIGRATOR_PASSWORD=${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-elyo} -d ${DB_DATABASE:-elyo}"]
       interval: 5s

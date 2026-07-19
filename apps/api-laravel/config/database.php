@@ -17,7 +17,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    'default' => env('DB_CONNECTION', 'identity'),
 
     /*
     |--------------------------------------------------------------------------
@@ -84,14 +84,84 @@ return [
             ]) : [],
         ],
 
+        /*
+        | ELYO domain-separated connections (ELYO-104 / ADR-001 §2.1-2.4).
+        | One PostgreSQL cluster, one database per domain, one runtime role per
+        | connection with minimal grants. The mapping database is reachable
+        | exclusively through the dedicated `elyo_mapping_svc` credentials, so
+        | the OS/DB boundary — not PHP — enforces access.
+        */
+
+        'identity' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_IDENTITY_DATABASE', 'elyo_identity'),
+            'username' => env('DB_IDENTITY_USERNAME', 'elyo_identity_rt'),
+            'password' => env('DB_IDENTITY_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
+        'mapping' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_MAPPING_DATABASE', 'elyo_subject_mapping'),
+            'username' => env('DB_MAPPING_USERNAME', 'elyo_mapping_svc'),
+            'password' => env('DB_MAPPING_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
+        'health' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_HEALTH_DATABASE', 'elyo_health'),
+            'username' => env('DB_HEALTH_USERNAME', 'elyo_employee_rt'),
+            'password' => env('DB_HEALTH_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
+        'audit' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_AUDIT_DATABASE', 'elyo_audit'),
+            'username' => env('DB_AUDIT_USERNAME', 'elyo_employee_rt'),
+            'password' => env('DB_AUDIT_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
+        // Legacy alias: pre-split code referencing `pgsql` keeps working by
+        // resolving to the identity connection. Do not add new usages.
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
-            'database' => env('DB_DATABASE', 'laravel'),
-            'username' => env('DB_USERNAME', 'root'),
-            'password' => env('DB_PASSWORD', ''),
+            'database' => env('DB_IDENTITY_DATABASE', env('DB_DATABASE', 'elyo_identity')),
+            'username' => env('DB_IDENTITY_USERNAME', env('DB_USERNAME', 'elyo_identity_rt')),
+            'password' => env('DB_IDENTITY_PASSWORD', env('DB_PASSWORD', '')),
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
