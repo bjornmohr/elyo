@@ -104,6 +104,29 @@ For survey results:
 - Small answer buckets must not reveal tiny groups.
 - Text answers must not be shown raw to company users.
 
+## Health Domain Rules
+
+The health domain is separated from identity by design (ADR-001, ADR-003). Enforce these rules for any health-domain code:
+
+- Health-domain tables must not carry `user_id` columns. New health data is always keyed on `health_subject_id`.
+- The mapping between `user_id` and `health_subject_id` is accessed only through `App\Services\Privacy\MappingService`. No direct ORM access, no ad-hoc joins.
+- Every mapping access requires a mandatory purpose code.
+- Health models must not be importable outside the health and privacy namespaces.
+- When adding new health or behavior data, attach it to `health_subject_id`, never to `user_id`.
+
+## Documentation Conventions
+
+- ADR documents go exclusively into `docs/adr-documents/`.
+- Every other new documentation file goes into `docs/further_docs/`.
+- Existing documentation files are edited in place; do not relocate them as part of an unrelated task.
+- The established roles of `docs/ai-tasks/`, `docs/ai-context/`, and `docs/api/` are unchanged — keep using them for their existing purposes.
+
+## OpenAPI Contract Rule
+
+- `docs/api/openapi.yaml` is the binding contract between frontend and backend.
+- Any change to routes, request or response shapes, validation rules, error responses, or ID formats MUST update `docs/api/openapi.yaml` in the same patch.
+- A patch that changes API behavior but leaves `openapi.yaml` untouched is incomplete and fails review.
+
 ## Output Expectations
 
 For every task, report:
