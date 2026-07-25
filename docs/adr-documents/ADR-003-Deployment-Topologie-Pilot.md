@@ -12,7 +12,7 @@
 
 ## 1. Kontext
 
-ADR-001 legt die Zielarchitektur verbindlich fest: vier getrennte Datenbanken plus Audit-DB, fünf Runtimes aus einem Image, eine geschützte Mapping-Domäne mit genau fünf zweckgebundenen Operationen, Reporting ausschließlich über suppressionsgeprüfte Aggregate und keine direkte Runtime-zu-Runtime-Kommunikation.
+ADR-001 legt die Zielarchitektur verbindlich fest: vier getrennte Datenbanken plus Audit-DB, fünf Runtimes aus einem Image, eine geschützte Mapping-Domäne mit genau fünf zweckgebundenen identifiertragenden Lifecycle-Operationen, Reporting ausschließlich über suppressionsgeprüfte Aggregate und keine direkte Runtime-zu-Runtime-Kommunikation.
 
 ADR-001 beschreibt den Zielzustand, nicht den Weg dorthin. Für den Pilotbetrieb müssen Deployment-Topologie, Umfang der ersten Umsetzung und bewusste Vertagungen konkretisiert werden. Diese ADR hält die zehn Umsetzungsentscheidungen der Session vom 2026-07-19 fest, damit jede nachfolgende Aufgabe der Prompt-Serie (`2026-07-19-02` … `-17`) dieselben Randbedingungen erbt. Es werden keine ADR-001-Entscheidungen aufgehoben; einzelne Punkte werden für den Pilot enger gefasst oder zeitlich gestaffelt.
 
@@ -52,8 +52,8 @@ Jede Entscheidung D1–D10 ist wortgleich aus dem Ausführungsplan übernommen; 
 
 > Mapping operations: **3 now** (`provisionOwnSubject`, `resolveOwnSubject`, `revokeSubjectLink`), `resolveReportingCohort` / `resolveForDataSubjectRequest` as defined interface with not-implemented guard.
 
-- **Begründung:** Von den fünf zweckgebundenen Operationen werden die drei für den Pilot benötigten implementiert; die beiden reporting- bzw. DSAR-bezogenen Operationen bleiben als definierte Schnittstelle mit einem Not-Implemented-Guard bestehen, damit der Contract vollständig, aber nicht funktionslos vorgetäuscht ist.
-- **ADR-001-Bezug:** Konkretisiert §2.3 (genau fünf zweckgebundene Operationen). **Pilot-Konkretisierung:** 3-von-5 Operationen sind aktiv; `resolveReportingCohort` und `resolveForDataSubjectRequest` existieren als Interface mit Guard — der Contract bleibt fünfteilig, die Umsetzung ist gestaffelt.
+- **Begründung:** Von den fünf zweckgebundenen Lifecycle-Operationen werden die drei für den Pilot benötigten implementiert; die beiden reporting- bzw. DSAR-bezogenen Operationen bleiben als definierte Schnittstelle mit einem Not-Implemented-Guard bestehen, damit der Contract vollständig, aber nicht funktionslos vorgetäuscht ist. Die nicht-identifizierende Hilfsabfrage `provisioningStateForUser` gehört zur Provisionierungsoperation und ermöglicht den idempotenten Abgleich, ohne Mapping-Identifikatoren offenzulegen.
+- **ADR-001-Bezug:** Konkretisiert §2.3 (genau fünf zweckgebundene identifiertragende Lifecycle-Operationen plus enge Zustandsabfrage innerhalb der Provisionierung). **Pilot-Konkretisierung:** 3-von-5 Lifecycle-Operationen sind aktiv; `resolveReportingCohort` und `resolveForDataSubjectRequest` existieren als Interface mit Guard — die Umsetzung ist gestaffelt.
 
 ### D6 — Boundary-Durchsetzung
 

@@ -6,6 +6,7 @@ use App\Models\Health\HealthSubject;
 use App\Models\Privacy\SubjectMapping;
 use App\Services\Privacy\AuditActorContext;
 use App\Services\Privacy\AuditLoggerContract;
+use App\Services\Privacy\Exceptions\InvalidPurposeCodeException;
 use App\Services\Privacy\Exceptions\MappingNotFoundException;
 use App\Services\Privacy\Exceptions\MappingRevokedException;
 use App\Services\Privacy\Exceptions\OperationNotAvailableException;
@@ -14,25 +15,22 @@ use App\Services\Privacy\MappingOperation;
 use App\Services\Privacy\MappingService;
 use App\Services\Privacy\MappingServiceContract;
 use App\Services\Privacy\PurposeCode;
+use App\Services\Privacy\SubjectProvisioningState;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Symfony\Component\Uid\Ulid;
+use Tests\Support\ConfiguresPrivacyMapping;
 use Tests\TestCase;
 
 class MappingServiceTest extends TestCase
 {
-    private const ENCRYPTION_KEY = 'base64:a2tra2tra2tra2tra2tra2tra2tra2tra2tra2tra2s=';
-
-    private const APP_KEY = 'base64:bW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW0=';
+    use ConfiguresPrivacyMapping;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        config()->set('privacy.mapping.encryption_key', self::ENCRYPTION_KEY);
-        config()->set('privacy.mapping.hmac_key', 'privacy-feature-test-hmac-key');
-        config()->set('privacy.mapping.subject_derivation_key', 'privacy-feature-test-subject-key');
-        config()->set('app.key', self::APP_KEY);
+        $this->configurePrivacyMapping('privacy-feature-test');
     }
 
     public function test_container_resolves_mapping_service_with_dedicated_keys(): void
@@ -74,6 +72,40 @@ class MappingServiceTest extends TestCase
             app(MappingCryptography::class)->decryptUserId($mapping->user_id_encrypted),
         );
         $this->assertFalse(DB::connection('mapping')->getSchemaBuilder()->hasColumn('subject_mappings', 'user_id'));
+    }
+
+    public function test_provisioning_state_distinguishes_missing_active_and_revoked_without_returning_identifiers(): void
+    {
+        $service = app(MappingServiceContract::class);
+
+        $this->assertSame(
+            SubjectProvisioningState::MISSING,
+            $service->provisioningStateForUser(7010, PurposeCode::PROVISIONING),
+        );
+
+        $service->provisionOwnSubject(7010, PurposeCode::PROVISIONING);
+
+        $this->assertSame(
+            SubjectProvisioningState::ACTIVE,
+            $service->provisioningStateForUser(7010, PurposeCode::PROVISIONING),
+        );
+
+        $service->revokeSubjectLink(7010, PurposeCode::REVOCATION);
+
+        $this->assertSame(
+            SubjectProvisioningState::REVOKED,
+            $service->provisioningStateForUser(7010, PurposeCode::PROVISIONING),
+        );
+    }
+
+    public function test_provisioning_state_requires_the_provisioning_purpose(): void
+    {
+        $this->expectException(InvalidPurposeCodeException::class);
+
+        app(MappingServiceContract::class)->provisioningStateForUser(
+            7011,
+            PurposeCode::HEALTH_SELF_READ,
+        );
     }
 
     public function test_retry_after_mapping_failure_adopts_the_orphan_health_subject(): void
@@ -232,6 +264,7 @@ class MappingServiceTest extends TestCase
         $service = app(MappingServiceContract::class);
 
         $subjectId = $service->provisionOwnSubject(87654321, PurposeCode::PROVISIONING);
+        $service->provisioningStateForUser(87654321, PurposeCode::PROVISIONING);
         $service->resolveOwnSubject(87654321, PurposeCode::HEALTH_SELF_READ);
         $service->revokeSubjectLink(87654321, PurposeCode::REVOCATION);
 
@@ -245,8 +278,9 @@ class MappingServiceTest extends TestCase
         } catch (OperationNotAvailableException) {
         }
 
-        $this->assertCount(5, $auditLogger->events);
+        $this->assertCount(6, $auditLogger->events);
         $this->assertSame([
+            'provisionOwnSubject',
             'provisionOwnSubject',
             'resolveOwnSubject',
             'revokeSubjectLink',
@@ -254,6 +288,7 @@ class MappingServiceTest extends TestCase
             'resolveForDataSubjectRequest',
         ], array_column($auditLogger->events, 'operation'));
         $this->assertSame([
+            ['type' => 'registration-workflow', 'runtime' => 'identity-api'],
             ['type' => 'registration-workflow', 'runtime' => 'identity-api'],
             ['type' => 'employee-self-service', 'runtime' => 'employee-health-api'],
             ['type' => 'privacy-admin', 'runtime' => 'privacy-admin'],

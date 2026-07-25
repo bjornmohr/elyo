@@ -5,13 +5,18 @@ namespace App\Services\Invitations;
 use App\Models\InviteToken;
 use App\Models\User;
 use App\Models\UserRole;
+use App\Services\Privacy\MappingServiceContract;
+use App\Services\Privacy\PurposeCode;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class InviteAcceptanceService
 {
-    public function __construct(private readonly InviteTeamValidator $teamValidator)
-    {
-    }
+    public function __construct(
+        private readonly InviteTeamValidator $teamValidator,
+        private readonly MappingServiceContract $mappingService,
+    ) {}
 
     public function accept(string $token, string $name, string $password): User
     {
@@ -77,7 +82,7 @@ class InviteAcceptanceService
             });
         }
 
-        return DB::transaction(function () use ($invite, $name, $password) {
+        $user = DB::transaction(function () use ($invite, $name, $password) {
             $user = User::create([
                 'name' => $name,
                 'email' => $invite->email,
@@ -95,5 +100,16 @@ class InviteAcceptanceService
 
             return $user->load('roles', 'company');
         });
+
+        try {
+            $this->mappingService->provisionOwnSubject($user->id, PurposeCode::PROVISIONING);
+        } catch (Throwable) {
+            // ADR-001 §2.2 accepts retry as compensation for cross-database
+            // partial failure; registration remains valid and the idempotent
+            // elyo:provision-subjects sweep repairs the missing mapping.
+            Log::warning('Health subject provisioning failed after invite acceptance; run elyo:provision-subjects.');
+        }
+
+        return $user;
     }
 }

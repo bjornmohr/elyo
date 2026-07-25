@@ -185,12 +185,12 @@ Die Referenz-IDs bleiben stabil und sollen künftig nicht neu nummeriert werden.
 
 - **Status:** DECIDED
 - **Entscheidung / Antwort:**
-  - Das globale Health Subject wird bei erfolgreicher Selbstregistrierung des Nutzers angelegt.
-  - Provisionierung erfolgt synchron im Registrierungs-Request nach dem Alles-oder-nichts-Prinzip: schlägt ein Teilschritt fehl, schlägt die gesamte Registrierung fehl und wird vollständig zurückgerollt; der Nutzer wiederholt die Registrierung.
+  - Das globale Health Subject wird unmittelbar nach erfolgreicher Selbstregistrierung des Nutzers synchron provisioniert.
+  - Die Identity-Registrierung wird vor der domänenübergreifenden Provisionierung committed. Schlägt diese anschließend fehl, bleibt die Registrierung gültig; ein generischer Logeintrag markiert den Reparaturbedarf und der idempotente Abgleich `elyo:provision-subjects` stellt die fehlende Zuordnung her.
   - Reihenfolge: zuerst der Health-Subject-Datensatz in `elyo_health`, danach das Mapping in `elyo_subject_mapping`. Ein verwaistes Subject ohne Mapping ist unkritisch und per Abgleich auffindbar.
-  - Kein eigener Provisionierungsstatus; Idempotenz über die Wiederholung der Registrierung (deterministische Prüfung auf bereits existierendes Subject/Mapping zur user_id).
-- **Begründung:** Nur tatsächlich registrierte Nutzer erhalten ein Health Subject. Der synchrone Ansatz ist die einfachste Lösung für den Pilot; da über DB-Grenzen keine echte Transaktion möglich ist, kompensiert die Subject-zuerst-Reihenfolge das Teilfehlerrisiko.
-- **Folgeaufgabe:** Registrierungsablauf implementieren inkl. Duplikatprüfung bei Wiederholung; einfacher Abgleich-Check für verwaiste Subjects.
+  - Kein eigener persistierter Provisionierungsstatus; Idempotenz über deterministische Prüfung auf bereits existierendes Subject/Mapping zur `user_id` und wiederholbare Reparatur.
+- **Begründung:** Nur tatsächlich registrierte Nutzer erhalten ein Health Subject. Der synchrone Ansatz ist die einfachste Lösung für den Pilot; da über DB-Grenzen keine echte Transaktion möglich ist, kompensieren Subject-zuerst-Reihenfolge und wiederholbarer Abgleich das Teilfehlerrisiko, ohne einen bereits angelegten Identity-Account zu verwerfen.
+- **Folgeaufgabe:** Registrierungsablauf mit generischer Fehlerprotokollierung und idempotenten Abgleich für fehlende Zuordnungen implementieren.
 - **ADR-relevant:** JA
 
 ## 3.2 Health Subject ohne aktive Membership
@@ -262,6 +262,7 @@ Die Referenz-IDs bleiben stabil und sollen künftig nicht neu nummeriert werden.
 - **Status:** DECIDED
 - **Entscheidung / Antwort:**
   - Operationen: `provisionOwnSubject`, `resolveOwnSubject`, `resolveReportingCohort`, `revokeSubjectLink`, `resolveForDataSubjectRequest`. Kein `mergeSubjects`, kein `restoreRevokedLink`.
+  - `provisioningStateForUser` ist eine nicht-identifizierende Hilfsabfrage innerhalb der Provisionierungsoperation. Sie liefert ausschließlich `MISSING`, `ACTIVE` oder `REVOKED`, nutzt denselben Pflicht-Purpose und dasselbe Audit und darf nur in der Identity-Runtime verwendet werden.
   - Strikte Runtime-Operations-Matrix (jede Operation genau eine berechtigte Runtime):
     - Identity API: `provisionOwnSubject` (nur im Registrierungsablauf)
     - Employee Health API: `resolveOwnSubject` (nur eigene Session)
@@ -280,7 +281,7 @@ Die Referenz-IDs bleiben stabil und sollen künftig nicht neu nummeriert werden.
 - **Status:** DECIDED
 - **Entscheidung / Antwort:**
   - Nur zwei Statuswerte: `ACTIVE` und `REVOKED`.
-  - Kein `PENDING` (Provisionierung ist synchron alles-oder-nichts, siehe 3.1), kein `MERGED` (keine Zusammenführung, siehe 3.3), kein `LOCKED`.
+  - Kein `PENDING` (fehlende Zuordnungen werden als nicht persistierter Zustand `MISSING` erkannt und synchron repariert, siehe 3.1), kein `MERGED` (keine Zusammenführung, siehe 3.3), kein `LOCKED`.
   - `REVOKED` ist endgültig; keine Reaktivierung (siehe 5.1: kein `restoreRevokedLink`).
   - Kein physisches Löschen im Normalbetrieb; die widerrufene Zeile bleibt als Tombstone erhalten und verhindert Wiederverwendung der IDs. Physische Löschung nur im Rahmen des Löschverfahrens (11.4).
 - **Begründung:** Minimales Zustandsmodell ohne Zustände, die im Pilot nie eintreten; weniger Test- und Fehlerfläche.

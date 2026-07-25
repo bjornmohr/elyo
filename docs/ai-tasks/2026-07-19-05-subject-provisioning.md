@@ -12,11 +12,11 @@ Relevant files:
 - apps/api-laravel/app/Services/Invitations/
 - apps/api-laravel/database/seeders/DemoDataSeeder.php
 - app/Services/Privacy/MappingService.php (prompt 04)
-- ADR-001 §2.2 (synchronous, all-or-nothing), Jira ELYO-104
+- ADR-001 §2.2 (synchronous after identity commit, compensating repair), Jira ELYO-104
 
 Background:
 
-- ADR-001: provisioning happens synchronously at successful self-registration; order subject → mapping; repeatability compensates partial failure (no cross-DB transaction exists).
+- ADR-001: provisioning happens synchronously immediately after the identity commit; order subject → mapping; generic logging plus repeatable repair compensates partial failure (no cross-DB transaction exists).
 - Users created by admin invite flows also need subjects; company/admin actors must never receive the subject id in any response.
 
 ## Scope

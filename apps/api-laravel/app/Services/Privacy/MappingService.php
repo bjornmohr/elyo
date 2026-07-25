@@ -18,6 +18,30 @@ class MappingService implements MappingServiceContract
         private readonly AuditLoggerContract $auditLogger,
     ) {}
 
+    public function provisioningStateForUser(
+        int $userId,
+        PurposeCode $purpose,
+    ): SubjectProvisioningState {
+        try {
+            $this->requirePurpose(MappingOperation::PROVISION_OWN_SUBJECT, $purpose, [PurposeCode::PROVISIONING]);
+
+            $mapping = $this->findMapping($userId);
+
+            return match ($mapping?->status) {
+                null => SubjectProvisioningState::MISSING,
+                SubjectMapping::STATUS_ACTIVE => SubjectProvisioningState::ACTIVE,
+                SubjectMapping::STATUS_REVOKED => SubjectProvisioningState::REVOKED,
+            };
+        } finally {
+            $this->auditOperation(
+                MappingOperation::PROVISION_OWN_SUBJECT,
+                $purpose,
+                $userId,
+                AuditActorContext::registrationWorkflow(),
+            );
+        }
+    }
+
     public function provisionOwnSubject(int $userId, PurposeCode $purpose): string
     {
         try {
