@@ -113,6 +113,20 @@
       <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/tijsverkoyen/css-to-inline-styles" />
       <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/vlucas/phpdotenv" />
       <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/voku/portable-ascii" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/deptrac/deptrac" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/doctrine/deprecations" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/jetbrains/phpstorm-stubs" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/phpdocumentor/graphviz" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/phpdocumentor/reflection-common" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/phpdocumentor/type-resolver" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/phpstan/phpdoc-parser" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/phpstan/phpstan" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/symfony/config" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/symfony/dependency-injection" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/symfony/filesystem" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/symfony/polyfill-deepclone" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/symfony/var-exporter" />
+      <excludeFolder url="file://$MODULE_DIR$/apps/api-laravel/vendor/symfony/yaml" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
