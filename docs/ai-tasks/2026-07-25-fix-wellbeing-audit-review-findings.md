@@ -52,7 +52,8 @@ Pure refactors remain covered through these seams; no private-helper tests.
 
 ## Test cases
 
-1. Off-scale and prohibited-note requests return the standard validation envelope.
+1. Off-scale and removed-note requests return the standard validation envelope;
+   every supplied `note` value is rejected, including `null`, `""`, and `[]`.
 2. Duplicate POST creates a write-purpose mapping-resolution audit event and no
    extra points/check-in.
 3. Missing-mapping repair audit events identify employee self-service actor
@@ -90,7 +91,11 @@ git diff --check
 ## Implementation result
 
 - Test-first RED confirmed all reviewed behavior gaps before production changes.
+- Empty-note regression test failed with HTTP 200 before the presence-based
+  validation fix, then passed with 25 assertions.
 - Check-in validation now returns the coded repository error envelope.
+- Check-in validation rejects every occurrence of the removed `note` key,
+  including null and empty values.
 - Duplicate submissions resolve the subject with `HEALTH_SELF_WRITE`.
 - Self-service mapping repair is provisioned and re-resolved with employee actor context.
 - Demo wellbeing entries use daily period keys.
@@ -102,7 +107,7 @@ git diff --check
 - Focused wellbeing/privacy tests: 64 passed, 401 assertions.
 - Privacy audit contract tests: 27 passed, 165 assertions.
 - Boundary suite: 17 passed, 86 assertions.
-- Full API suite: 404 passed, 1,870 assertions.
+- Full API suite: 404 passed, 1,888 assertions.
 - Deptrac: 0 violations, 0 errors.
 - Pint: 20 changed PHP files pass.
 - Docker Compose config, OpenAPI YAML parse, and `git diff --check`: pass.

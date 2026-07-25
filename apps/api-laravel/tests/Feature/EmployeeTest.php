@@ -150,25 +150,27 @@ class EmployeeTest extends TestCase
         $this->assertSame(0, WellbeingEntry::query()->count());
     }
 
-    public function test_checkin_rejects_a_supplied_note_instead_of_dropping_it(): void
+    public function test_checkin_rejects_every_supplied_note_value_instead_of_dropping_it(): void
     {
         $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
 
-        $this->actingAs($this->employee, 'sanctum')
-            ->postJson('/api/employee/checkin', [
-                'mood' => 4,
-                'stress' => 2,
-                'energy' => 5,
-                'note' => 'Rücken tut weh',
-            ])
-            ->assertStatus(422)
-            ->assertJsonPath('error.code', 'VALIDATION_ERROR')
-            ->assertJsonPath('error.message', 'The given data was invalid.')
-            ->assertJsonStructure([
-                'error' => [
-                    'details' => ['note'],
-                ],
-            ]);
+        foreach (['Rücken tut weh', null, '', []] as $note) {
+            $this->actingAs($this->employee, 'sanctum')
+                ->postJson('/api/employee/checkin', [
+                    'mood' => 4,
+                    'stress' => 2,
+                    'energy' => 5,
+                    'note' => $note,
+                ])
+                ->assertStatus(422)
+                ->assertJsonPath('error.code', 'VALIDATION_ERROR')
+                ->assertJsonPath('error.message', 'The given data was invalid.')
+                ->assertJsonStructure([
+                    'error' => [
+                        'details' => ['note'],
+                    ],
+                ]);
+        }
 
         $this->assertSame(0, WellbeingEntry::query()->count());
     }

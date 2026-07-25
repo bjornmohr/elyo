@@ -31,14 +31,14 @@ class CheckinRequest extends FormRequest
             'mood' => ['required', 'integer', 'min:1', 'max:5'],
             'stress' => ['required', 'integer', 'min:1', 'max:5'],
             'energy' => ['required', 'integer', 'min:1', 'max:5'],
-            'note' => ['prohibited'],
+            'note' => ['missing'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'note.prohibited' => 'Freitext-Notizen werden im Check-in nicht mehr erfasst.',
+            'note.missing' => 'Freitext-Notizen werden im Check-in nicht mehr erfasst.',
         ];
     }
 

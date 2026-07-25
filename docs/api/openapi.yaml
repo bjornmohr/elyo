@@ -1064,10 +1064,10 @@ paths:
       description: >-
         One check-in per employee and daily period. `mood`, `stress` and `energy` are
         required integers on the canonical 1–5 scale (ELYO-102 §3.1 / B3); values outside
-        1–5 return 422. The free-text `note` is no longer accepted and is rejected with
-        422 rather than silently dropped (ELYO-102 §3.3 / B4), so an outdated client cannot
-        lose text the employee believed was stored. `location` and `sleep` are not part of
-        this contract version (ELYO-133).
+        1–5 return 422. The free-text `note` is no longer accepted; every occurrence,
+        including null or empty values, is rejected with 422 rather than silently dropped
+        (ELYO-102 §3.3 / B4), so an outdated client cannot lose text the employee believed
+        was stored. `location` and `sleep` are not part of this contract version (ELYO-133).
       security: [{ Sanctum: [] }]
       requestBody:
         required: true
@@ -1081,7 +1081,7 @@ paths:
                 stress: { type: integer, minimum: 1, maximum: 5 }
                 energy: { type: integer, minimum: 1, maximum: 5 }
                 note:
-                  description: Removed free-text field; any supplied value is invalid.
+                  description: Removed free-text field; any supplied value, including null or empty values, is invalid.
                   not: {}
       responses:
         200:
