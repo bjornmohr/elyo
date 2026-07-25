@@ -1,0 +1,68 @@
+deptrac:
+  paths:
+    - ./app
+  exclude_files:
+    - '#^app/Console/Kernel\.php$#'
+  layers:
+    - name: PrivacyModels
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\Models\\Privacy\\.*#'
+    - name: HealthModels
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\Models\\Health\\.*#'
+    - name: Privacy
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\Services\\Privacy\\(?!MappingService$).*#'
+    - name: MappingService
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\Services\\Privacy\\MappingService$#'
+    - name: HealthDomain
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\Services\\Health\\.*#'
+    - name: AppServices
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\Services\\(?!Privacy\\|Health\\).*#'
+    - name: Http
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\Http\\.*#'
+    - name: Application
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\(?!Models\\Privacy\\|Models\\Health\\|Services\\|Http\\).*#'
+  ruleset:
+    Privacy:
+      - HealthModels
+      - HealthDomain
+      - Application
+    MappingService:
+      - PrivacyModels
+      - Privacy
+      - HealthModels
+      - HealthDomain
+      - Application
+    HealthDomain:
+      - HealthModels
+      - Privacy
+    AppServices:
+      - Privacy
+      - MappingService
+      - HealthDomain
+      - Application
+    Http:
+      - Privacy
+      - MappingService
+      - HealthDomain
+      - AppServices
+      - Application
+    Application:
+      - Privacy
+      - MappingService
+      - HealthDomain
+      - AppServices

@@ -46,7 +46,12 @@ Use:
 Important validation commands:
 
     docker compose exec api php artisan test
+    docker compose exec api php artisan test --testsuite=boundary
+    docker compose exec api composer deptrac
     docker compose exec api php artisan route:list
+
+The boundary suite requires the Dockerized PostgreSQL test databases and runtime
+role credentials. Missing PostgreSQL setup is a test failure, never a skipped test.
 
 If migrations change:
 
