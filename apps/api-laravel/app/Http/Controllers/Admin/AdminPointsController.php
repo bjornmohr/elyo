@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdatePointSettingsRequest;
 use App\Models\PointSetting;
-use App\Services\PointsService;
+use App\Services\PointSettingsService;
 use Illuminate\Http\JsonResponse;
 
 class AdminPointsController extends Controller
@@ -13,7 +13,7 @@ class AdminPointsController extends Controller
     public function index(): JsonResponse
     {
         return response()->json([
-            'data' => PointsService::resolvePointMap(),
+            'data' => PointSettingsService::resolvePointMap(),
         ]);
     }
 
@@ -27,7 +27,7 @@ class AdminPointsController extends Controller
         }
 
         return response()->json([
-            'data' => PointsService::resolvePointMap(),
+            'data' => PointSettingsService::resolvePointMap(),
         ]);
     }
 }

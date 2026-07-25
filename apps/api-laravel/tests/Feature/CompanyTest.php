@@ -17,12 +17,14 @@ use App\Models\User;
 use App\Models\UserRole;
 use App\Services\MeasureCheckinTokenService;
 use Carbon\Carbon;
+use Tests\Support\AssertsNoWellbeingValues;
 use Tests\Support\ConfiguresPrivacyMapping;
 use Tests\Support\CreatesWellbeingCheckins;
 use Tests\TestCase;
 
 class CompanyTest extends TestCase
 {
+    use AssertsNoWellbeingValues;
     use ConfiguresPrivacyMapping;
     use CreatesWellbeingCheckins;
 
@@ -60,13 +62,13 @@ class CompanyTest extends TestCase
     }
 
     /**
-     * ELYO-91 prompt 09: the wellbeing aggregates lost their live source when
-     * check-ins moved into the health domain, so the dashboard reports the
-     * suppressed block even when check-ins exist. The threshold-suppression
-     * shape itself is unchanged and still asserted here; prompt 09 replaces it
-     * with the reporting-pending state.
+     * ELYO-91 prompt 09 (ADR-003 D7): wellbeing lives in the health domain and
+     * the company runtime has no read path to it. The dashboard therefore
+     * reports an explicit reporting-pending block instead of aggregating live —
+     * even for a company with plenty of check-in data — until the reporting
+     * domain delivers suppressed quarterly snapshots.
      */
-    public function test_company_dashboard_wellbeing_aggregates_are_suppressed_without_a_reporting_source()
+    public function test_company_dashboard_wellbeing_blocks_report_reporting_pending()
     {
         $employees = User::factory()->count(4)->create([
             'company_id' => $this->company->id,
@@ -87,73 +89,58 @@ class CompanyTest extends TestCase
         $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
 
         $response->assertStatus(200);
-        $response->assertJsonPath('company.isAboveThreshold', false);
-        $response->assertJsonPath('company.responseCount', null);
-        $response->assertJsonPath('company.respondentCount', null);
-        $response->assertJsonPath('company.eligibleEmployeeCount', null);
-        $response->assertJsonPath('company.participationRate', null);
-        $response->assertJsonPath('company.avgScore', null);
-        $response->assertJsonPath('company.avgMood', null);
-        $response->assertJsonPath('company.avgStress', null);
-        $response->assertJsonPath('company.avgEnergy', null);
-        $response->assertJsonPath('company.suppressionReason', 'ANONYMITY_THRESHOLD_NOT_MET');
-        $response->assertJsonCount(0, 'trend');
+        $response->assertJsonPath('company.status', 'reporting_pending');
+        $response->assertJsonPath('company.data', null);
+        $response->assertJsonPath('teams.0.metrics.status', 'reporting_pending');
+        $response->assertJsonPath('teams.0.metrics.data', null);
+        $response->assertJsonPath('trend.status', 'reporting_pending');
+        $response->assertJsonPath('trend.data', null);
         $response->assertJsonMissingPath('teams.0.memberCount');
-    }
 
-    public function test_company_dashboard_participation_counts_distinct_active_employees()
-    {
-        $employees = User::factory()->count(3)->create([
-            'company_id' => $this->company->id,
-            'team_id' => $this->team->id,
-            'role' => Role::EMPLOYEE,
-        ]);
-
-        foreach (range(1, 10) as $index) {
-            $this->createWellbeingEntry($employees->first(), [
-                'period_key' => sprintf('2024-W%02d', $index),
-            ]);
-        }
-
-        $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
-
-        $response->assertStatus(200);
-        $response->assertJsonPath('company.isAboveThreshold', false);
+        // Legacy fields the existing Angular dashboard reads are kept present
+        // but empty; no partial numbers are reported.
+        $response->assertJsonPath('company.isAboveThreshold', null);
         $response->assertJsonPath('company.responseCount', null);
-        $response->assertJsonPath('company.respondentCount', null);
-        $response->assertJsonPath('company.eligibleEmployeeCount', null);
-        $response->assertJsonPath('company.participationRate', null);
+        $response->assertJsonMissingPath('company.respondentCount');
+        $response->assertJsonMissingPath('company.eligibleEmployeeCount');
+        $response->assertJsonMissingPath('company.participationRate');
+        $response->assertJsonMissingPath('company.suppressionReason');
     }
 
     /**
-     * ELYO-91 prompt 09: participation is no longer computable without a
-     * reporting source, so the cap itself is not observable here anymore. The
-     * case is kept so the endpoint stays covered for the state it now reports.
+     * ELYO-91 prompt 09 requirement 4: pattern and numeric sweep over the two
+     * reporting endpoints changed by this transition. The boundary suite
+     * separately prevents any Company/Admin response path from reaching Health.
      */
-    public function test_company_dashboard_participation_is_capped_at_one_hundred_percent()
+    public function test_affected_company_reporting_endpoints_expose_no_wellbeing_values()
     {
-        $employees = User::factory()->count(3)->create([
+        $employees = User::factory()->count(4)->create([
             'company_id' => $this->company->id,
             'team_id' => $this->team->id,
             'role' => Role::EMPLOYEE,
         ]);
 
         foreach ($employees as $employee) {
-            foreach (range(1, 4) as $index) {
-                $this->createWellbeingEntry($employee, [
-                    'period_key' => sprintf('2024-W%02d', $index),
-                ]);
-            }
+            $this->createWellbeingEntry($employee, [
+                'mood' => 5,
+                'stress' => 1,
+                'energy' => 5,
+                'score' => 4.8,
+                'period_key' => '2026-W20',
+            ]);
         }
 
-        $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
+        $this->assertResponseHasNoWellbeingValues(
+            $this->actingAs($this->admin)->getJson('/api/company/dashboard')->assertStatus(200),
+            [
+                '$.teams.*.id',
+                '$.teams.*.managerId',
+            ],
+        );
 
-        $response->assertStatus(200);
-        $response->assertJsonPath('company.responseCount', null);
-        $response->assertJsonPath('company.respondentCount', null);
-        $response->assertJsonPath('company.eligibleEmployeeCount', null);
-        $response->assertJsonPath('company.participationRate', null);
-        $response->assertJsonPath('company.isAboveThreshold', false);
+        $this->assertResponseHasNoWellbeingValues(
+            $this->actingAs($this->admin)->getJson('/api/company/reports')->assertStatus(200)
+        );
     }
 
     public function test_manager_scoping_to_team()
@@ -182,15 +169,15 @@ class CompanyTest extends TestCase
 
         // Team metadata scoping is unaffected by the missing wellbeing source:
         // the manager still sees only their own team, the admin sees both. The
-        // scores themselves are suppressed (ELYO-91 prompt 09).
+        // aggregates themselves are reporting-pending (ELYO-91 prompt 09).
         $response = $this->actingAs($this->manager)->getJson('/api/company/dashboard');
         $response->assertStatus(200);
-        $this->assertNull($response->json('company.avgScore'));
+        $response->assertJsonPath('company.status', 'reporting_pending');
         $response->assertJsonCount(1, 'teams');
         $response->assertJsonPath('teams.0.name', 'Tech Team');
 
         $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
-        $this->assertNull($response->json('company.avgScore'));
+        $response->assertJsonPath('company.status', 'reporting_pending');
         $response->assertJsonCount(2, 'teams');
     }
 
@@ -552,13 +539,12 @@ class CompanyTest extends TestCase
     }
 
     /**
-     * ELYO-91 prompt 09: the report trend has no wellbeing source anymore, so it
-     * stays empty even once enough distinct respondents have checked in. The
-     * "no data leaks below the threshold" half of the original expectation is
-     * unchanged and still asserted; the "enough respondents produce a point"
-     * half returns with the reporting domain.
+     * ELYO-91 prompt 09: the report trend has no wellbeing source anymore, so
+     * the endpoint answers with the reporting-pending block instead of trend
+     * points — regardless of how many employees have checked in. Trend points
+     * return with the reporting domain (ADR-001 §2.5 snapshots).
      */
-    public function test_reports_return_no_trend_points_without_a_reporting_source()
+    public function test_reports_return_reporting_pending_without_a_reporting_source()
     {
         $activeEmployee = User::factory()->create([
             'company_id' => $this->company->id,
@@ -579,7 +565,7 @@ class CompanyTest extends TestCase
         $response = $this->actingAs($this->admin)->getJson('/api/company/reports');
 
         $response->assertStatus(200);
-        $response->assertJsonCount(0, 'data');
+        $response->assertExactJson(['status' => 'reporting_pending', 'data' => null]);
 
         $employees = User::factory()->count(2)->create([
             'company_id' => $this->company->id,
@@ -594,7 +580,7 @@ class CompanyTest extends TestCase
         $response = $this->actingAs($this->admin)->getJson('/api/company/reports');
 
         $response->assertStatus(200);
-        $response->assertJsonCount(0, 'data');
+        $response->assertExactJson(['status' => 'reporting_pending', 'data' => null]);
     }
 
     public function test_draft_surveys_can_be_edited_and_activated_by_allowed_owner()
@@ -1636,10 +1622,12 @@ class CompanyTest extends TestCase
         $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
 
         $response->assertStatus(200);
-        // ELYO-91 prompt 09: aggregates are suppressed for lack of a reporting
-        // source. The point of this case — the endpoint still answers 200 with an
-        // empty team list when the team layer is off — is unchanged.
-        $response->assertJsonPath('company.isAboveThreshold', false);
+        // ELYO-91 prompt 09: aggregates are reporting-pending until the reporting
+        // domain exists. The point of this case — the endpoint still answers 200
+        // with an empty team list when the team layer is off — is unchanged.
+        $response->assertJsonPath('company.status', 'reporting_pending');
+        $response->assertJsonPath('trend.status', 'reporting_pending');
+        $response->assertJsonPath('company.isAboveThreshold', null);
         $response->assertJsonPath('company.responseCount', null);
         $response->assertJsonCount(0, 'teams');
     }

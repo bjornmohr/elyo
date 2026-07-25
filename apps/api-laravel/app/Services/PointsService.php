@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\PointSetting;
 use App\Models\PointTransaction;
 use App\Models\User;
 use App\Models\UserPoints;
@@ -11,15 +10,6 @@ use Carbon\Carbon;
 
 class PointsService
 {
-    public const DEFAULT_POINTS = [
-        'daily_checkin' => 10,
-        'anamnesis_completed' => 100,
-        'medical_document_upload' => 25,
-        'measure_participation' => 20,
-        'streak_7days' => 50,
-        'streak_30days' => 200,
-    ];
-
     /**
      * Points stay identity-side; only the consecutive-days source lives in the
      * health domain (subject-scoped) since check-ins moved there (ADR-003 D3).
@@ -28,7 +18,7 @@ class PointsService
 
     public function awardPoints(User $user, string $reason): void
     {
-        $points = self::resolvePointMap()[$reason] ?? 0;
+        $points = PointSettingsService::resolvePointMap()[$reason] ?? 0;
 
         if ($points === 0) {
             return;
@@ -134,15 +124,5 @@ class PointsService
         }
 
         return $previous;
-    }
-
-    public static function resolvePointMap(): array
-    {
-        $configured = PointSetting::query()
-            ->whereIn('action', array_keys(self::DEFAULT_POINTS))
-            ->pluck('points', 'action')
-            ->all();
-
-        return array_merge(self::DEFAULT_POINTS, $configured);
     }
 }

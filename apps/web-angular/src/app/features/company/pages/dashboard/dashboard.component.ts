@@ -44,7 +44,7 @@ import { AuthStore } from '../../../../core/store/auth.store';
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
               <h3 class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2">Aktive Teams</h3>
               <p class="text-4xl font-bold text-gray-900">{{ data()?.teams?.length || '0' }}</p>
-              <p class="text-xs text-gray-400 mt-2">Alle Teams erfüllen die Anonymitätsschwelle</p>
+              <p class="text-xs text-gray-400 mt-2">{{ teamMetricsLabel() }}</p>
             </div>
           }
         </div>
@@ -65,7 +65,7 @@ import { AuthStore } from '../../../../core/store/auth.store';
             }
           </div>
           <div class="flex justify-between mt-4 text-[10px] text-gray-400 uppercase tracking-widest">
-            @for (point of data()?.trend; track point.period) {
+            @for (point of trendPoints(); track point.period) {
               <span>{{ point.period }}</span>
             }
           </div>
@@ -77,6 +77,7 @@ import { AuthStore } from '../../../../core/store/auth.store';
 export class CompanyDashboardComponent implements OnInit {
   private api = inject(ApiClient);
   private authStore = inject(AuthStore);
+  private readonly reportingPendingLabel = 'Berichtsdaten werden vorbereitet';
 
   data = signal<any>(null);
   loading = signal(true);
@@ -107,6 +108,10 @@ export class CompanyDashboardComponent implements OnInit {
 
   participantLabel() {
     const company = this.data()?.company;
+    if (this.isReportingPending(company)) {
+      return this.reportingPendingLabel;
+    }
+
     if (company?.isAboveThreshold === false) {
       return 'Aus Datenschutzgründen erst ab ausreichender Gruppengröße sichtbar';
     }
@@ -120,6 +125,10 @@ export class CompanyDashboardComponent implements OnInit {
 
   responseCountLabel() {
     const company = this.data()?.company;
+    if (this.isReportingPending(company)) {
+      return this.reportingPendingLabel;
+    }
+
     if (company?.isAboveThreshold === false || company?.responseCount === null) {
       return 'Durch Anonymitätsschwelle geschützt';
     }
@@ -131,8 +140,32 @@ export class CompanyDashboardComponent implements OnInit {
     return this.authStore.teamLayerEnabled();
   }
 
+  teamMetricsLabel() {
+    if (this.isReportingPending(this.data()?.company)) {
+      return this.reportingPendingLabel;
+    }
+
+    const teams = this.data()?.teams;
+    return Array.isArray(teams) && teams.some((team: any) => this.isReportingPending(team?.metrics))
+      ? this.reportingPendingLabel
+      : 'Alle Teams erfüllen die Anonymitätsschwelle';
+  }
+
   trendBars() {
-    const trend = this.data()?.trend ?? [];
+    const trend = this.trendPoints();
     return trend.length ? trend.map((point: any) => Math.max(8, Math.min(100, Math.round((point.avgScore ?? 0) * 10)))) : [];
+  }
+
+  trendPoints() {
+    const trend = this.data()?.trend;
+    if (Array.isArray(trend)) {
+      return trend;
+    }
+
+    return Array.isArray(trend?.data) ? trend.data : [];
+  }
+
+  private isReportingPending(block: any) {
+    return block?.status === 'reporting_pending';
   }
 }

@@ -10,7 +10,7 @@ use App\Http\Requests\Company\PatchSurveyRequest;
 use App\Http\Resources\Company\SurveyResource;
 use App\Http\Resources\Company\SurveyResultsResource;
 use App\Models\Survey;
-use App\Services\AnonymityService;
+use App\Services\Company\AnonymityThreshold;
 use App\Services\Company\TeamLayerGuard;
 use App\Services\SurveyResultsAggregationService;
 use Illuminate\Database\Eloquent\Builder;
@@ -196,7 +196,7 @@ class CompanySurveyController extends Controller
         }
 
         $company = $user->company;
-        $threshold = $company->anonymity_threshold ?? AnonymityService::DEFAULT_THRESHOLD;
+        $threshold = AnonymityThreshold::resolve($company->anonymity_threshold);
         $scopeTeamIds = $this->resultScopeTeamIds($user, $survey);
         $results = $this->surveyResultsAggregationService->aggregate($survey, $scopeTeamIds, $threshold);
 
