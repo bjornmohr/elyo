@@ -4,6 +4,7 @@ namespace App\Services\Privacy;
 
 enum MappingOperation: string
 {
+    case PROVISIONING_STATE_FOR_USER = 'provisioningStateForUser';
     case PROVISION_OWN_SUBJECT = 'provisionOwnSubject';
     case RESOLVE_OWN_SUBJECT = 'resolveOwnSubject';
     case REVOKE_SUBJECT_LINK = 'revokeSubjectLink';

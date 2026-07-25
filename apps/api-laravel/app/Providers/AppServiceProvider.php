@@ -3,10 +3,10 @@
 namespace App\Providers;
 
 use App\Services\Privacy\AuditLoggerContract;
+use App\Services\Privacy\DatabaseAuditLogger;
 use App\Services\Privacy\MappingCryptography;
 use App\Services\Privacy\MappingService;
 use App\Services\Privacy\MappingServiceContract;
-use App\Services\Privacy\NullAuditLogger;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -23,7 +23,7 @@ class AppServiceProvider extends ServiceProvider
             (string) config('app.key'),
         ));
 
-        $this->app->bind(AuditLoggerContract::class, NullAuditLogger::class);
+        $this->app->singleton(AuditLoggerContract::class, DatabaseAuditLogger::class);
         $this->app->bind(MappingServiceContract::class, MappingService::class);
     }
 

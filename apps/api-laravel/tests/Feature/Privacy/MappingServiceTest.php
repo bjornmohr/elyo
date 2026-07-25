@@ -108,7 +108,7 @@ class MappingServiceTest extends TestCase
         );
     }
 
-    public function test_retry_after_mapping_failure_adopts_the_orphan_health_subject(): void
+    public function test_mapping_failure_rolls_back_the_subject_and_retry_provisions_cleanly(): void
     {
         $service = app(MappingServiceContract::class);
         $failMappingOnce = true;
@@ -130,13 +130,12 @@ class MappingServiceTest extends TestCase
             SubjectMapping::flushEventListeners();
         }
 
-        $this->assertSame(1, HealthSubject::query()->count());
+        $this->assertSame(0, HealthSubject::query()->count());
         $this->assertSame(0, SubjectMapping::query()->count());
-        $orphanSubjectId = HealthSubject::query()->value('id');
 
-        $adoptedSubjectId = $service->provisionOwnSubject(7002, PurposeCode::PROVISIONING);
+        $subjectId = $service->provisionOwnSubject(7002, PurposeCode::PROVISIONING);
 
-        $this->assertSame($orphanSubjectId, $adoptedSubjectId);
+        $this->assertNotEmpty($subjectId);
         $this->assertSame(1, HealthSubject::query()->count());
         $this->assertSame(1, SubjectMapping::query()->count());
     }
@@ -252,11 +251,17 @@ class MappingServiceTest extends TestCase
                 MappingOperation $operation,
                 PurposeCode $purpose,
                 AuditActorContext $actorContext,
-                string $subjectReference,
+                string $userReference,
+                string $outcome,
             ): void {
                 $operation = $operation->value;
                 $actorContext = $actorContext->toArray();
-                $this->events[] = compact('operation', 'purpose', 'actorContext', 'subjectReference');
+                $this->events[] = compact('operation', 'purpose', 'actorContext', 'userReference', 'outcome');
+            }
+
+            public function logProvisioningBackfill(array $summary, string $outcome): void
+            {
+                // This test exercises MappingService operations only.
             }
         };
 
@@ -281,19 +286,19 @@ class MappingServiceTest extends TestCase
         $this->assertCount(6, $auditLogger->events);
         $this->assertSame([
             'provisionOwnSubject',
-            'provisionOwnSubject',
+            'provisioningStateForUser',
             'resolveOwnSubject',
             'revokeSubjectLink',
             'resolveReportingCohort',
             'resolveForDataSubjectRequest',
         ], array_column($auditLogger->events, 'operation'));
         $this->assertSame([
-            ['type' => 'registration-workflow', 'runtime' => 'identity-api'],
-            ['type' => 'registration-workflow', 'runtime' => 'identity-api'],
-            ['type' => 'employee-self-service', 'runtime' => 'employee-health-api'],
-            ['type' => 'privacy-admin', 'runtime' => 'privacy-admin'],
-            ['type' => 'reporting-worker', 'runtime' => 'reporting-worker'],
-            ['type' => 'privacy-admin', 'runtime' => 'privacy-admin'],
+            ['type' => 'registration-workflow', 'runtime' => 'identity-api', 'role' => 'system'],
+            ['type' => 'registration-workflow', 'runtime' => 'identity-api', 'role' => 'system'],
+            ['type' => 'employee-self-service', 'runtime' => 'employee-health-api', 'role' => 'employee'],
+            ['type' => 'privacy-admin', 'runtime' => 'privacy-admin', 'role' => 'privacy-admin'],
+            ['type' => 'reporting-worker', 'runtime' => 'reporting-worker', 'role' => 'reporting-worker'],
+            ['type' => 'privacy-admin', 'runtime' => 'privacy-admin', 'role' => 'privacy-admin'],
         ], array_column($auditLogger->events, 'actorContext'));
 
         foreach ($auditLogger->events as $event) {
@@ -301,8 +306,9 @@ class MappingServiceTest extends TestCase
 
             $this->assertStringNotContainsString('87654321', $payload);
             $this->assertStringNotContainsString($subjectId, $payload);
-            $this->assertNotSame('', $event['subjectReference']);
+            $this->assertNotSame('', $event['userReference']);
             $this->assertNotSame([], $event['actorContext']);
+            $this->assertContains($event['outcome'], ['success', 'denied', 'failed']);
         }
     }
 }

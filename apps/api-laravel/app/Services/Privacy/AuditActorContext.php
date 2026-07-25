@@ -7,36 +7,54 @@ final readonly class AuditActorContext
     private function __construct(
         public MappingActorType $type,
         public MappingRuntime $runtime,
+        public string $role,
     ) {}
 
     public static function registrationWorkflow(): self
     {
-        return new self(MappingActorType::REGISTRATION_WORKFLOW, MappingRuntime::IDENTITY_API);
+        return new self(
+            MappingActorType::REGISTRATION_WORKFLOW,
+            MappingRuntime::IDENTITY_API,
+            'system',
+        );
     }
 
     public static function employeeSelfService(): self
     {
-        return new self(MappingActorType::EMPLOYEE_SELF_SERVICE, MappingRuntime::EMPLOYEE_HEALTH_API);
+        return new self(
+            MappingActorType::EMPLOYEE_SELF_SERVICE,
+            MappingRuntime::EMPLOYEE_HEALTH_API,
+            'employee',
+        );
     }
 
     public static function privacyAdmin(): self
     {
-        return new self(MappingActorType::PRIVACY_ADMIN, MappingRuntime::PRIVACY_ADMIN);
+        return new self(
+            MappingActorType::PRIVACY_ADMIN,
+            MappingRuntime::PRIVACY_ADMIN,
+            'privacy-admin',
+        );
     }
 
     public static function reportingWorker(): self
     {
-        return new self(MappingActorType::REPORTING_WORKER, MappingRuntime::REPORTING_WORKER);
+        return new self(
+            MappingActorType::REPORTING_WORKER,
+            MappingRuntime::REPORTING_WORKER,
+            'reporting-worker',
+        );
     }
 
     /**
-     * @return array{type: string, runtime: string}
+     * @return array{type: string, runtime: string, role: string}
      */
     public function toArray(): array
     {
         return [
             'type' => $this->type->value,
             'runtime' => $this->runtime->value,
+            'role' => $this->role,
         ];
     }
 }

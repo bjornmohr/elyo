@@ -10,6 +10,7 @@ use App\Services\Privacy\Exceptions\MappingRevokedException;
 use App\Services\Privacy\Exceptions\OperationNotAvailableException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class MappingService implements MappingServiceContract
 {
@@ -22,172 +23,178 @@ class MappingService implements MappingServiceContract
         int $userId,
         PurposeCode $purpose,
     ): SubjectProvisioningState {
-        try {
-            $this->requirePurpose(MappingOperation::PROVISION_OWN_SUBJECT, $purpose, [PurposeCode::PROVISIONING]);
+        return $this->performAuditedOperation(
+            MappingOperation::PROVISIONING_STATE_FOR_USER,
+            $purpose,
+            AuditActorContext::registrationWorkflow(),
+            $this->cryptography->auditSubjectReferenceForUserId($userId),
+            function () use ($purpose, $userId): SubjectProvisioningState {
+                $this->requirePurpose(
+                    MappingOperation::PROVISIONING_STATE_FOR_USER,
+                    $purpose,
+                    [PurposeCode::PROVISIONING],
+                );
 
-            $mapping = $this->findMapping($userId);
+                $mapping = $this->findMapping($userId);
 
-            return match ($mapping?->status) {
-                null => SubjectProvisioningState::MISSING,
-                SubjectMapping::STATUS_ACTIVE => SubjectProvisioningState::ACTIVE,
-                SubjectMapping::STATUS_REVOKED => SubjectProvisioningState::REVOKED,
-            };
-        } finally {
-            $this->auditOperation(
-                MappingOperation::PROVISION_OWN_SUBJECT,
-                $purpose,
-                $userId,
-                AuditActorContext::registrationWorkflow(),
-            );
-        }
+                return match ($mapping?->status) {
+                    null => SubjectProvisioningState::MISSING,
+                    SubjectMapping::STATUS_ACTIVE => SubjectProvisioningState::ACTIVE,
+                    SubjectMapping::STATUS_REVOKED => SubjectProvisioningState::REVOKED,
+                };
+            },
+        );
     }
 
     public function provisionOwnSubject(int $userId, PurposeCode $purpose): string
     {
-        try {
-            $this->requirePurpose(MappingOperation::PROVISION_OWN_SUBJECT, $purpose, [PurposeCode::PROVISIONING]);
-
-            $mapping = $this->findMapping($userId);
-
-            if ($mapping !== null) {
-                $this->throwIfRevoked($mapping);
-
-                return $mapping->health_subject_id;
-            }
-
-            // Subject-first is deliberate. A deterministic, secret-derived ULID
-            // makes a retry adopt any orphan left by a failed mapping write.
-            $subjectId = $this->cryptography->healthSubjectIdForUserId($userId);
-            $now = now();
-
-            DB::connection('health')->table('health_subjects')->insertOrIgnore([
-                'id' => $subjectId,
-                'status' => HealthSubject::STATUS_ACTIVE,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-
-            $subject = HealthSubject::query()->findOrFail($subjectId);
-
-            $mapping = new SubjectMapping;
-            $mapping->user_id_hmac = $this->cryptography->userIdHmac($userId);
-            $mapping->user_id_encrypted = $this->cryptography->encryptUserId($userId);
-            $mapping->health_subject_id = $subject->getKey();
-            $mapping->status = SubjectMapping::STATUS_ACTIVE;
-
-            try {
-                // Nested transaction provides a savepoint in the test lane and
-                // keeps a unique-key race recoverable instead of aborting the
-                // caller's surrounding transaction.
-                DB::connection('mapping')->transaction(fn () => $mapping->save());
-            } catch (UniqueConstraintViolationException $exception) {
+        return $this->performAuditedOperation(
+            MappingOperation::PROVISION_OWN_SUBJECT,
+            $purpose,
+            AuditActorContext::registrationWorkflow(),
+            $this->cryptography->auditSubjectReferenceForUserId($userId),
+            function () use ($userId): string {
                 $mapping = $this->findMapping($userId);
 
-                if ($mapping === null) {
-                    throw $exception;
+                if ($mapping !== null) {
+                    $this->throwIfRevoked($mapping);
+
+                    return $mapping->health_subject_id;
                 }
 
-                $this->throwIfRevoked($mapping);
+                // Subject-first is deliberate. A deterministic, secret-derived ULID
+                // makes a retry adopt any orphan left by a failed mapping write.
+                $subjectId = $this->cryptography->healthSubjectIdForUserId($userId);
+                $now = now();
 
-                return $mapping->health_subject_id;
-            }
+                DB::connection('health')->table('health_subjects')->insertOrIgnore([
+                    'id' => $subjectId,
+                    'status' => HealthSubject::STATUS_ACTIVE,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
 
-            return $subject->getKey();
-        } finally {
-            $this->auditOperation(
-                MappingOperation::PROVISION_OWN_SUBJECT,
-                $purpose,
-                $userId,
-                AuditActorContext::registrationWorkflow(),
-            );
-        }
+                $subject = HealthSubject::query()->findOrFail($subjectId);
+
+                $mapping = new SubjectMapping;
+                $mapping->user_id_hmac = $this->cryptography->userIdHmac($userId);
+                $mapping->user_id_encrypted = $this->cryptography->encryptUserId($userId);
+                $mapping->health_subject_id = $subject->getKey();
+                $mapping->status = SubjectMapping::STATUS_ACTIVE;
+
+                try {
+                    // Nested transaction provides a savepoint in the test lane and
+                    // keeps a unique-key race recoverable instead of aborting the
+                    // caller's surrounding transaction.
+                    DB::connection('mapping')->transaction(fn () => $mapping->save());
+                } catch (UniqueConstraintViolationException $exception) {
+                    $mapping = $this->findMapping($userId);
+
+                    if ($mapping === null) {
+                        throw $exception;
+                    }
+
+                    $this->throwIfRevoked($mapping);
+
+                    return $mapping->health_subject_id;
+                }
+
+                return $subject->getKey();
+            },
+            ['mapping', 'health'],
+            [PurposeCode::PROVISIONING],
+        );
     }
 
     public function resolveOwnSubject(int $userId, PurposeCode $purpose): string
     {
-        try {
-            $this->requirePurpose(MappingOperation::RESOLVE_OWN_SUBJECT, $purpose, [
-                PurposeCode::HEALTH_SELF_READ,
-                PurposeCode::HEALTH_SELF_WRITE,
-            ]);
+        return $this->performAuditedOperation(
+            MappingOperation::RESOLVE_OWN_SUBJECT,
+            $purpose,
+            AuditActorContext::employeeSelfService(),
+            $this->cryptography->auditSubjectReferenceForUserId($userId),
+            function () use ($purpose, $userId): string {
+                $this->requirePurpose(MappingOperation::RESOLVE_OWN_SUBJECT, $purpose, [
+                    PurposeCode::HEALTH_SELF_READ,
+                    PurposeCode::HEALTH_SELF_WRITE,
+                ]);
 
-            $mapping = $this->requireMapping($userId);
-            $this->throwIfRevoked($mapping);
+                $mapping = $this->requireMapping($userId);
+                $this->throwIfRevoked($mapping);
 
-            return $mapping->health_subject_id;
-        } finally {
-            $this->auditOperation(
-                MappingOperation::RESOLVE_OWN_SUBJECT,
-                $purpose,
-                $userId,
-                AuditActorContext::employeeSelfService(),
-            );
-        }
+                return $mapping->health_subject_id;
+            },
+        );
     }
 
     public function revokeSubjectLink(int $userId, PurposeCode $purpose): void
     {
-        try {
-            $this->requirePurpose(MappingOperation::REVOKE_SUBJECT_LINK, $purpose, [PurposeCode::REVOCATION]);
+        $this->performAuditedOperation(
+            MappingOperation::REVOKE_SUBJECT_LINK,
+            $purpose,
+            AuditActorContext::privacyAdmin(),
+            $this->cryptography->auditSubjectReferenceForUserId($userId),
+            function () use ($userId): void {
+                $mapping = $this->requireMapping($userId);
 
-            $mapping = $this->requireMapping($userId);
+                if ($mapping->status === SubjectMapping::STATUS_REVOKED) {
+                    return;
+                }
 
-            if ($mapping->status === SubjectMapping::STATUS_REVOKED) {
-                return;
-            }
-
-            $mapping->status = SubjectMapping::STATUS_REVOKED;
-            $mapping->revoked_at = now();
-            $mapping->save();
-        } finally {
-            $this->auditOperation(
-                MappingOperation::REVOKE_SUBJECT_LINK,
-                $purpose,
-                $userId,
-                AuditActorContext::privacyAdmin(),
-            );
-        }
+                $mapping->status = SubjectMapping::STATUS_REVOKED;
+                $mapping->revoked_at = now();
+                $mapping->save();
+            },
+            ['mapping'],
+            [PurposeCode::REVOCATION],
+        );
     }
 
     public function resolveReportingCohort(array $userIds, PurposeCode $purpose): array
     {
-        try {
-            $this->requirePurpose(MappingOperation::RESOLVE_REPORTING_COHORT, $purpose, [PurposeCode::REPORTING]);
+        $userReference = hash('sha256', implode(':', array_map(
+            fn (int $userId): string => $this->cryptography->auditSubjectReferenceForUserId($userId),
+            $userIds,
+        )));
 
-            throw new OperationNotAvailableException(
-                'resolveReportingCohort is unavailable in the pilot; see ADR-003 D5.',
-            );
-        } finally {
-            $subjectReference = hash('sha256', implode(':', array_map(
-                fn (int $userId): string => $this->cryptography->auditSubjectReferenceForUserId($userId),
-                $userIds,
-            )));
+        return $this->performAuditedOperation(
+            MappingOperation::RESOLVE_REPORTING_COHORT,
+            $purpose,
+            AuditActorContext::reportingWorker(),
+            $userReference,
+            function () use ($purpose): never {
+                $this->requirePurpose(
+                    MappingOperation::RESOLVE_REPORTING_COHORT,
+                    $purpose,
+                    [PurposeCode::REPORTING],
+                );
 
-            $this->auditLogger->logMappingOperation(
-                MappingOperation::RESOLVE_REPORTING_COHORT,
-                $purpose,
-                AuditActorContext::reportingWorker(),
-                $subjectReference,
-            );
-        }
+                throw new OperationNotAvailableException(
+                    'resolveReportingCohort is unavailable in the pilot; see ADR-003 D5.',
+                );
+            },
+        );
     }
 
     public function resolveForDataSubjectRequest(int $userId, PurposeCode $purpose): string
     {
-        try {
-            $this->requirePurpose(MappingOperation::RESOLVE_FOR_DATA_SUBJECT_REQUEST, $purpose, [PurposeCode::DSR]);
+        return $this->performAuditedOperation(
+            MappingOperation::RESOLVE_FOR_DATA_SUBJECT_REQUEST,
+            $purpose,
+            AuditActorContext::privacyAdmin(),
+            $this->cryptography->auditSubjectReferenceForUserId($userId),
+            function () use ($purpose): never {
+                $this->requirePurpose(
+                    MappingOperation::RESOLVE_FOR_DATA_SUBJECT_REQUEST,
+                    $purpose,
+                    [PurposeCode::DSR],
+                );
 
-            throw new OperationNotAvailableException(
-                'resolveForDataSubjectRequest is unavailable in the pilot; see ADR-003 D5.',
-            );
-        } finally {
-            $this->auditLogger->logMappingOperation(
-                MappingOperation::RESOLVE_FOR_DATA_SUBJECT_REQUEST,
-                $purpose,
-                AuditActorContext::privacyAdmin(),
-                $this->cryptography->auditSubjectReferenceForUserId($userId),
-            );
-        }
+                throw new OperationNotAvailableException(
+                    'resolveForDataSubjectRequest is unavailable in the pilot; see ADR-003 D5.',
+                );
+            },
+        );
     }
 
     private function findMapping(int $userId): ?SubjectMapping
@@ -225,20 +232,96 @@ class MappingService implements MappingServiceContract
         }
     }
 
-    private function auditOperation(
+    /**
+     * @template TReturn
+     *
+     * @param  callable(): TReturn  $operationCallback
+     * @param  list<string>  $transactionConnections
+     * @param  array<int, PurposeCode>  $preTransactionPurposes
+     * @return TReturn
+     */
+    private function performAuditedOperation(
         MappingOperation $operation,
         PurposeCode $purpose,
-        int $userId,
         AuditActorContext $actorContext,
-    ): void {
-        // Actor context carries only a typed workflow/runtime classification.
-        // subjectReference is a domain-separated HMAC, never a raw user_id or
-        // health_subject_id, so audit cannot become a re-identification join.
-        $this->auditLogger->logMappingOperation(
+        string $userReference,
+        callable $operationCallback,
+        array $transactionConnections = [],
+        array $preTransactionPurposes = [],
+    ): mixed {
+        if ($preTransactionPurposes !== []) {
+            try {
+                $this->requirePurpose($operation, $purpose, $preTransactionPurposes);
+            } catch (InvalidPurposeCodeException $exception) {
+                $this->auditLogger->logMappingOperation(
+                    $operation,
+                    $purpose,
+                    $actorContext,
+                    $userReference,
+                    AuditLoggerContract::OUTCOME_DENIED,
+                );
+
+                throw $exception;
+            }
+        }
+
+        $executeAndAudit = function () use (
             $operation,
             $purpose,
             $actorContext,
-            $this->cryptography->auditSubjectReferenceForUserId($userId),
+            $userReference,
+            $operationCallback,
+        ): mixed {
+            $outcome = AuditLoggerContract::OUTCOME_SUCCESS;
+
+            try {
+                return $operationCallback();
+            } catch (
+                InvalidPurposeCodeException
+                |MappingNotFoundException
+                |MappingRevokedException
+                |OperationNotAvailableException $exception
+            ) {
+                $outcome = AuditLoggerContract::OUTCOME_DENIED;
+
+                throw $exception;
+            } catch (Throwable $exception) {
+                $outcome = AuditLoggerContract::OUTCOME_FAILED;
+
+                throw $exception;
+            } finally {
+                // No catch surrounds the synchronous insert. For mutations, the
+                // domain transactions remain open until this insert succeeds.
+                $this->auditLogger->logMappingOperation(
+                    $operation,
+                    $purpose,
+                    $actorContext,
+                    $userReference,
+                    $outcome,
+                );
+            }
+        };
+
+        return $this->runInTransactions($transactionConnections, $executeAndAudit);
+    }
+
+    /**
+     * @template TReturn
+     *
+     * @param  list<string>  $connections
+     * @param  callable(): TReturn  $callback
+     * @return TReturn
+     */
+    private function runInTransactions(array $connections, callable $callback): mixed
+    {
+        $connection = array_shift($connections);
+
+        if ($connection === null) {
+            return $callback();
+        }
+
+        return DB::connection($connection)->transaction(
+            fn (): mixed => $this->runInTransactions($connections, $callback),
         );
     }
 }
