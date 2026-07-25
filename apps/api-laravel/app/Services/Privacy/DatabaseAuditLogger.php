@@ -14,7 +14,7 @@ final class DatabaseAuditLogger implements AuditLoggerContract
         PurposeCode $purpose,
         AuditActorContext $actorContext,
         string $userReference,
-        string $outcome,
+        AuditOutcome $outcome,
     ): void {
         $this->insertEvent(
             'mapping.'.$operation->value,
@@ -26,7 +26,7 @@ final class DatabaseAuditLogger implements AuditLoggerContract
         );
     }
 
-    public function logProvisioningBackfill(array $summary, string $outcome): void
+    public function logProvisioningBackfill(array $summary, AuditOutcome $outcome): void
     {
         $this->insertEvent(
             'provisioning.backfill',
@@ -50,7 +50,7 @@ final class DatabaseAuditLogger implements AuditLoggerContract
         array $actorContext,
         ?string $subjectReference,
         ?string $userReference,
-        string $outcome,
+        AuditOutcome $outcome,
     ): void {
         DB::connection('audit')->table('audit_events')->insert([
             'id' => (string) Str::ulid(),
@@ -59,7 +59,7 @@ final class DatabaseAuditLogger implements AuditLoggerContract
             'actor_context' => json_encode($actorContext, JSON_THROW_ON_ERROR),
             'subject_ref' => $subjectReference,
             'user_ref' => $userReference,
-            'outcome' => $outcome,
+            'outcome' => $outcome->value,
             'correlation_id' => $this->correlationId(),
             'occurred_at' => now(),
         ]);

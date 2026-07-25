@@ -457,16 +457,102 @@ components:
             total: { type: integer }
 
     WellbeingEntry:
+      description: >-
+        A daily wellbeing check-in on the canonical 1–5 scale (ELYO-102 §3.1, breaking
+        change B5 against the former 1–10 scale). The free-text `note` was removed from
+        request and response (ELYO-102 §3.3). Entries are stored in the health domain
+        keyed on an internal health subject, which is never part of any response.
       type: object
+      required: [id, mood, stress, energy, score, periodKey, createdAt]
       properties:
-        id: { type: string }
-        mood: { type: integer }
-        stress: { type: integer }
-        energy: { type: integer }
-        score: { type: number }
-        note: { type: string, nullable: true }
-        periodKey: { type: string }
+        id:
+          type: string
+          description: Opaque ULID of the entry. Carries no identity semantics.
+          example: 01JY0000000000000000000001
+        mood: { type: integer, minimum: 1, maximum: 5 }
+        stress: { type: integer, minimum: 1, maximum: 5 }
+        energy: { type: integer, minimum: 1, maximum: 5 }
+        score:
+          type: number
+          description: >-
+            Mean of mood, inverted stress and energy on the 1–5 scale, rounded to one
+            decimal place: `(mood + (6 - stress) + energy) / 3`. Range 1.0–5.0.
+          minimum: 1
+          maximum: 5
+          example: 4.3
+        periodKey:
+          type: string
+          description: Daily period, `YYYY-MM-DD`.
+          example: "2026-05-25"
         createdAt: { type: string, format: date-time }
+    EmployeeAnamnesis:
+      description: >-
+        The employee's anamnesis. Stored in the health domain keyed on an internal
+        health subject (ELYO-91 prompt 08a, ADR-003 D8), which is never part of any
+        response — the anamnesis therefore has no client-visible id of its own.
+      type: object
+      required: [completionPct, chronicPatterns]
+      properties:
+        completionPct: { type: integer, minimum: 0, maximum: 100 }
+        birthYear: { type: integer, nullable: true }
+        biologicalSex:
+          type: string
+          nullable: true
+          enum: [MALE, FEMALE, OTHER, PREFER_NOT_TO_SAY]
+        activityLevel: { type: string, nullable: true, maxLength: 80 }
+        sleepQuality: { type: string, nullable: true, maxLength: 80 }
+        stressTendency: { type: string, nullable: true, maxLength: 80 }
+        smokingStatus: { type: string, nullable: true, maxLength: 80 }
+        nutritionType: { type: string, nullable: true, maxLength: 80 }
+        chronicPatterns:
+          type: array
+          items: { type: string, maxLength: 120 }
+        hasMedication: { type: boolean, nullable: true }
+        updatedAt: { type: string, format: date-time, nullable: true }
+
+    EmployeeDocument:
+      description: >-
+        Metadata of a medical document uploaded by the employee. Stored in the health
+        domain keyed on an internal health subject (ELYO-91 prompt 08a, ADR-003 D8);
+        neither the subject nor the storage key is ever returned.
+      type: object
+      required: [id, fileName, mimeType, size, uploadedAt]
+      properties:
+        id:
+          type: string
+          description: >-
+            Opaque ULID of the document. Carries no identity semantics. Before ELYO-91
+            prompt 08a this was a numeric identity-side id; the field type was and stays
+            an opaque string for clients.
+          example: 01JY0000000000000000000002
+        fileName: { type: string }
+        mimeType: { type: string, example: application/pdf }
+        size: { type: integer, description: File size in bytes. }
+        uploadedAt: { type: string, format: date-time, nullable: true }
+
+    EmployeeProfile:
+      description: >-
+        The employee's own profile: identity fields plus the health-domain anamnesis and
+        document list, resolved for the authenticated employee only.
+      type: object
+      required: [id, name, email, anamnesis, anamnesisDue]
+      properties:
+        id: { type: integer }
+        name: { type: string, nullable: true }
+        email: { type: string }
+        anamnesis:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/EmployeeAnamnesis'
+        anamnesisDue:
+          type: boolean
+          description: True when no anamnesis exists or the last update is older than six months.
+        documents:
+          type: array
+          description: Newest upload first. Absent from the update response.
+          items:
+            $ref: '#/components/schemas/EmployeeDocument'
+
     EmployeeCheckinStatusResponse:
       type: object
       required: [completed, entry]
@@ -815,6 +901,24 @@ components:
             type: array
             items: { type: string }
 
+    CheckinValidationError:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message, details]
+          additionalProperties: false
+          properties:
+            code: { type: string, enum: [VALIDATION_ERROR] }
+            message: { type: string }
+            details:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+
     AnonymityThresholdError:
       type: object
       required: [error, minRequired, isAboveThreshold, suppressionReason]
@@ -1025,6 +1129,13 @@ paths:
     post:
       tags: [Employee]
       summary: Submit a wellbeing check-in
+      description: >-
+        One check-in per employee and daily period. `mood`, `stress` and `energy` are
+        required integers on the canonical 1–5 scale (ELYO-102 §3.1 / B3); values outside
+        1–5 return 422. The free-text `note` is no longer accepted; every occurrence,
+        including null or empty values, is rejected with 422 rather than silently dropped
+        (ELYO-102 §3.3 / B4), so an outdated client cannot lose text the employee believed
+        was stored. `location` and `sleep` are not part of this contract version (ELYO-133).
       security: [{ Sanctum: [] }]
       requestBody:
         required: true
@@ -1032,11 +1143,14 @@ paths:
           application/json:
             schema:
               type: object
+              required: [mood, stress, energy]
               properties:
-                mood: { type: integer, minimum: 1, maximum: 10 }
-                stress: { type: integer, minimum: 1, maximum: 10 }
-                energy: { type: integer, minimum: 1, maximum: 10 }
-                note: { type: string, nullable: true }
+                mood: { type: integer, minimum: 1, maximum: 5 }
+                stress: { type: integer, minimum: 1, maximum: 5 }
+                energy: { type: integer, minimum: 1, maximum: 5 }
+                note:
+                  description: Removed free-text field; any supplied value, including null or empty values, is invalid.
+                  not: {}
       responses:
         200:
           description: Success
@@ -1044,10 +1158,16 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [success, score, periodKey]
                 properties:
                   success: { type: boolean }
-                  score: { type: number }
-                  periodKey: { type: string }
+                  score:
+                    type: number
+                    description: >-
+                      `(mood + (6 - stress) + energy) / 3`, rounded to one decimal place.
+                  periodKey: { type: string, example: "2026-05-25" }
+        403:
+          description: The authenticated employee does not belong to a company.
         409:
           description: Check-in already completed for the authenticated employee and current daily period.
           content:
@@ -1058,6 +1178,29 @@ paths:
                 error:
                   code: CHECKIN_ALREADY_DONE
                   message: Der Check-in wurde heute bereits abgeschlossen.
+        422:
+          description: Validation failed — off-scale value, missing field, or a supplied `note`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckinValidationError'
+              examples:
+                outOfRange:
+                  summary: Value outside the canonical 1–5 scale
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: The given data was invalid.
+                      details:
+                        mood: ["The mood field must not be greater than 5."]
+                noteProhibited:
+                  summary: Removed free-text field supplied
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: The given data was invalid.
+                      details:
+                        note: ["Freitext-Notizen werden im Check-in nicht mehr erfasst."]
 
   /employee/checkin/status:
     get:
@@ -1079,11 +1222,10 @@ paths:
                     completed: true
                     entry:
                       id: "01JY0000000000000000000001"
-                      mood: 8
-                      stress: 3
-                      energy: 7
-                      score: 7.7
-                      note: "Guter Start in den Tag."
+                      mood: 4
+                      stress: 2
+                      energy: 4
+                      score: 4.0
                       periodKey: "2026-05-25"
                       createdAt: "2026-05-25T08:00:00Z"
                 notCompleted:
@@ -1119,6 +1261,11 @@ paths:
     get:
       tags: [Employee]
       summary: Get employee profile
+      description: >-
+        Returns the authenticated employee's identity fields together with their own
+        anamnesis and uploaded documents. Anamnesis and documents live in the health
+        domain and are resolved for the caller's own health subject only (ELYO-91
+        prompt 08a, ADR-003 D8); another employee's data is never reachable here.
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -1128,10 +1275,14 @@ paths:
               schema:
                 type: object
                 properties:
-                  data: { $ref: '#/components/schemas/User' }
+                  data: { $ref: '#/components/schemas/EmployeeProfile' }
     put:
       tags: [Employee]
       summary: Update employee profile
+      description: >-
+        Updates the display name and the anamnesis. `completionPct` is derived from the
+        filled anamnesis fields and cannot be set by the client. The response omits
+        `documents`.
       security: [{ Sanctum: [] }]
       requestBody:
         required: true
@@ -1139,8 +1290,24 @@ paths:
           application/json:
             schema:
               type: object
+              required: [name]
               properties:
                 name: { type: string, minLength: 2, maxLength: 80 }
+                birthYear: { type: integer, nullable: true, minimum: 1900 }
+                biologicalSex:
+                  type: string
+                  nullable: true
+                  enum: [MALE, FEMALE, OTHER, PREFER_NOT_TO_SAY]
+                activityLevel: { type: string, nullable: true, maxLength: 80 }
+                sleepQuality: { type: string, nullable: true, maxLength: 80 }
+                stressTendency: { type: string, nullable: true, maxLength: 80 }
+                smokingStatus: { type: string, nullable: true, maxLength: 80 }
+                nutritionType: { type: string, nullable: true, maxLength: 80 }
+                chronicPatterns:
+                  type: array
+                  nullable: true
+                  items: { type: string, maxLength: 120 }
+                hasMedication: { type: boolean, nullable: true }
       responses:
         200:
           description: Updated profile
@@ -1149,7 +1316,52 @@ paths:
               schema:
                 type: object
                 properties:
-                  data: { $ref: '#/components/schemas/User' }
+                  data: { $ref: '#/components/schemas/EmployeeProfile' }
+        422:
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LaravelValidationError'
+
+  /employee/documents:
+    post:
+      tags: [Employee]
+      summary: Upload a medical document
+      description: >-
+        Stores a PDF (max 10 MB) for the authenticated employee. Metadata is written in
+        the health domain on the caller's own health subject (ELYO-91 prompt 08a,
+        ADR-003 D8) and the file is stored subject-scoped, so no storage path carries
+        identity data. Bucket separation, signed URLs and virus scanning are the
+        ADR-001 §2.9 storage hardening follow-up.
+      security: [{ Sanctum: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file, maximum 10240 KB.
+      responses:
+        201:
+          description: Document stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/EmployeeDocument' }
+        422:
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LaravelValidationError'
 
   /employee/measures:
     get:

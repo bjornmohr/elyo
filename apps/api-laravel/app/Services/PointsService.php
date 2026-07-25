@@ -6,7 +6,7 @@ use App\Models\PointSetting;
 use App\Models\PointTransaction;
 use App\Models\User;
 use App\Models\UserPoints;
-use App\Models\WellbeingEntry;
+use App\Services\Health\WellbeingService;
 use Carbon\Carbon;
 
 class PointsService
@@ -19,6 +19,12 @@ class PointsService
         'streak_7days' => 50,
         'streak_30days' => 200,
     ];
+
+    /**
+     * Points stay identity-side; only the consecutive-days source lives in the
+     * health domain (subject-scoped) since check-ins moved there (ADR-003 D3).
+     */
+    public function __construct(private readonly WellbeingService $wellbeingService) {}
 
     public function awardPoints(User $user, string $reason): void
     {
@@ -68,12 +74,7 @@ class PointsService
 
     public function calculateStreak(User $user): int
     {
-        $days = WellbeingEntry::where('user_id', $user->id)
-            ->where('company_id', $user->company_id)
-            ->where('period_key', 'like', '____-__-__')
-            ->orderByDesc('period_key')
-            ->distinct()
-            ->pluck('period_key')
+        $days = $this->wellbeingService->checkinPeriodKeys($user->id)
             ->filter(fn (string $periodKey) => $this->isValidDailyPeriodKey($periodKey))
             ->filter(fn (string $periodKey) => $this->isWorkdayPeriodKey($periodKey))
             ->unique()

@@ -1,0 +1,159 @@
+<?php
+
+namespace App\Services\Health;
+
+use App\Models\Health\WellbeingEntry;
+use App\Services\Privacy\MappingServiceContract;
+use App\Services\Privacy\PurposeCode;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EntryCollection;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Collection;
+
+/**
+ * Health-domain access to wellbeing check-ins (ELYO-110, ADR-003 D3).
+ *
+ * Everything here is subject-scoped: callers pass an identity user id, the
+ * service resolves it to a `health_subject_id` through the mapping domain with
+ * an explicit purpose code, and only the subject id ever reaches the health
+ * database. No caller receives the subject id back.
+ */
+class WellbeingService
+{
+    use ResolvesOwnSubject;
+
+    public function __construct(private readonly MappingServiceContract $mappingService) {}
+
+    protected function mappingService(): MappingServiceContract
+    {
+        return $this->mappingService;
+    }
+
+    public function getPeriodKey(): string
+    {
+        return Carbon::now()->toDateString();
+    }
+
+    /**
+     * Mean of mood, inverted stress and energy on the 1–5 scale, rounded to one
+     * decimal: `(mood + (6 - stress) + energy) / 3`.
+     */
+    public function calculateScore(int $mood, int $stress, int $energy): float
+    {
+        return WellbeingScoreCalculator::calculate($mood, $stress, $energy);
+    }
+
+    public function hasDailyCheckin(int $userId, ?string $periodKey = null): bool
+    {
+        return $this->subjectEntries($userId)
+            ->where('period_key', $periodKey ?? $this->getPeriodKey())
+            ->exists();
+    }
+
+    /**
+     * @param  array{mood: int, stress: int, energy: int}  $data
+     * @return WellbeingEntry|null null when the daily check-in already exists
+     */
+    public function submitCheckin(int $userId, array $data): ?WellbeingEntry
+    {
+        $subjectId = $this->resolveSubjectId($userId, PurposeCode::HEALTH_SELF_WRITE);
+        $periodKey = $this->getPeriodKey();
+
+        if ($this->hasSubjectCheckin($subjectId, $periodKey)) {
+            return null;
+        }
+
+        try {
+            return WellbeingEntry::create([
+                'health_subject_id' => $subjectId,
+                'period_key' => $periodKey,
+                'mood' => $data['mood'],
+                'stress' => $data['stress'],
+                'energy' => $data['energy'],
+                'score' => $this->calculateScore($data['mood'], $data['stress'], $data['energy']),
+            ]);
+        } catch (QueryException $exception) {
+            if ($this->isUniqueConstraintViolation($exception)) {
+                return null;
+            }
+
+            throw $exception;
+        }
+    }
+
+    public function entryForPeriod(int $userId, ?string $periodKey = null): ?WellbeingEntry
+    {
+        return $this->subjectEntries($userId)
+            ->where('period_key', $periodKey ?? $this->getPeriodKey())
+            ->latest()
+            ->first();
+    }
+
+    /**
+     * Newest entries first — the dashboard's sparkline source.
+     *
+     * @return EntryCollection<int, WellbeingEntry>
+     */
+    public function recentEntries(int $userId, int $limit): EntryCollection
+    {
+        return $this->subjectEntries($userId)
+            ->orderByDesc('created_at')
+            ->take($limit)
+            ->get();
+    }
+
+    /**
+     * Oldest entries first — the history endpoint's chronological order.
+     *
+     * @return EntryCollection<int, WellbeingEntry>
+     */
+    public function historyEntries(int $userId, int $limit): EntryCollection
+    {
+        return $this->subjectEntries($userId)
+            ->orderBy('created_at')
+            ->take($limit)
+            ->get();
+    }
+
+    /**
+     * Distinct period keys, newest first. This is the streak source for
+     * `App\Services\PointsService`: points stay identity-side and never see a
+     * subject id or an entry.
+     *
+     * @return Collection<int, string>
+     */
+    public function checkinPeriodKeys(int $userId): Collection
+    {
+        return $this->subjectEntries($userId)
+            ->orderByDesc('period_key')
+            ->distinct()
+            ->pluck('period_key');
+    }
+
+    protected function hasSubjectCheckin(string $subjectId, string $periodKey): bool
+    {
+        return WellbeingEntry::query()
+            ->where('health_subject_id', $subjectId)
+            ->where('period_key', $periodKey)
+            ->exists();
+    }
+
+    /**
+     * @return Builder<WellbeingEntry>
+     */
+    private function subjectEntries(int $userId): Builder
+    {
+        return WellbeingEntry::query()->where(
+            'health_subject_id',
+            $this->resolveSubjectId($userId, PurposeCode::HEALTH_SELF_READ),
+        );
+    }
+
+    private function isUniqueConstraintViolation(QueryException $exception): bool
+    {
+        $sqlState = $exception->errorInfo[0] ?? null;
+
+        return in_array($sqlState, ['23000', '23505'], true);
+    }
+}

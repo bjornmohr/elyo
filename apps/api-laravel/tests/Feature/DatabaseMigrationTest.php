@@ -5,16 +5,17 @@ namespace Tests\Feature;
 use App\Models\Company;
 use App\Models\Team;
 use App\Models\User;
-use App\Models\WellbeingEntry;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\ConfiguresPrivacyMapping;
+use Tests\Support\CreatesWellbeingCheckins;
 use Tests\TestCase;
 
 class DatabaseMigrationTest extends TestCase
 {
     use ConfiguresPrivacyMapping;
+    use CreatesWellbeingCheckins;
 
     protected function setUp(): void
     {
@@ -34,12 +35,12 @@ class DatabaseMigrationTest extends TestCase
         $company = Company::factory()->create();
         $user = User::factory()->create(['company_id' => $company->id]);
         $team = Team::factory()->create(['company_id' => $company->id, 'manager_id' => $user->id]);
-        $entry = WellbeingEntry::factory()->create(['user_id' => $user->id, 'company_id' => $company->id]);
+        $entry = $this->createWellbeingEntry($user);
 
         $this->assertDatabaseHas('companies', ['id' => $company->id]);
         $this->assertDatabaseHas('users', ['id' => $user->id]);
         $this->assertDatabaseHas('teams', ['id' => $team->id]);
-        $this->assertDatabaseHas('wellbeing_entries', ['id' => $entry->id]);
+        $this->assertDatabaseHas('wellbeing_entries', ['id' => $entry->id], 'health');
     }
 
     public function test_user_factory_creates_users_with_company(): void
