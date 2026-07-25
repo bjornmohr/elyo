@@ -41,6 +41,7 @@ services:
       - DB_HEALTH_DATABASE=elyo_health
       - DB_HEALTH_USERNAME=elyo_employee_rt
       - DB_HEALTH_PASSWORD=${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
+      - ELYO_COMPANY_RT_PASSWORD=${ELYO_COMPANY_RT_PASSWORD:-company_rt_dev}
       - DB_AUDIT_DATABASE=elyo_audit
       - DB_AUDIT_USERNAME=elyo_employee_rt
       - DB_AUDIT_PASSWORD=${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
