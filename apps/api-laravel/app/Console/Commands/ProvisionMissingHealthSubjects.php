@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
+use App\Services\Privacy\AuditLoggerContract;
 use App\Services\Privacy\MappingServiceContract;
 use App\Services\Privacy\PurposeCode;
 use App\Services\Privacy\SubjectProvisioningState;
@@ -21,6 +22,7 @@ class ProvisionMissingHealthSubjects extends Command
     public function handle(Container $container): int
     {
         $mappingService = $container->make(MappingServiceContract::class);
+        $auditLogger = $container->make(AuditLoggerContract::class);
         $dryRun = (bool) $this->option('dry-run');
         $scanned = 0;
         $missing = 0;
@@ -82,6 +84,18 @@ class ProvisionMissingHealthSubjects extends Command
                     }
                 }
             });
+
+        $auditLogger->logProvisioningBackfill([
+            'scanned' => $scanned,
+            'missing' => $missing,
+            'active' => $active,
+            'revoked' => $revoked,
+            'provisioned' => $provisioned,
+            'failed' => $failed,
+            'dry_run' => $dryRun,
+        ], $failed === 0
+            ? AuditLoggerContract::OUTCOME_SUCCESS
+            : AuditLoggerContract::OUTCOME_FAILED);
 
         $this->line("Users scanned: {$scanned}");
 

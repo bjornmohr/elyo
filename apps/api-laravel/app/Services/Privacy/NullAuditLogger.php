@@ -8,8 +8,14 @@ class NullAuditLogger implements AuditLoggerContract
         MappingOperation $operation,
         PurposeCode $purpose,
         AuditActorContext $actorContext,
-        string $subjectReference,
+        string $userReference,
+        string $outcome,
     ): void {
         // Prompt 07 replaces this binding with the append-only audit writer.
+    }
+
+    public function logProvisioningBackfill(array $summary, string $outcome): void
+    {
+        // Test-only no-op retained for isolated MappingService construction.
     }
 }
