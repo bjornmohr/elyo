@@ -3,8 +3,6 @@
 namespace App\Services\Health;
 
 use App\Models\Health\WellbeingEntry;
-use App\Services\Privacy\AuditActorContext;
-use App\Services\Privacy\Exceptions\MappingNotFoundException;
 use App\Services\Privacy\MappingServiceContract;
 use App\Services\Privacy\PurposeCode;
 use Carbon\Carbon;
@@ -12,7 +10,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EntryCollection;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Health-domain access to wellbeing check-ins (ELYO-110, ADR-003 D3).
@@ -24,7 +21,14 @@ use Illuminate\Support\Facades\Log;
  */
 class WellbeingService
 {
+    use ResolvesOwnSubject;
+
     public function __construct(private readonly MappingServiceContract $mappingService) {}
+
+    protected function mappingService(): MappingServiceContract
+    {
+        return $this->mappingService;
+    }
 
     public function getPeriodKey(): string
     {
@@ -144,32 +148,6 @@ class WellbeingService
             'health_subject_id',
             $this->resolveSubjectId($userId, PurposeCode::HEALTH_SELF_READ),
         );
-    }
-
-    /**
-     * Resolves the caller's own subject. A missing mapping is repaired in place:
-     * provisioning is idempotent by design (ADR-003 D5, prompt 05), so a subject
-     * that was never provisioned — or whose provisioning failed after the
-     * identity commit — must not turn into a failed check-in. Both the failed
-     * resolve and the repair are audited by the mapping service.
-     */
-    private function resolveSubjectId(int $userId, PurposeCode $purpose): string
-    {
-        try {
-            return $this->mappingService->resolveOwnSubject($userId, $purpose);
-        } catch (MappingNotFoundException) {
-            Log::warning('[HEALTH] Missing subject mapping repaired during self-service access.', [
-                'purpose' => $purpose->value,
-            ]);
-
-            $this->mappingService->provisionOwnSubject(
-                $userId,
-                PurposeCode::PROVISIONING,
-                AuditActorContext::employeeSelfService(),
-            );
-
-            return $this->mappingService->resolveOwnSubject($userId, $purpose);
-        }
     }
 
     private function isUniqueConstraintViolation(QueryException $exception): bool

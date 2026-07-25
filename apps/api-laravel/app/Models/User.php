@@ -59,15 +59,11 @@ class User extends Authenticatable
         return $this->hasMany(SurveyResponse::class);
     }
 
-    public function anamnesisProfile(): HasOne
-    {
-        return $this->hasOne(AnamnesisProfile::class);
-    }
-
-    public function healthDocuments(): HasMany
-    {
-        return $this->hasMany(HealthDocument::class);
-    }
+    // No `anamnesisProfile()` / `healthDocuments()` / `documents()` /
+    // `wearableConnections()` / `wearableSyncs()` relations: anamnesis,
+    // health-document metadata and wearable data live in the health domain on
+    // `health_subject_id` (ADR-003 D8). They are reachable only through the
+    // App\Services\Health services, never by joining from an identity.
 
     public function userPoints(): HasOne
     {
@@ -82,21 +78,6 @@ class User extends Authenticatable
     public function measureParticipations(): HasMany
     {
         return $this->hasMany(MeasureParticipation::class);
-    }
-
-    public function wearableConnections(): HasMany
-    {
-        return $this->hasMany(WearableConnection::class);
-    }
-
-    public function wearableSyncs(): HasMany
-    {
-        return $this->hasMany(WearableSync::class);
-    }
-
-    public function documents(): HasMany
-    {
-        return $this->hasMany(UserDocument::class);
     }
 
     public function pushSubscriptions(): HasMany

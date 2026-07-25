@@ -2,6 +2,8 @@
 
 namespace Tests\Boundary;
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use PhpParser\Node;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\StaticCall;
@@ -12,6 +14,9 @@ use PhpParser\NodeFinder;
 use PhpParser\ParserFactory;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use ReflectionClass;
+use ReflectionMethod;
+use ReflectionNamedType;
 use SplFileInfo;
 
 class SourceBoundaryTest extends BoundaryTestCase
@@ -54,6 +59,62 @@ class SourceBoundaryTest extends BoundaryTestCase
             $violations,
             "Code outside MappingService must not access the mapping connection directly:\n".implode("\n", $violations),
         );
+    }
+
+    /**
+     * ADR-003 D3/D8: no identity model may relate to a health model. Reflection
+     * rather than grep, so a relation added under any name is caught.
+     */
+    public function test_identity_models_have_no_relation_to_health_domain_models(): void
+    {
+        $violations = [];
+
+        foreach ($this->identityModelClasses() as $class) {
+            $model = new $class;
+
+            foreach ((new ReflectionClass($class))->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+                $returnType = $method->getReturnType();
+
+                if ($method->getNumberOfParameters() > 0 || ! $returnType instanceof ReflectionNamedType) {
+                    continue;
+                }
+
+                if ($returnType->isBuiltin() || ! is_a($returnType->getName(), Relation::class, true)) {
+                    continue;
+                }
+
+                $relatedClass = $method->invoke($model)->getRelated()::class;
+
+                if (str_starts_with($relatedClass, 'App\\Models\\Health\\')) {
+                    $violations[] = "{$class}::{$method->getName()}() relates to {$relatedClass}";
+                }
+            }
+        }
+
+        $this->assertSame(
+            [],
+            $violations,
+            "Identity models must not relate to health models:\n".implode("\n", $violations),
+        );
+    }
+
+    /**
+     * @return iterable<class-string<Model>>
+     */
+    private function identityModelClasses(): iterable
+    {
+        foreach ($this->phpFiles(app_path('Models')) as $file) {
+            $relative = str_replace([app_path('Models').DIRECTORY_SEPARATOR, '.php'], '', $file->getPathname());
+            $class = 'App\\Models\\'.str_replace(DIRECTORY_SEPARATOR, '\\', $relative);
+
+            if (str_starts_with($class, 'App\\Models\\Health\\') || str_starts_with($class, 'App\\Models\\Privacy\\')) {
+                continue;
+            }
+
+            if (is_subclass_of($class, Model::class)) {
+                yield $class;
+            }
+        }
     }
 
     /**

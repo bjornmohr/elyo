@@ -20,7 +20,20 @@ class HealthSchemaBoundaryTest extends BoundaryTestCase
         $tables = collect($schemaBuilder->getTables())->pluck('name');
 
         $this->assertNotEmpty($tables, 'The health schema is empty — migrations did not run.');
-        $this->assertContains('wellbeing_entries', $tables->all());
+
+        // Every health table the domain owns today (prompt 08 + 08a). Listing
+        // them here makes an accidentally missing migration a failure, while the
+        // loop below still covers tables added later.
+        foreach ([
+            'wellbeing_entries',
+            'anamnesis_profiles',
+            'health_documents',
+            'user_documents',
+            'wearable_connections',
+            'wearable_syncs',
+        ] as $healthTable) {
+            $this->assertContains($healthTable, $tables->all());
+        }
 
         $violations = [];
 
@@ -48,6 +61,28 @@ class HealthSchemaBoundaryTest extends BoundaryTestCase
             $schemaBuilder->hasColumn('wellbeing_entries', 'note'),
             'The free-text note was removed from the check-in (ELYO-102 §3.3).',
         );
+    }
+
+    /**
+     * The tables moved in prompt 08a (ADR-003 D8) are keyed on the subject and
+     * carry no identity remnant of their own.
+     */
+    public function test_moved_health_tables_are_keyed_on_a_health_subject(): void
+    {
+        $schemaBuilder = Schema::connection('health');
+
+        foreach ([
+            'anamnesis_profiles',
+            'health_documents',
+            'user_documents',
+            'wearable_connections',
+            'wearable_syncs',
+        ] as $table) {
+            $this->assertTrue(
+                $schemaBuilder->hasColumn($table, 'health_subject_id'),
+                "{$table} must be keyed on health_subject_id.",
+            );
+        }
     }
 
     /**

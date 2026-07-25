@@ -5,18 +5,19 @@ namespace App\Http\Controllers\Employee;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\CheckinRequest;
 use App\Http\Requests\Employee\UpdateProfileRequest;
+use App\Http\Resources\Employee\AnamnesisResource;
+use App\Http\Resources\Employee\EmployeeDocumentResource;
 use App\Http\Resources\Employee\MeasureResource;
 use App\Http\Resources\Employee\WellbeingEntryResource;
-use App\Models\AnamnesisProfile;
 use App\Models\Measure;
-use App\Models\UserDocument;
+use App\Services\Health\AnamnesisService;
+use App\Services\Health\HealthDocumentService;
 use App\Services\Health\WellbeingService;
 use App\Services\MeasureCheckinTokenService;
 use App\Services\MeasureParticipationService;
 use App\Services\PointsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -26,7 +27,9 @@ class EmployeeController extends Controller
         protected WellbeingService $wellbeingService,
         protected PointsService $pointsService,
         protected MeasureParticipationService $measureParticipationService,
-        protected MeasureCheckinTokenService $measureCheckinTokenService
+        protected MeasureCheckinTokenService $measureCheckinTokenService,
+        protected AnamnesisService $anamnesisService,
+        protected HealthDocumentService $healthDocumentService
     ) {}
 
     public function dashboard(Request $request): JsonResponse
@@ -106,26 +109,19 @@ class EmployeeController extends Controller
     public function getProfile(Request $request): JsonResponse
     {
         $user = $request->user();
-        $user->loadMissing(['anamnesisProfile', 'documents']);
-        $anamnesis = $user->anamnesisProfile;
+        // Anamnesis and documents live in the health domain on the caller's own
+        // subject (ADR-003 D8); they are never joined from the identity.
+        $anamnesis = $this->anamnesisService->profileFor($user->id);
+        $documents = $this->healthDocumentService->documentsFor($user->id);
 
         return response()->json([
             'data' => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'anamnesis' => $anamnesis ? $this->anamnesisPayload($anamnesis) : null,
+                'anamnesis' => $anamnesis ? new AnamnesisResource($anamnesis) : null,
                 'anamnesisDue' => ! $anamnesis || $anamnesis->updated_at->lte(now()->subMonths(6)),
-                'documents' => $user->documents()
-                    ->latest('uploaded_at')
-                    ->get()
-                    ->map(fn (UserDocument $document) => [
-                        'id' => $document->id,
-                        'fileName' => $document->file_name,
-                        'mimeType' => $document->mime_type,
-                        'size' => $document->size,
-                        'uploadedAt' => $document->uploaded_at?->toIso8601String(),
-                    ]),
+                'documents' => EmployeeDocumentResource::collection($documents),
             ],
         ]);
     }
@@ -147,12 +143,11 @@ class EmployeeController extends Controller
             'chronic_patterns' => $validated['chronicPatterns'] ?? [],
             'has_medication' => $validated['hasMedication'] ?? null,
         ];
-        $profileData['completion_pct'] = $this->calculateAnamnesisCompletion($profileData);
 
-        $existingProfile = $user->anamnesisProfile;
-        $profile = AnamnesisProfile::updateOrCreate(['user_id' => $user->id], $profileData);
+        ['profile' => $profile, 'created' => $created] = $this->anamnesisService
+            ->saveProfile($user->id, $profileData);
 
-        if (! $existingProfile && $profile->completion_pct >= 80) {
+        if ($created && $profile->completion_pct >= 80) {
             $this->pointsService->awardPoints($user, 'anamnesis_completed');
         }
 
@@ -161,7 +156,7 @@ class EmployeeController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'anamnesis' => $this->anamnesisPayload($profile),
+                'anamnesis' => new AnamnesisResource($profile),
                 'anamnesisDue' => false,
             ],
         ]);
@@ -174,29 +169,14 @@ class EmployeeController extends Controller
         ]);
 
         $user = $request->user();
-        $file = $request->file('file');
-        $path = $file->store("employee-documents/{$user->id}", 'public');
-
-        $document = UserDocument::create([
-            'user_id' => $user->id,
-            'file_name' => $file->getClientOriginalName(),
-            'blob_url' => Storage::disk('public')->url($path),
-            'blob_key' => $path,
-            'mime_type' => $file->getMimeType() ?? 'application/pdf',
-            'size' => $file->getSize(),
-            'uploaded_at' => now(),
-        ]);
+        // Metadata and file both land subject-scoped; the identity never reaches
+        // the health domain. ADR-001 §2.9 storage hardening follow-up.
+        $document = $this->healthDocumentService->storeUploadedDocument($user->id, $request->file('file'));
 
         $this->pointsService->awardPoints($user, 'medical_document_upload');
 
         return response()->json([
-            'data' => [
-                'id' => $document->id,
-                'fileName' => $document->file_name,
-                'mimeType' => $document->mime_type,
-                'size' => $document->size,
-                'uploadedAt' => $document->uploaded_at?->toIso8601String(),
-            ],
+            'data' => new EmployeeDocumentResource($document),
         ], 201);
     }
 
@@ -321,40 +301,5 @@ class EmployeeController extends Controller
         return response()->json([
             'data' => new MeasureResource($measureModel),
         ], 201);
-    }
-
-    private function calculateAnamnesisCompletion(array $profileData): int
-    {
-        $fields = [
-            'birth_year',
-            'biological_sex',
-            'activity_level',
-            'sleep_quality',
-            'stress_tendency',
-            'smoking_status',
-            'nutrition_type',
-            'has_medication',
-        ];
-
-        $filled = collect($fields)->filter(fn ($field) => $profileData[$field] !== null && $profileData[$field] !== '')->count();
-
-        return (int) round(($filled / count($fields)) * 100);
-    }
-
-    private function anamnesisPayload(AnamnesisProfile $profile): array
-    {
-        return [
-            'completionPct' => $profile->completion_pct,
-            'birthYear' => $profile->birth_year,
-            'biologicalSex' => $profile->biological_sex,
-            'activityLevel' => $profile->activity_level,
-            'sleepQuality' => $profile->sleep_quality,
-            'stressTendency' => $profile->stress_tendency,
-            'smokingStatus' => $profile->smoking_status,
-            'nutritionType' => $profile->nutrition_type,
-            'chronicPatterns' => $profile->chronic_patterns ?? [],
-            'hasMedication' => $profile->has_medication,
-            'updatedAt' => $profile->updated_at?->toIso8601String(),
-        ];
     }
 }

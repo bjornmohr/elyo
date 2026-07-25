@@ -603,10 +603,12 @@ class EmployeeTest extends TestCase
             ->assertJsonPath('data.anamnesis.birthYear', 1990);
 
         $this->assertEquals('Updated Name', $this->employee->refresh()->name);
+        // The anamnesis lives in the health domain on the employee's subject
+        // (ADR-003 D8) — never on a user id.
         $this->assertDatabaseHas('anamnesis_profiles', [
-            'user_id' => $this->employee->id,
+            'health_subject_id' => $this->healthSubjectIdFor($this->employee),
             'birth_year' => 1990,
-        ]);
+        ], 'health');
     }
 
     public function test_employee_can_list_surveys()
@@ -1580,9 +1582,9 @@ class EmployeeTest extends TestCase
             ->assertJsonPath('data.fileName', 'report.pdf');
 
         $this->assertDatabaseHas('user_documents', [
-            'user_id' => $this->employee->id,
+            'health_subject_id' => $this->healthSubjectIdFor($this->employee),
             'file_name' => 'report.pdf',
-        ]);
+        ], 'health');
     }
 
     private function createDailyWellbeingEntry(User $user, string $periodKey): WellbeingEntry

@@ -87,3 +87,21 @@ Expected result:
 - openapi.yaml updated for every shape/ID-format change (or explicitly confirmed unchanged)?
 - Storage hardening cleanly deferred with marker, not half-built?
 - Do User-model relations to health data no longer exist?
+
+## Review Follow-up: Concurrent First Profile Writes
+
+Reviewer finding: two overlapping first `PUT /employee/profile` requests can
+both observe a missing anamnesis. A check-then-create implementation lets the
+losing insert violate the unique `health_subject_id` constraint and return 500.
+
+Acceptance criteria:
+
+- A first profile write recovers when a concurrent insert wins the race.
+- The endpoint returns 200 and keeps one subject-scoped anamnesis row.
+- `created` is derived from Eloquent's `wasRecentlyCreated`, so only the winning
+  first creation can trigger first-completion points.
+- Route and response shapes remain unchanged; no OpenAPI change is required.
+
+Test seam: `PUT /api/employee/profile`. The regression test inserts the competing
+row from a second health connection during Eloquent's creating event, after the
+initial lookup and before the request's insert.
