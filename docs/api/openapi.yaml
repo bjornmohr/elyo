@@ -457,15 +457,33 @@ components:
             total: { type: integer }
 
     WellbeingEntry:
+      description: >-
+        A daily wellbeing check-in on the canonical 1–5 scale (ELYO-102 §3.1, breaking
+        change B5 against the former 1–10 scale). The free-text `note` was removed from
+        request and response (ELYO-102 §3.3). Entries are stored in the health domain
+        keyed on an internal health subject, which is never part of any response.
       type: object
+      required: [id, mood, stress, energy, score, periodKey, createdAt]
       properties:
-        id: { type: string }
-        mood: { type: integer }
-        stress: { type: integer }
-        energy: { type: integer }
-        score: { type: number }
-        note: { type: string, nullable: true }
-        periodKey: { type: string }
+        id:
+          type: string
+          description: Opaque ULID of the entry. Carries no identity semantics.
+          example: 01JY0000000000000000000001
+        mood: { type: integer, minimum: 1, maximum: 5 }
+        stress: { type: integer, minimum: 1, maximum: 5 }
+        energy: { type: integer, minimum: 1, maximum: 5 }
+        score:
+          type: number
+          description: >-
+            Mean of mood, inverted stress and energy on the 1–5 scale, rounded to one
+            decimal place: `(mood + (6 - stress) + energy) / 3`. Range 1.0–5.0.
+          minimum: 1
+          maximum: 5
+          example: 4.3
+        periodKey:
+          type: string
+          description: Daily period, `YYYY-MM-DD`.
+          example: "2026-05-25"
         createdAt: { type: string, format: date-time }
     EmployeeCheckinStatusResponse:
       type: object
@@ -815,6 +833,24 @@ components:
             type: array
             items: { type: string }
 
+    CheckinValidationError:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message, details]
+          additionalProperties: false
+          properties:
+            code: { type: string, enum: [VALIDATION_ERROR] }
+            message: { type: string }
+            details:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+
     AnonymityThresholdError:
       type: object
       required: [error, minRequired, isAboveThreshold, suppressionReason]
@@ -1025,6 +1061,13 @@ paths:
     post:
       tags: [Employee]
       summary: Submit a wellbeing check-in
+      description: >-
+        One check-in per employee and daily period. `mood`, `stress` and `energy` are
+        required integers on the canonical 1–5 scale (ELYO-102 §3.1 / B3); values outside
+        1–5 return 422. The free-text `note` is no longer accepted; every occurrence,
+        including null or empty values, is rejected with 422 rather than silently dropped
+        (ELYO-102 §3.3 / B4), so an outdated client cannot lose text the employee believed
+        was stored. `location` and `sleep` are not part of this contract version (ELYO-133).
       security: [{ Sanctum: [] }]
       requestBody:
         required: true
@@ -1032,11 +1075,14 @@ paths:
           application/json:
             schema:
               type: object
+              required: [mood, stress, energy]
               properties:
-                mood: { type: integer, minimum: 1, maximum: 10 }
-                stress: { type: integer, minimum: 1, maximum: 10 }
-                energy: { type: integer, minimum: 1, maximum: 10 }
-                note: { type: string, nullable: true }
+                mood: { type: integer, minimum: 1, maximum: 5 }
+                stress: { type: integer, minimum: 1, maximum: 5 }
+                energy: { type: integer, minimum: 1, maximum: 5 }
+                note:
+                  description: Removed free-text field; any supplied value, including null or empty values, is invalid.
+                  not: {}
       responses:
         200:
           description: Success
@@ -1044,10 +1090,16 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [success, score, periodKey]
                 properties:
                   success: { type: boolean }
-                  score: { type: number }
-                  periodKey: { type: string }
+                  score:
+                    type: number
+                    description: >-
+                      `(mood + (6 - stress) + energy) / 3`, rounded to one decimal place.
+                  periodKey: { type: string, example: "2026-05-25" }
+        403:
+          description: The authenticated employee does not belong to a company.
         409:
           description: Check-in already completed for the authenticated employee and current daily period.
           content:
@@ -1058,6 +1110,29 @@ paths:
                 error:
                   code: CHECKIN_ALREADY_DONE
                   message: Der Check-in wurde heute bereits abgeschlossen.
+        422:
+          description: Validation failed — off-scale value, missing field, or a supplied `note`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckinValidationError'
+              examples:
+                outOfRange:
+                  summary: Value outside the canonical 1–5 scale
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: The given data was invalid.
+                      details:
+                        mood: ["The mood field must not be greater than 5."]
+                noteProhibited:
+                  summary: Removed free-text field supplied
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: The given data was invalid.
+                      details:
+                        note: ["Freitext-Notizen werden im Check-in nicht mehr erfasst."]
 
   /employee/checkin/status:
     get:
@@ -1079,11 +1154,10 @@ paths:
                     completed: true
                     entry:
                       id: "01JY0000000000000000000001"
-                      mood: 8
-                      stress: 3
-                      energy: 7
-                      score: 7.7
-                      note: "Guter Start in den Tag."
+                      mood: 4
+                      stress: 2
+                      energy: 4
+                      score: 4.0
                       periodKey: "2026-05-25"
                       createdAt: "2026-05-25T08:00:00Z"
                 notCompleted:

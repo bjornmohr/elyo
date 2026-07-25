@@ -6,17 +6,28 @@ use App\Enums\QuestionType;
 use App\Enums\Role;
 use App\Enums\SurveyStatus;
 use App\Models\Company;
+use App\Models\Health\WellbeingEntry;
 use App\Models\InviteToken;
 use App\Models\Measure;
 use App\Models\Survey;
 use App\Models\SurveyQuestion;
 use App\Models\Team;
 use App\Models\User;
-use App\Models\WellbeingEntry;
+use Tests\Support\ConfiguresPrivacyMapping;
+use Tests\Support\CreatesWellbeingCheckins;
 use Tests\TestCase;
 
 class TenantScopeTest extends TestCase
 {
+    use ConfiguresPrivacyMapping;
+    use CreatesWellbeingCheckins;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->configurePrivacyMapping('tenant-scope-test');
+    }
 
     public function test_employee_forged_user_and_company_ids_are_ignored_on_checkin(): void
     {
@@ -26,9 +37,9 @@ class TenantScopeTest extends TestCase
         $otherUser = User::factory()->create(['company_id' => $otherCompany->id, 'role' => Role::EMPLOYEE]);
 
         $this->actingAs($employee, 'sanctum')->postJson('/api/employee/checkin', [
-            'mood' => 8,
-            'stress' => 3,
-            'energy' => 7,
+            'mood' => 4,
+            'stress' => 2,
+            'energy' => 5,
             'user_id' => $otherUser->id,
             'userId' => $otherUser->id,
             'company_id' => $otherCompany->id,
@@ -36,14 +47,14 @@ class TenantScopeTest extends TestCase
             'role' => Role::COMPANY_ADMIN->value,
         ])->assertStatus(200);
 
-        $this->assertDatabaseHas('wellbeing_entries', [
-            'user_id' => $employee->id,
-            'company_id' => $company->id,
-        ]);
-        $this->assertDatabaseMissing('wellbeing_entries', [
-            'user_id' => $otherUser->id,
-            'company_id' => $otherCompany->id,
-        ]);
+        // The check-in is attached to the caller's own health subject; the forged
+        // ids cannot steer it to another identity's subject.
+        $this->assertSame(1, WellbeingEntry::query()
+            ->where('health_subject_id', $this->healthSubjectIdFor($employee))
+            ->count());
+        $this->assertSame(0, WellbeingEntry::query()
+            ->where('health_subject_id', $this->healthSubjectIdFor($otherUser))
+            ->count());
     }
 
     public function test_employee_forged_user_id_is_ignored_on_profile_update(): void

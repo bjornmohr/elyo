@@ -9,7 +9,11 @@ interface MappingServiceContract
         PurposeCode $purpose,
     ): SubjectProvisioningState;
 
-    public function provisionOwnSubject(int $userId, PurposeCode $purpose): string;
+    public function provisionOwnSubject(
+        int $userId,
+        PurposeCode $purpose,
+        ?AuditActorContext $actorContext = null,
+    ): string;
 
     public function resolveOwnSubject(int $userId, PurposeCode $purpose): string;
 

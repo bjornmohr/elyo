@@ -3,11 +3,13 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Services\Health\WellbeingScoreCalculator;
 use App\Services\Privacy\MappingServiceContract;
 use App\Services\Privacy\PurposeCode;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
@@ -91,30 +93,7 @@ class DemoDataSeeder extends Seeder
             ]
         );
 
-        $periods = collect(range(0, 11))->map(fn ($week) => $now->copy()->subWeeks($week)->format('Y-\WW'))->values();
-        DB::table('wellbeing_entries')->where('company_id', $companyId)->delete();
-
-        foreach ($employeeIds as $idx => $userId) {
-            foreach ($periods as $weekIdx => $periodKey) {
-                $mood = max(1, min(10, 7 + (($idx + $weekIdx) % 3) - 1));
-                $stress = max(1, min(10, 4 + (($idx + $weekIdx) % 4) - 1));
-                $energy = max(1, min(10, 7 + (($idx + $weekIdx + 1) % 3) - 1));
-                $score = round(($mood + (11 - $stress) + $energy) / 3, 1);
-
-                DB::table('wellbeing_entries')->insert([
-                    'mood' => $mood,
-                    'stress' => $stress,
-                    'energy' => $energy,
-                    'score' => $score,
-                    'note' => null,
-                    'period_key' => $periodKey,
-                    'company_id' => $companyId,
-                    'user_id' => $userId,
-                    'created_at' => $now->copy()->subWeeks($weekIdx)->subHours($idx),
-                    'updated_at' => $now,
-                ]);
-            }
-        }
+        $this->seedWellbeingEntries($employeeIds, $now, 12);
 
         $surveyId = DB::table('surveys')->where('company_id', $companyId)->where('title', 'Quarterly Pulse Check')->value('id');
         if (! $surveyId) {
@@ -219,7 +198,7 @@ class DemoDataSeeder extends Seeder
             );
         }
         DB::table('teams')->where('company_id', $smallCompanyId)->delete();
-        $this->seedWellbeingEntries($smallCompanyId, $smallEmployeeIds, $now, 6);
+        $this->seedWellbeingEntries($smallEmployeeIds, $now, 6);
         $this->seedSurvey(
             $smallCompanyId,
             'Small Company Pulse',
@@ -262,7 +241,7 @@ class DemoDataSeeder extends Seeder
                 $now->copy()->subDays($i)
             );
         }
-        $this->seedWellbeingEntries($legacyCompanyId, $legacyEmployeeIds, $now, 8);
+        $this->seedWellbeingEntries($legacyEmployeeIds, $now, 8);
         $this->seedSurvey(
             $legacyCompanyId,
             'Legacy Team Pulse',
@@ -381,33 +360,65 @@ class DemoDataSeeder extends Seeder
     }
 
     /**
+     * Seeds wellbeing check-ins in the health domain (ADR-003 D3): keyed on
+     * health_subject_id, canonical 1–5 scale, no note and no company column.
+     *
      * @param  array<int>  $userIds
      */
-    private function seedWellbeingEntries(int $companyId, array $userIds, mixed $now, int $weeks): void
+    private function seedWellbeingEntries(array $userIds, mixed $now, int $weeks): void
     {
-        DB::table('wellbeing_entries')->where('company_id', $companyId)->delete();
+        $subjectIds = $this->provisionSubjects($userIds);
 
-        $periods = collect(range(0, $weeks - 1))->map(fn ($week) => $now->copy()->subWeeks($week)->format('Y-\WW'))->values();
-        foreach ($userIds as $idx => $userId) {
+        DB::connection('health')
+            ->table('wellbeing_entries')
+            ->whereIn('health_subject_id', $subjectIds)
+            ->delete();
+
+        $periods = collect(range(0, $weeks - 1))
+            ->map(fn ($week) => $now->copy()->subWeeks($week)->toDateString())
+            ->values();
+        foreach (array_values($subjectIds) as $idx => $subjectId) {
             foreach ($periods as $weekIdx => $periodKey) {
-                $mood = max(1, min(10, 7 + (($idx + $weekIdx) % 3) - 1));
-                $stress = max(1, min(10, 4 + (($idx + $weekIdx) % 4) - 1));
-                $energy = max(1, min(10, 7 + (($idx + $weekIdx + 1) % 3) - 1));
-                $score = round(($mood + (11 - $stress) + $energy) / 3, 1);
+                $mood = max(1, min(5, 4 + (($idx + $weekIdx) % 3) - 1));
+                $stress = max(1, min(5, 2 + (($idx + $weekIdx) % 3) - 1));
+                $energy = max(1, min(5, 4 + (($idx + $weekIdx + 1) % 3) - 1));
 
-                DB::table('wellbeing_entries')->insert([
+                DB::connection('health')->table('wellbeing_entries')->insert([
+                    'id' => (string) Str::ulid(),
+                    'health_subject_id' => $subjectId,
                     'mood' => $mood,
                     'stress' => $stress,
                     'energy' => $energy,
-                    'score' => $score,
-                    'note' => null,
+                    'score' => WellbeingScoreCalculator::calculate($mood, $stress, $energy),
                     'period_key' => $periodKey,
-                    'company_id' => $companyId,
-                    'user_id' => $userId,
                     'created_at' => $now->copy()->subWeeks($weekIdx)->subHours($idx),
                     'updated_at' => $now,
                 ]);
             }
+        }
+    }
+
+    /**
+     * Provisioning is idempotent, so seeding may re-run. Failures are reported
+     * generically for the same reason as the final sweep: a provisioning error
+     * must not surface identity or subject identifiers.
+     *
+     * @param  array<int>  $userIds
+     * @return array<int, string>
+     */
+    private function provisionSubjects(array $userIds): array
+    {
+        try {
+            return collect($userIds)
+                ->mapWithKeys(fn (int $userId): array => [
+                    $userId => $this->mappingService->provisionOwnSubject(
+                        $userId,
+                        PurposeCode::PROVISIONING,
+                    ),
+                ])
+                ->all();
+        } catch (Throwable) {
+            throw new RuntimeException('Health subject provisioning failed during demo seeding.');
         }
     }
 

@@ -46,12 +46,15 @@ class MappingService implements MappingServiceContract
         );
     }
 
-    public function provisionOwnSubject(int $userId, PurposeCode $purpose): string
-    {
+    public function provisionOwnSubject(
+        int $userId,
+        PurposeCode $purpose,
+        ?AuditActorContext $actorContext = null,
+    ): string {
         return $this->performAuditedOperation(
             MappingOperation::PROVISION_OWN_SUBJECT,
             $purpose,
-            AuditActorContext::registrationWorkflow(),
+            $actorContext ?? AuditActorContext::registrationWorkflow(),
             $this->cryptography->auditSubjectReferenceForUserId($userId),
             function () use ($userId): string {
                 $mapping = $this->findMapping($userId);
@@ -258,7 +261,7 @@ class MappingService implements MappingServiceContract
                     $purpose,
                     $actorContext,
                     $userReference,
-                    AuditLoggerContract::OUTCOME_DENIED,
+                    AuditOutcome::DENIED,
                 );
 
                 throw $exception;
@@ -272,7 +275,7 @@ class MappingService implements MappingServiceContract
             $userReference,
             $operationCallback,
         ): mixed {
-            $outcome = AuditLoggerContract::OUTCOME_SUCCESS;
+            $outcome = AuditOutcome::SUCCESS;
 
             try {
                 return $operationCallback();
@@ -282,11 +285,11 @@ class MappingService implements MappingServiceContract
                 |MappingRevokedException
                 |OperationNotAvailableException $exception
             ) {
-                $outcome = AuditLoggerContract::OUTCOME_DENIED;
+                $outcome = AuditOutcome::DENIED;
 
                 throw $exception;
             } catch (Throwable $exception) {
-                $outcome = AuditLoggerContract::OUTCOME_FAILED;
+                $outcome = AuditOutcome::FAILED;
 
                 throw $exception;
             } finally {

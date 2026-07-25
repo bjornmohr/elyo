@@ -50,10 +50,9 @@ class User extends Authenticatable
         return $this->hasMany(Team::class, 'manager_id');
     }
 
-    public function wellbeingEntries(): HasMany
-    {
-        return $this->hasMany(WellbeingEntry::class);
-    }
+    // No `wellbeingEntries()` relation: check-ins live in the health domain on
+    // `health_subject_id` (ADR-003 D3). They are reachable only through
+    // App\Services\Health\WellbeingService, never by joining from an identity.
 
     public function surveyResponses(): HasMany
     {
