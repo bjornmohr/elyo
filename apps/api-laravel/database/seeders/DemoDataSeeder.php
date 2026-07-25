@@ -2,12 +2,19 @@
 
 namespace Database\Seeders;
 
+use App\Models\User;
+use App\Services\Privacy\MappingServiceContract;
+use App\Services\Privacy\PurposeCode;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
+use Throwable;
 
 class DemoDataSeeder extends Seeder
 {
+    public function __construct(private readonly MappingServiceContract $mappingService) {}
+
     public function run(): void
     {
         $now = now();
@@ -310,6 +317,21 @@ class DemoDataSeeder extends Seeder
                     'updated_at' => $now,
                 ]
             );
+        }
+
+        // Provision every identity user, regardless of today's role. Company
+        // actors can use the employee portal and roles can change, so an
+        // all-user sweep avoids gaps without exposing subject identifiers.
+        try {
+            User::query()
+                ->select('id')
+                ->orderBy('id')
+                ->each(fn (User $user) => $this->mappingService->provisionOwnSubject(
+                    $user->id,
+                    PurposeCode::PROVISIONING,
+                ));
+        } catch (Throwable) {
+            throw new RuntimeException('Health subject provisioning failed during demo seeding.');
         }
 
         $this->command?->info('Demo data seeded: admin@demo.de, small.admin@demo.de, legacy.admin@demo.de / demo1234');

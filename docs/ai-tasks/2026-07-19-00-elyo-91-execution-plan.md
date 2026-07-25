@@ -26,7 +26,7 @@
 | 02 | `…-02-multi-db-infrastructure.md` | ELYO-104 | initdb script (DBs + roles + grants), compose, .env.example, Laravel connections | Grants matrix matches ADR-001 access matrix |
 | 03 | `…-03-migration-restructure.md` | ELYO-104 | Per-connection migration directories, identity schema rebuilt, fresh+seed tooling | No schema drift vs. current behavior; wellbeing untouched yet |
 | 04 | `…-04-mapping-domain-service.md` | ELYO-104 | health_subjects + mapping tables, MappingService (3 ops, purpose codes, encryption, tombstone), audit contract (log stub) | Service interface, encryption/HMAC, REVOKED semantics |
-| 05 | `…-05-subject-provisioning.md` | ELYO-104 | Synchronous provisioning on invite-accept, seeder provisioning, backfill command, failure paths | All-or-nothing order (subject → mapping), idempotency |
+| 05 | `…-05-subject-provisioning.md` | ELYO-104 | Synchronous provisioning after invite-accept identity commit, seeder provisioning, backfill command, failure paths | Subject → mapping order, generic failure flagging, idempotent repair |
 | 06 | `…-06-boundary-enforcement.md` | ELYO-106 | Grants boundary tests (PG lane), Deptrac rules + CI | Standard connection provably cannot read mapping |
 | 07 | `…-07-audit-logging.md` | ELYO-107 | Audit DB writer (INSERT-only), events for mapping ops, concept doc | Never user_id + health_subject_id in one entry |
 | 08 | `…-08-wellbeing-health-domain.md` | ELYO-110/109 | wellbeing rebuilt in health domain (ULID, 1–5, no note/company_id), employee endpoints reworked via mapping | Contract per ELYO-102 §3; streak/points still work |

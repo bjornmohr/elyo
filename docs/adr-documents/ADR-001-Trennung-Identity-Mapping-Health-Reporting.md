@@ -24,11 +24,11 @@ Vier PostgreSQL-Datenbanken auf einem gemeinsamen Cluster: `elyo_identity`, `ely
 
 ### 2.2 Globales Health Subject
 
-Jeder Nutzer erhält bei erfolgreicher Selbstregistrierung ein globales, arbeitgeberunabhängiges `health_subject_id`. Die Provisionierung erfolgt synchron nach dem Alles-oder-nichts-Prinzip (zuerst Subject, dann Mapping). Der Gesundheitsverlauf bleibt bei Arbeitgeberwechseln erhalten; ohne aktive Membership oder ohne Sponsor gilt ein kostenloser Read-only-Basisstatus (Bestandsdaten sichtbar und exportierbar, keine neue Erfassung).
+Jeder Nutzer erhält bei erfolgreicher Selbstregistrierung ein globales, arbeitgeberunabhängiges `health_subject_id`. Die Provisionierung startet synchron unmittelbar nach dem Commit der Identity-Registrierung; innerhalb der Mapping-Provisionierung gilt die Reihenfolge Subject vor Mapping. Schlägt die domänenübergreifende Provisionierung fehl, bleibt die Registrierung gültig, der Fehler wird ohne Identifikatoren protokolliert und ein idempotenter Abgleich (`elyo:provision-subjects`) repariert die fehlende Zuordnung. Der Gesundheitsverlauf bleibt bei Arbeitgeberwechseln erhalten; ohne aktive Membership oder ohne Sponsor gilt ein kostenloser Read-only-Basisstatus (Bestandsdaten sichtbar und exportierbar, keine neue Erfassung).
 
 ### 2.3 Mapping als geschützte Domäne
 
-Kein freier ORM-Zugriff auf das Mapping. Es existieren genau fünf zweckgebundene Operationen (`provisionOwnSubject`, `resolveOwnSubject`, `resolveReportingCohort`, `revokeSubjectLink`, `resolveForDataSubjectRequest`), jede exakt einer Runtime zugeordnet, jede mit Pflicht-Purpose-Code und Audit. Statusmodell: nur `ACTIVE` und `REVOKED` (endgültig, Tombstone). Re-Identifizierung ist ein Ausnahmeprozess mit Vier-Augen-Freigabe, Einzelauflösung, 24-Stunden-Befristung und Exportverbot.
+Kein freier ORM-Zugriff auf das Mapping. Es existieren genau fünf zweckgebundene, identifiertragende Lifecycle-Operationen (`provisionOwnSubject`, `resolveOwnSubject`, `resolveReportingCohort`, `revokeSubjectLink`, `resolveForDataSubjectRequest`), jede exakt einer Runtime zugeordnet, jede mit Pflicht-Purpose-Code und Audit. Als enger Bestandteil der Provisionierungsoperation darf die Identity-Runtime über `provisioningStateForUser` ausschließlich den nicht-identifizierenden Zustand `MISSING`, `ACTIVE` oder `REVOKED` abfragen; der Aufruf verwendet denselben Provisionierungs-Purpose und wird wie `provisionOwnSubject` auditiert. Statusmodell: nur `ACTIVE` und `REVOKED` (endgültig, Tombstone); `MISSING` bezeichnet das Fehlen einer Mapping-Zeile und ist kein persistierter Status. Re-Identifizierung ist ein Ausnahmeprozess mit Vier-Augen-Freigabe, Einzelauflösung, 24-Stunden-Befristung und Exportverbot.
 
 ### 2.4 Fünf Runtimes aus einem Codebestand
 
@@ -70,7 +70,7 @@ Automatisierte Boundary-Tests laufen bei jedem Merge in der CI gegen PostgreSQL 
 
 **Negativ / bewusst akzeptiert:**
 
-- Keine echte Transaktion über DB-Grenzen: Die synchrone Registrierung kompensiert Teilfehler nur über Reihenfolge (Subject zuerst) und Wiederholbarkeit.
+- Keine echte Transaktion über DB-Grenzen: Die Identity-Registrierung kann erfolgreich sein, obwohl die anschließende Subject-Provisionierung fehlschlägt; Reihenfolge (Subject zuerst), generische Fehlerprotokollierung und der idempotente Abgleich kompensieren diesen Teilfehler.
 - Kein Sperr-/Deaktivierungszustand im Pilot — bei Missbrauch bleibt nur die endgültige Löschung (11.1).
 - Ein privilegierter Admin-Account für den Tech-Lead statt getrennter Rollen-Accounts; Break-glass bleibt über den Vier-Augen-Prozess geschützt (9.2).
 - Die Datenschutz-Folgenabschätzung wird parallel zum Pilot nachgezogen statt vorab erstellt — dokumentiertes rechtliches Restrisiko (18.1).

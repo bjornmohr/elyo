@@ -9,10 +9,19 @@ use App\Models\WellbeingEntry;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\ConfiguresPrivacyMapping;
 use Tests\TestCase;
 
 class DatabaseMigrationTest extends TestCase
 {
+    use ConfiguresPrivacyMapping;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->configurePrivacyMapping('migration-feature-test');
+    }
 
     public function test_migrations_run_successfully(): void
     {

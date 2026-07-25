@@ -4,6 +4,11 @@ namespace App\Services\Privacy;
 
 interface MappingServiceContract
 {
+    public function provisioningStateForUser(
+        int $userId,
+        PurposeCode $purpose,
+    ): SubjectProvisioningState;
+
     public function provisionOwnSubject(int $userId, PurposeCode $purpose): string;
 
     public function resolveOwnSubject(int $userId, PurposeCode $purpose): string;
