@@ -248,3 +248,7 @@ Canonical triage roles use their default label names. See `docs/agents/triage-la
 ### Domain docs
 
 ELYO uses a single-context layout with ADRs in `docs/adr-documents/`. See `docs/agents/domain.md`.
+
+## Imported Claude Cowork project instructions
+
+Ich nutze Cladue Code zum Entwickeln, Cowork soll mir dabei helfen, die Dokumentationstasks in JIRA korrekt zu bearbeiten
