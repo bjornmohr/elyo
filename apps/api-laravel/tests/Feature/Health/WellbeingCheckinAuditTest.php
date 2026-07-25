@@ -60,6 +60,7 @@ class WellbeingCheckinAuditTest extends TestCase
             ->table('audit_events')
             ->where('event_type', 'mapping.'.MappingOperation::RESOLVE_OWN_SUBJECT->value)
             ->where('purpose', PurposeCode::HEALTH_SELF_WRITE->value)
+            ->where('outcome', 'success')
             ->get();
 
         $this->assertCount(1, $events, 'The check-in did not audit its mapping resolution.');
@@ -67,6 +68,30 @@ class WellbeingCheckinAuditTest extends TestCase
         // Never both sides of the mapping in one entry (prompt 07).
         $this->assertNull($events->first()->subject_ref);
         $this->assertNotNull($events->first()->user_ref);
+    }
+
+    public function test_duplicate_checkin_still_resolves_its_mapping_with_a_write_purpose(): void
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson('/api/employee/checkin', ['mood' => 4, 'stress' => 2, 'energy' => 5])
+            ->assertStatus(200);
+
+        DB::connection('audit_migrator')->table('audit_events')->delete();
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson('/api/employee/checkin', ['mood' => 3, 'stress' => 3, 'energy' => 3])
+            ->assertStatus(409);
+
+        $events = DB::connection('audit_migrator')
+            ->table('audit_events')
+            ->where('event_type', 'mapping.'.MappingOperation::RESOLVE_OWN_SUBJECT->value)
+            ->get();
+
+        $this->assertCount(1, $events);
+        $this->assertSame(PurposeCode::HEALTH_SELF_WRITE->value, $events->first()->purpose);
+        $this->assertSame('success', $events->first()->outcome);
     }
 
     public function test_repairing_a_missing_mapping_is_audited_as_provisioning(): void
@@ -100,5 +125,21 @@ class WellbeingCheckinAuditTest extends TestCase
                 ->take(3)
                 ->all(),
         );
+
+        $provisionEvent = $events->firstWhere(
+            'event_type',
+            'mapping.'.MappingOperation::PROVISION_OWN_SUBJECT->value,
+        );
+        $actorContext = json_decode(
+            $provisionEvent->actor_context,
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $this->assertSame([
+            'type' => 'employee-self-service',
+            'runtime' => 'employee-health-api',
+            'role' => 'employee',
+        ], $actorContext);
     }
 }

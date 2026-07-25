@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Employee;
 
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class CheckinRequest extends FormRequest
 {
@@ -38,5 +40,16 @@ class CheckinRequest extends FormRequest
         return [
             'note.prohibited' => 'Freitext-Notizen werden im Check-in nicht mehr erfasst.',
         ];
+    }
+
+    protected function failedValidation(Validator $validator): void
+    {
+        throw new HttpResponseException(response()->json([
+            'error' => [
+                'code' => 'VALIDATION_ERROR',
+                'message' => 'The given data was invalid.',
+                'details' => $validator->errors()->toArray(),
+            ],
+        ], 422));
     }
 }

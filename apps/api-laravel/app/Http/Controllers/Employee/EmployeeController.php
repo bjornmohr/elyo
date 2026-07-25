@@ -64,12 +64,6 @@ class EmployeeController extends Controller
             return response()->json(['error' => 'Employee must belong to a company'], 403);
         }
 
-        if ($this->wellbeingService->hasDailyCheckin($user->id)) {
-            return response()->json([
-                'error' => ['code' => 'CHECKIN_ALREADY_DONE', 'message' => 'Der Check-in wurde heute bereits abgeschlossen.'],
-            ], 409);
-        }
-
         $entry = $this->wellbeingService->submitCheckin($user->id, $request->validated());
 
         if (! $entry) {

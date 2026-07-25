@@ -833,6 +833,24 @@ components:
             type: array
             items: { type: string }
 
+    CheckinValidationError:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message, details]
+          additionalProperties: false
+          properties:
+            code: { type: string, enum: [VALIDATION_ERROR] }
+            message: { type: string }
+            details:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+
     AnonymityThresholdError:
       type: object
       required: [error, minRequired, isAboveThreshold, suppressionReason]
@@ -1062,6 +1080,9 @@ paths:
                 mood: { type: integer, minimum: 1, maximum: 5 }
                 stress: { type: integer, minimum: 1, maximum: 5 }
                 energy: { type: integer, minimum: 1, maximum: 5 }
+                note:
+                  description: Removed free-text field; any supplied value is invalid.
+                  not: {}
       responses:
         200:
           description: Success
@@ -1094,20 +1115,24 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LaravelValidationError'
+                $ref: '#/components/schemas/CheckinValidationError'
               examples:
                 outOfRange:
                   summary: Value outside the canonical 1–5 scale
                   value:
-                    message: The mood field must not be greater than 5.
-                    errors:
-                      mood: ["The mood field must not be greater than 5."]
+                    error:
+                      code: VALIDATION_ERROR
+                      message: The given data was invalid.
+                      details:
+                        mood: ["The mood field must not be greater than 5."]
                 noteProhibited:
                   summary: Removed free-text field supplied
                   value:
-                    message: Freitext-Notizen werden im Check-in nicht mehr erfasst.
-                    errors:
-                      note: ["Freitext-Notizen werden im Check-in nicht mehr erfasst."]
+                    error:
+                      code: VALIDATION_ERROR
+                      message: The given data was invalid.
+                      details:
+                        note: ["Freitext-Notizen werden im Check-in nicht mehr erfasst."]
 
   /employee/checkin/status:
     get:

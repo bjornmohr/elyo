@@ -6,6 +6,7 @@ use App\Models\Health\HealthSubject;
 use App\Models\Privacy\SubjectMapping;
 use App\Services\Privacy\AuditActorContext;
 use App\Services\Privacy\AuditLoggerContract;
+use App\Services\Privacy\AuditOutcome;
 use App\Services\Privacy\Exceptions\InvalidPurposeCodeException;
 use App\Services\Privacy\Exceptions\MappingNotFoundException;
 use App\Services\Privacy\Exceptions\MappingRevokedException;
@@ -252,14 +253,15 @@ class MappingServiceTest extends TestCase
                 PurposeCode $purpose,
                 AuditActorContext $actorContext,
                 string $userReference,
-                string $outcome,
+                AuditOutcome $outcome,
             ): void {
                 $operation = $operation->value;
                 $actorContext = $actorContext->toArray();
+                $outcome = $outcome->value;
                 $this->events[] = compact('operation', 'purpose', 'actorContext', 'userReference', 'outcome');
             }
 
-            public function logProvisioningBackfill(array $summary, string $outcome): void
+            public function logProvisioningBackfill(array $summary, AuditOutcome $outcome): void
             {
                 // This test exercises MappingService operations only.
             }

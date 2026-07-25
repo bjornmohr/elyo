@@ -7,7 +7,7 @@ final readonly class AuditActorContext
     private function __construct(
         public MappingActorType $type,
         public MappingRuntime $runtime,
-        public string $role,
+        public AuditActorRole $role,
     ) {}
 
     public static function registrationWorkflow(): self
@@ -15,7 +15,7 @@ final readonly class AuditActorContext
         return new self(
             MappingActorType::REGISTRATION_WORKFLOW,
             MappingRuntime::IDENTITY_API,
-            'system',
+            AuditActorRole::SYSTEM,
         );
     }
 
@@ -24,7 +24,7 @@ final readonly class AuditActorContext
         return new self(
             MappingActorType::EMPLOYEE_SELF_SERVICE,
             MappingRuntime::EMPLOYEE_HEALTH_API,
-            'employee',
+            AuditActorRole::EMPLOYEE,
         );
     }
 
@@ -33,7 +33,7 @@ final readonly class AuditActorContext
         return new self(
             MappingActorType::PRIVACY_ADMIN,
             MappingRuntime::PRIVACY_ADMIN,
-            'privacy-admin',
+            AuditActorRole::PRIVACY_ADMIN,
         );
     }
 
@@ -42,7 +42,7 @@ final readonly class AuditActorContext
         return new self(
             MappingActorType::REPORTING_WORKER,
             MappingRuntime::REPORTING_WORKER,
-            'reporting-worker',
+            AuditActorRole::REPORTING_WORKER,
         );
     }
 
@@ -54,7 +54,7 @@ final readonly class AuditActorContext
         return [
             'type' => $this->type->value,
             'runtime' => $this->runtime->value,
-            'role' => $this->role,
+            'role' => $this->role->value,
         ];
     }
 }

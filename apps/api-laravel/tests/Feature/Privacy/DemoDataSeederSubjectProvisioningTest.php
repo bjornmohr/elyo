@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Privacy;
 
+use App\Models\Health\WellbeingEntry;
 use App\Models\User;
 use App\Services\Privacy\MappingServiceContract;
 use App\Services\Privacy\PurposeCode;
@@ -52,6 +53,18 @@ class DemoDataSeederSubjectProvisioningTest extends TestCase
             ->all();
 
         $this->assertSame($firstSubjects, $secondSubjects);
+    }
+
+    public function test_seeded_wellbeing_entries_use_daily_period_keys(): void
+    {
+        $this->seed(DemoDataSeeder::class);
+
+        $periodKeys = WellbeingEntry::query()->pluck('period_key');
+
+        $this->assertNotEmpty($periodKeys);
+        foreach ($periodKeys as $periodKey) {
+            $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $periodKey);
+        }
     }
 
     public function test_subject_provisioning_failure_does_not_expose_identifiers(): void

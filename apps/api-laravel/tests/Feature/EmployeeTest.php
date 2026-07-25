@@ -138,7 +138,13 @@ class EmployeeTest extends TestCase
                     'energy' => $offScaleValue,
                 ])
                 ->assertStatus(422)
-                ->assertJsonValidationErrors(['mood', 'stress', 'energy']);
+                ->assertJsonPath('error.code', 'VALIDATION_ERROR')
+                ->assertJsonPath('error.message', 'The given data was invalid.')
+                ->assertJsonStructure([
+                    'error' => [
+                        'details' => ['mood', 'stress', 'energy'],
+                    ],
+                ]);
         }
 
         $this->assertSame(0, WellbeingEntry::query()->count());
@@ -156,7 +162,13 @@ class EmployeeTest extends TestCase
                 'note' => 'Rücken tut weh',
             ])
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['note']);
+            ->assertJsonPath('error.code', 'VALIDATION_ERROR')
+            ->assertJsonPath('error.message', 'The given data was invalid.')
+            ->assertJsonStructure([
+                'error' => [
+                    'details' => ['note'],
+                ],
+            ]);
 
         $this->assertSame(0, WellbeingEntry::query()->count());
     }

@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Services\Health\WellbeingScoreCalculator;
 use App\Services\Privacy\MappingServiceContract;
 use App\Services\Privacy\PurposeCode;
 use Illuminate\Database\Seeder;
@@ -373,7 +374,9 @@ class DemoDataSeeder extends Seeder
             ->whereIn('health_subject_id', $subjectIds)
             ->delete();
 
-        $periods = collect(range(0, $weeks - 1))->map(fn ($week) => $now->copy()->subWeeks($week)->format('Y-\WW'))->values();
+        $periods = collect(range(0, $weeks - 1))
+            ->map(fn ($week) => $now->copy()->subWeeks($week)->toDateString())
+            ->values();
         foreach (array_values($subjectIds) as $idx => $subjectId) {
             foreach ($periods as $weekIdx => $periodKey) {
                 $mood = max(1, min(5, 4 + (($idx + $weekIdx) % 3) - 1));
@@ -386,7 +389,7 @@ class DemoDataSeeder extends Seeder
                     'mood' => $mood,
                     'stress' => $stress,
                     'energy' => $energy,
-                    'score' => round(($mood + (6 - $stress) + $energy) / 3, 1),
+                    'score' => WellbeingScoreCalculator::calculate($mood, $stress, $energy),
                     'period_key' => $periodKey,
                     'created_at' => $now->copy()->subWeeks($weekIdx)->subHours($idx),
                     'updated_at' => $now,

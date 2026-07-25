@@ -3,10 +3,12 @@
 namespace App\Services\Health;
 
 use App\Models\Health\WellbeingEntry;
+use App\Services\Privacy\AuditActorContext;
 use App\Services\Privacy\Exceptions\MappingNotFoundException;
 use App\Services\Privacy\MappingServiceContract;
 use App\Services\Privacy\PurposeCode;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EntryCollection;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
@@ -22,14 +24,6 @@ use Illuminate\Support\Facades\Log;
  */
 class WellbeingService
 {
-    /**
-     * Canonical scale per ELYO-102 §3.1. The inverted-stress term uses
-     * `SCALE_MAX + SCALE_MIN` so the inversion stays symmetric on the scale.
-     */
-    public const SCALE_MIN = 1;
-
-    public const SCALE_MAX = 5;
-
     public function __construct(private readonly MappingServiceContract $mappingService) {}
 
     public function getPeriodKey(): string
@@ -43,15 +37,12 @@ class WellbeingService
      */
     public function calculateScore(int $mood, int $stress, int $energy): float
     {
-        $invertedStress = self::SCALE_MAX + self::SCALE_MIN - $stress;
-
-        return round(($mood + $invertedStress + $energy) / 3, 1);
+        return WellbeingScoreCalculator::calculate($mood, $stress, $energy);
     }
 
     public function hasDailyCheckin(int $userId, ?string $periodKey = null): bool
     {
-        return WellbeingEntry::query()
-            ->where('health_subject_id', $this->resolveSubjectId($userId, PurposeCode::HEALTH_SELF_READ))
+        return $this->subjectEntries($userId)
             ->where('period_key', $periodKey ?? $this->getPeriodKey())
             ->exists();
     }
@@ -89,8 +80,7 @@ class WellbeingService
 
     public function entryForPeriod(int $userId, ?string $periodKey = null): ?WellbeingEntry
     {
-        return WellbeingEntry::query()
-            ->where('health_subject_id', $this->resolveSubjectId($userId, PurposeCode::HEALTH_SELF_READ))
+        return $this->subjectEntries($userId)
             ->where('period_key', $periodKey ?? $this->getPeriodKey())
             ->latest()
             ->first();
@@ -103,8 +93,7 @@ class WellbeingService
      */
     public function recentEntries(int $userId, int $limit): EntryCollection
     {
-        return WellbeingEntry::query()
-            ->where('health_subject_id', $this->resolveSubjectId($userId, PurposeCode::HEALTH_SELF_READ))
+        return $this->subjectEntries($userId)
             ->orderByDesc('created_at')
             ->take($limit)
             ->get();
@@ -117,8 +106,7 @@ class WellbeingService
      */
     public function historyEntries(int $userId, int $limit): EntryCollection
     {
-        return WellbeingEntry::query()
-            ->where('health_subject_id', $this->resolveSubjectId($userId, PurposeCode::HEALTH_SELF_READ))
+        return $this->subjectEntries($userId)
             ->orderBy('created_at')
             ->take($limit)
             ->get();
@@ -133,8 +121,7 @@ class WellbeingService
      */
     public function checkinPeriodKeys(int $userId): Collection
     {
-        return WellbeingEntry::query()
-            ->where('health_subject_id', $this->resolveSubjectId($userId, PurposeCode::HEALTH_SELF_READ))
+        return $this->subjectEntries($userId)
             ->orderByDesc('period_key')
             ->distinct()
             ->pluck('period_key');
@@ -146,6 +133,17 @@ class WellbeingService
             ->where('health_subject_id', $subjectId)
             ->where('period_key', $periodKey)
             ->exists();
+    }
+
+    /**
+     * @return Builder<WellbeingEntry>
+     */
+    private function subjectEntries(int $userId): Builder
+    {
+        return WellbeingEntry::query()->where(
+            'health_subject_id',
+            $this->resolveSubjectId($userId, PurposeCode::HEALTH_SELF_READ),
+        );
     }
 
     /**
@@ -164,7 +162,13 @@ class WellbeingService
                 'purpose' => $purpose->value,
             ]);
 
-            return $this->mappingService->provisionOwnSubject($userId, PurposeCode::PROVISIONING);
+            $this->mappingService->provisionOwnSubject(
+                $userId,
+                PurposeCode::PROVISIONING,
+                AuditActorContext::employeeSelfService(),
+            );
+
+            return $this->mappingService->resolveOwnSubject($userId, $purpose);
         }
     }
 

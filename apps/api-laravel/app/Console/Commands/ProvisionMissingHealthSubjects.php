@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use App\Services\Privacy\AuditLoggerContract;
+use App\Services\Privacy\AuditOutcome;
 use App\Services\Privacy\MappingServiceContract;
 use App\Services\Privacy\PurposeCode;
 use App\Services\Privacy\SubjectProvisioningState;
@@ -94,8 +95,8 @@ class ProvisionMissingHealthSubjects extends Command
             'failed' => $failed,
             'dry_run' => $dryRun,
         ], $failed === 0
-            ? AuditLoggerContract::OUTCOME_SUCCESS
-            : AuditLoggerContract::OUTCOME_FAILED);
+            ? AuditOutcome::SUCCESS
+            : AuditOutcome::FAILED);
 
         $this->line("Users scanned: {$scanned}");
 

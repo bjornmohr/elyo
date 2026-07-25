@@ -4,6 +4,7 @@ namespace Database\Factories\Health;
 
 use App\Models\Health\HealthSubject;
 use App\Models\Health\WellbeingEntry;
+use App\Services\Health\WellbeingScoreCalculator;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -25,7 +26,7 @@ class WellbeingEntryFactory extends Factory
             'mood' => $mood,
             'stress' => $stress,
             'energy' => $energy,
-            'score' => round(($mood + (6 - $stress) + $energy) / 3, 1),
+            'score' => WellbeingScoreCalculator::calculate($mood, $stress, $energy),
             'period_key' => now()->toDateString(),
             // Standalone subject by default. Tests that need the subject of a
             // concrete identity provision it through MappingService and pass the
