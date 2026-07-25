@@ -11,6 +11,9 @@ use PhpParser\Node\Identifier;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\NodeFinder;
+use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor\NameResolver;
+use PhpParser\Parser;
 use PhpParser\ParserFactory;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -38,6 +41,12 @@ class SourceBoundaryTest extends BoundaryTestCase
         ];
         $parser = (new ParserFactory)->createForNewestSupportedVersion();
         $nodeFinder = new NodeFinder;
+        $applicationFiles = $this->applicationClassFiles();
+        $dependencyGraph = $this->applicationDependencyGraph(
+            $applicationFiles,
+            $parser,
+            $nodeFinder,
+        );
 
         foreach ($directories as $directory) {
             if (! is_dir($directory)) {
@@ -45,20 +54,17 @@ class SourceBoundaryTest extends BoundaryTestCase
             }
 
             foreach ($this->phpFiles($directory) as $file) {
-                $source = file_get_contents($file->getPathname());
-
-                if ($source === false) {
-                    $this->fail("Could not read {$file->getPathname()}.");
-                }
-
-                $ast = $parser->parse($source);
-                $forbiddenReference = $nodeFinder->findFirst(
-                    $ast ?? [],
-                    fn (Node $node): bool => $this->isCompanyHealthReadReference($node),
+                $dependencyPath = $this->healthReadDependencyPath(
+                    $file->getPathname(),
+                    $dependencyGraph,
                 );
 
-                if ($forbiddenReference !== null) {
-                    $violations[] = "{$file->getPathname()}: references the health domain";
+                if ($dependencyPath !== null) {
+                    $relativePath = array_map(
+                        fn (string $path): string => str_replace(base_path().DIRECTORY_SEPARATOR, '', $path),
+                        $dependencyPath,
+                    );
+                    $violations[] = implode(' -> ', $relativePath);
                 }
             }
         }
@@ -68,6 +74,109 @@ class SourceBoundaryTest extends BoundaryTestCase
             $violations,
             "Company/Admin HTTP paths must not read the health domain:\n".implode("\n", $violations),
         );
+    }
+
+    /**
+     * @param  array<string, array{dependencies: list<string>, readsHealth: bool}>  $dependencyGraph
+     * @param  array<string, true>  $visited
+     * @return list<string>|null
+     */
+    private function healthReadDependencyPath(
+        string $filePath,
+        array $dependencyGraph,
+        array $visited = [],
+    ): ?array {
+        if (isset($visited[$filePath])) {
+            return null;
+        }
+
+        $visited[$filePath] = true;
+        $dependency = $dependencyGraph[$filePath] ?? null;
+
+        if ($dependency === null) {
+            return null;
+        }
+
+        if ($dependency['readsHealth']) {
+            return [$filePath];
+        }
+
+        foreach ($dependency['dependencies'] as $dependencyFile) {
+            $healthDependencyPath = $this->healthReadDependencyPath(
+                $dependencyFile,
+                $dependencyGraph,
+                $visited,
+            );
+
+            if ($healthDependencyPath !== null) {
+                return [$filePath, ...$healthDependencyPath];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<class-string, string>  $applicationFiles
+     * @return array<string, array{dependencies: list<string>, readsHealth: bool}>
+     */
+    private function applicationDependencyGraph(
+        array $applicationFiles,
+        Parser $parser,
+        NodeFinder $nodeFinder,
+    ): array {
+        $graph = [];
+
+        foreach ($applicationFiles as $filePath) {
+            $source = file_get_contents($filePath);
+
+            if ($source === false) {
+                $this->fail("Could not read {$filePath}.");
+            }
+
+            $ast = $parser->parse($source) ?? [];
+            $traverser = new NodeTraverser;
+            $traverser->addVisitor(new NameResolver);
+            $ast = $traverser->traverse($ast);
+            $dependencies = [];
+
+            /** @var list<Node\Name> $names */
+            $names = $nodeFinder->findInstanceOf($ast, Node\Name::class);
+
+            foreach ($names as $name) {
+                $class = ltrim($name->toString(), '\\');
+
+                if (isset($applicationFiles[$class]) && $applicationFiles[$class] !== $filePath) {
+                    $dependencies[] = $applicationFiles[$class];
+                }
+            }
+
+            $graph[$filePath] = [
+                'dependencies' => array_values(array_unique($dependencies)),
+                'readsHealth' => $nodeFinder->findFirst(
+                    $ast,
+                    fn (Node $node): bool => $this->isCompanyHealthReadReference($node),
+                ) !== null,
+            ];
+        }
+
+        return $graph;
+    }
+
+    /**
+     * @return array<class-string, string>
+     */
+    private function applicationClassFiles(): array
+    {
+        $files = [];
+
+        foreach ($this->phpFiles(app_path()) as $file) {
+            $relative = str_replace([app_path().DIRECTORY_SEPARATOR, '.php'], '', $file->getPathname());
+            $class = 'App\\'.str_replace(DIRECTORY_SEPARATOR, '\\', $relative);
+            $files[$class] = $file->getPathname();
+        }
+
+        return $files;
     }
 
     public function test_code_outside_mapping_service_cannot_access_mapping_connection_directly(): void

@@ -58,16 +58,30 @@ trait AssertsNoWellbeingValues
                 $payload,
                 "Wellbeing value at {$path} must not appear in this response.",
             );
+
+            if (is_numeric($payload)) {
+                $this->assertNumericPathIsAllowed($path, $allowedNumericPaths);
+            }
+
+            return;
         }
 
         if (is_int($payload) || is_float($payload)) {
-            $isAllowedIdentityValue = collect($allowedNumericPaths)
-                ->contains(fn (string $allowedPath): bool => Str::is($allowedPath, $path));
-
-            $this->assertTrue(
-                $isAllowedIdentityValue,
-                "Unexpected numeric value at {$path}; company/admin responses must explicitly allow identity-side numeric fields.",
-            );
+            $this->assertNumericPathIsAllowed($path, $allowedNumericPaths);
         }
+    }
+
+    /**
+     * @param  list<string>  $allowedNumericPaths
+     */
+    private function assertNumericPathIsAllowed(string $path, array $allowedNumericPaths): void
+    {
+        $isAllowedIdentityValue = collect($allowedNumericPaths)
+            ->contains(fn (string $allowedPath): bool => Str::is($allowedPath, $path));
+
+        $this->assertTrue(
+            $isAllowedIdentityValue,
+            "Unexpected numeric value at {$path}; company/admin responses must explicitly allow identity-side numeric fields.",
+        );
     }
 }

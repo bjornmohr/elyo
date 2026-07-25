@@ -108,11 +108,11 @@ class CompanyTest extends TestCase
     }
 
     /**
-     * ELYO-91 prompt 09 requirement 4: pattern and numeric sweep over each
-     * affected response, so a wellbeing value re-entering through any field name
-     * fails the suite. Reused by the privacy regression suite (prompt 16).
+     * ELYO-91 prompt 09 requirement 4: pattern and numeric sweep over the two
+     * reporting endpoints changed by this transition. The boundary suite
+     * separately prevents any Company/Admin response path from reaching Health.
      */
-    public function test_company_wellbeing_endpoints_expose_no_wellbeing_values()
+    public function test_affected_company_reporting_endpoints_expose_no_wellbeing_values()
     {
         $employees = User::factory()->count(4)->create([
             'company_id' => $this->company->id,

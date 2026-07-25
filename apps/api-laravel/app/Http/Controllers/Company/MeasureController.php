@@ -10,7 +10,7 @@ use App\Http\Resources\Company\MeasureResource;
 use App\Http\Resources\Company\MeasureParticipationSummaryResource;
 use App\Models\Measure;
 use App\Models\Team;
-use App\Services\AnonymityService;
+use App\Services\Company\AnonymityThreshold;
 use App\Services\Company\TeamLayerGuard;
 use App\Services\MeasureCheckinTokenService;
 use App\Services\MeasureParticipationSummaryService;
@@ -178,7 +178,7 @@ class MeasureController extends Controller
     public function participationSummary(Request $request, $id)
     {
         $company = $request->user()->company;
-        $threshold = $company->anonymity_threshold ?? AnonymityService::DEFAULT_THRESHOLD;
+        $threshold = AnonymityThreshold::resolve($company->anonymity_threshold);
 
         return new MeasureParticipationSummaryResource(
             $this->measureParticipationSummaryService->summaryFor($request->user(), $id, $threshold)
