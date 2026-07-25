@@ -10,10 +10,10 @@ use App\Http\Resources\Employee\WellbeingEntryResource;
 use App\Models\AnamnesisProfile;
 use App\Models\Measure;
 use App\Models\UserDocument;
+use App\Services\Health\WellbeingService;
 use App\Services\MeasureCheckinTokenService;
 use App\Services\MeasureParticipationService;
 use App\Services\PointsService;
-use App\Services\WellbeingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -32,11 +32,7 @@ class EmployeeController extends Controller
     public function dashboard(Request $request): JsonResponse
     {
         $user = $request->user();
-        $entries = $user->wellbeingEntries()
-            ->where('company_id', $user->company_id)
-            ->orderBy('created_at', 'desc')
-            ->take(7)
-            ->get();
+        $entries = $this->wellbeingService->recentEntries($user->id, 7);
 
         $latest = $entries->first();
         $streakCount = $this->pointsService->calculateStreak($user);
@@ -46,16 +42,13 @@ class EmployeeController extends Controller
             'entries' => WellbeingEntryResource::collection($entries->reverse()),
             'streakCount' => $streakCount,
             'points' => $user->userPoints?->total ?? 0,
-            'todayCheckinCompleted' => $this->wellbeingService->hasDailyCheckin($user),
+            'todayCheckinCompleted' => $this->wellbeingService->hasDailyCheckin($user->id),
         ]);
     }
 
     public function checkinStatus(Request $request): JsonResponse
     {
-        $entry = $request->user()->wellbeingEntries()
-            ->where('period_key', $this->wellbeingService->getPeriodKey($request->user()))
-            ->latest()
-            ->first();
+        $entry = $this->wellbeingService->entryForPeriod($request->user()->id);
 
         return response()->json([
             'completed' => $entry !== null,
@@ -71,13 +64,13 @@ class EmployeeController extends Controller
             return response()->json(['error' => 'Employee must belong to a company'], 403);
         }
 
-        if ($this->wellbeingService->hasDailyCheckin($user)) {
+        if ($this->wellbeingService->hasDailyCheckin($user->id)) {
             return response()->json([
                 'error' => ['code' => 'CHECKIN_ALREADY_DONE', 'message' => 'Der Check-in wurde heute bereits abgeschlossen.'],
             ], 409);
         }
 
-        $entry = $this->wellbeingService->submitCheckin($user, $request->validated());
+        $entry = $this->wellbeingService->submitCheckin($user->id, $request->validated());
 
         if (! $entry) {
             return response()->json([
@@ -108,12 +101,8 @@ class EmployeeController extends Controller
 
     public function history(Request $request): JsonResponse
     {
-        $limit = $request->query('limit', 20);
-        $entries = $request->user()->wellbeingEntries()
-            ->where('company_id', $request->user()->company_id)
-            ->orderBy('created_at', 'asc')
-            ->take($limit)
-            ->get();
+        $limit = (int) $request->query('limit', 20);
+        $entries = $this->wellbeingService->historyEntries($request->user()->id, $limit);
 
         return response()->json([
             'entries' => WellbeingEntryResource::collection($entries),

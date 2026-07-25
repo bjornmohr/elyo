@@ -8,13 +8,16 @@ topology (ADR-001 §2.1–2.4) is reproduced from schema up.
 database/migrations/
 ├── identity/   → connection `identity`   (elyo_identity)          — populated
 ├── mapping/    → connection `mapping`    (elyo_subject_mapping)    — empty (prompt 04)
-├── health/     → connection `health`     (elyo_health)            — empty (prompts 08/08a/11)
-└── audit/      → connection `audit`      (elyo_audit)             — empty (prompt 07)
+├── health/     → connection `health`     (elyo_health)            — populated
+└── audit/      → connection `audit`      (elyo_audit)             — populated
 ```
 
-`mapping/`, `health/` and `audit/` intentionally contain only a `.gitkeep`; the
-domains are filled by later prompts. They are already wired into the tooling, so
-new baselines dropped into them are picked up with no further configuration.
+`health/` holds `health_subjects` (prompt 04) and `wellbeing_entries` (prompt 08,
+ELYO-110). Health tables are keyed on `health_subject_id` and carry no `user_id`
+or `company_id` — asserted for the whole schema by
+`tests/Boundary/HealthSchemaBoundaryTest.php`. The identity-side
+`wellbeing_entries` table is dropped by a follow-up migration in `identity/`
+rather than by editing the reviewed baseline.
 
 ## Consolidated baseline
 
