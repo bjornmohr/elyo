@@ -4,29 +4,21 @@ namespace App\Http\Controllers\Company;
 
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\Company\AggregatedMetricsResource;
+use App\Http\Resources\Company\ReportingPendingResource;
 use App\Http\Resources\Company\TeamResource;
-use App\Http\Resources\Company\TrendPointResource;
 use App\Models\Team;
-use App\Services\AnonymityService;
 use App\Services\Company\TeamLayerGuard;
 use Illuminate\Http\Request;
 
 class CompanyController extends Controller
 {
-    protected $anonymityService;
-
-    public function __construct(AnonymityService $anonymityService, private readonly TeamLayerGuard $teamLayerGuard)
-    {
-        $this->anonymityService = $anonymityService;
-    }
+    public function __construct(private readonly TeamLayerGuard $teamLayerGuard) {}
 
     public function dashboard(Request $request)
     {
         $user = $request->user();
         $company = $user->company;
         $companyId = $company->id;
-        $threshold = $company->anonymity_threshold ?? AnonymityService::DEFAULT_THRESHOLD;
         $teamLayerEnabled = $this->teamLayerGuard->enabledFor($user);
 
         $user->loadMissing('roles');
@@ -45,17 +37,6 @@ class CompanyController extends Controller
             ], 403);
         }
 
-        $metrics = $this->anonymityService->getAggregatedMetrics($companyId, [
-            'teamId' => $isManager ? $managedTeamId : null,
-            'threshold' => $threshold,
-        ]);
-
-        $trend = $this->anonymityService->getTrendData($companyId, [
-            'teamId' => $isManager ? $managedTeamId : null,
-            'threshold' => $threshold,
-            'limit' => 12,
-        ]);
-
         $teams = collect();
         if ($teamLayerEnabled) {
             $teamQuery = Team::where('company_id', $companyId);
@@ -66,16 +47,18 @@ class CompanyController extends Controller
         }
 
         foreach ($teams as $team) {
-            $teamMetrics = $this->anonymityService->getAggregatedMetrics($companyId, [
-                'teamId' => $team->id,
-                'threshold' => $threshold,
-            ]);
-            $team->metrics = $teamMetrics;
+            $team->metrics = new ReportingPendingResource;
         }
 
         return response()->json([
-            'company' => new AggregatedMetricsResource($metrics),
-            'trend' => TrendPointResource::collection($trend),
+            // ELYO-91 prompt 09: no live wellbeing aggregation from the company
+            // runtime (ADR-003 D7). `responseCount`/`isAboveThreshold` stay
+            // present but empty for the existing Angular dashboard.
+            'company' => new ReportingPendingResource([
+                'isAboveThreshold' => null,
+                'responseCount' => null,
+            ]),
+            'trend' => new ReportingPendingResource,
             'teams' => TeamResource::collection($teams),
         ]);
     }

@@ -21,6 +21,55 @@ use SplFileInfo;
 
 class SourceBoundaryTest extends BoundaryTestCase
 {
+    /**
+     * ADR-001 §2.4 / ADR-003 D7: company and admin HTTP paths cannot read the
+     * health domain. Runtime grants are the final barrier; this source check
+     * keeps forbidden dependencies from entering those namespaces at all.
+     */
+    public function test_company_and_admin_http_paths_have_no_health_read_dependency(): void
+    {
+        $violations = [];
+        $directories = [
+            app_path('Http/Controllers/Company'),
+            app_path('Http/Controllers/Admin'),
+            app_path('Http/Resources/Company'),
+            app_path('Http/Resources/Admin'),
+            app_path('Services/Company'),
+        ];
+        $parser = (new ParserFactory)->createForNewestSupportedVersion();
+        $nodeFinder = new NodeFinder;
+
+        foreach ($directories as $directory) {
+            if (! is_dir($directory)) {
+                continue;
+            }
+
+            foreach ($this->phpFiles($directory) as $file) {
+                $source = file_get_contents($file->getPathname());
+
+                if ($source === false) {
+                    $this->fail("Could not read {$file->getPathname()}.");
+                }
+
+                $ast = $parser->parse($source);
+                $forbiddenReference = $nodeFinder->findFirst(
+                    $ast ?? [],
+                    fn (Node $node): bool => $this->isCompanyHealthReadReference($node),
+                );
+
+                if ($forbiddenReference !== null) {
+                    $violations[] = "{$file->getPathname()}: references the health domain";
+                }
+            }
+        }
+
+        $this->assertSame(
+            [],
+            $violations,
+            "Company/Admin HTTP paths must not read the health domain:\n".implode("\n", $violations),
+        );
+    }
+
     public function test_code_outside_mapping_service_cannot_access_mapping_connection_directly(): void
     {
         $violations = [];
@@ -170,5 +219,25 @@ class SourceBoundaryTest extends BoundaryTestCase
 
         return $node instanceof String_
             && $node->value === 'database.connections.mapping';
+    }
+
+    private function isCompanyHealthReadReference(Node $node): bool
+    {
+        if ($node instanceof Node\Name) {
+            $name = ltrim($node->toString(), '\\');
+
+            return str_starts_with($name, 'App\\Models\\Health\\')
+                || str_starts_with($name, 'App\\Services\\Health\\');
+        }
+
+        if ($node instanceof StaticCall || $node instanceof MethodCall) {
+            return $node->name instanceof Identifier
+                && $node->name->toString() === 'connection'
+                && isset($node->args[0])
+                && $this->resolvedString($node->args[0]->value) === 'health';
+        }
+
+        return $node instanceof String_
+            && $node->value === 'database.connections.health';
     }
 }
