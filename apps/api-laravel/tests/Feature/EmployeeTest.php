@@ -6,6 +6,7 @@ use App\Enums\QuestionType;
 use App\Enums\Role;
 use App\Enums\SurveyStatus;
 use App\Models\Company;
+use App\Models\Health\WellbeingEntry;
 use App\Models\Measure;
 use App\Models\MeasureCheckinToken;
 use App\Models\MeasureParticipation;
@@ -17,17 +18,23 @@ use App\Models\SurveyResponse;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\UserPoints;
-use App\Models\WellbeingEntry;
-use App\Services\WellbeingService;
+use App\Services\Health\WellbeingService;
 use App\Services\MeasureCheckinTokenService;
+use App\Services\Privacy\MappingServiceContract;
+use App\Services\Privacy\PurposeCode;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Tests\Support\ConfiguresPrivacyMapping;
+use Tests\Support\CreatesWellbeingCheckins;
 use Tests\TestCase;
 
 class EmployeeTest extends TestCase
 {
+    use ConfiguresPrivacyMapping;
+    use CreatesWellbeingCheckins;
 
     protected User $employee;
 
@@ -36,6 +43,7 @@ class EmployeeTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->configurePrivacyMapping('employee-feature-test');
         $this->company = Company::factory()->create();
         $this->employee = User::factory()->create([
             'company_id' => $this->company->id,
@@ -45,11 +53,9 @@ class EmployeeTest extends TestCase
 
     public function test_employee_can_get_dashboard_data()
     {
-        WellbeingEntry::factory()->create([
-            'user_id' => $this->employee->id,
-            'company_id' => $this->company->id,
+        $this->createWellbeingEntry($this->employee, [
             'period_key' => '2024-W01',
-            'score' => 7.5,
+            'score' => 4.0,
         ]);
 
         $response = $this->actingAs($this->employee, 'sanctum')
@@ -69,25 +75,104 @@ class EmployeeTest extends TestCase
 
         $response = $this->actingAs($this->employee, 'sanctum')
             ->postJson('/api/employee/checkin', [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
-                'note' => 'Feeling good',
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 5,
             ]);
 
         $response->assertStatus(200)
             ->assertJson([
                 'success' => true,
-            ])
-            ->assertJsonStructure(['score', 'periodKey']);
+                // (4 + (6 - 2) + 5) / 3 = 13 / 3 = 4.333 -> 4.3
+                'score' => 4.3,
+                'periodKey' => '2026-05-25',
+            ]);
+
+        $subjectId = app(MappingServiceContract::class)->resolveOwnSubject(
+            $this->employee->id,
+            PurposeCode::HEALTH_SELF_READ,
+        );
 
         $this->assertDatabaseHas('wellbeing_entries', [
-            'user_id' => $this->employee->id,
+            'health_subject_id' => $subjectId,
             'period_key' => '2026-05-25',
-            'mood' => 8,
-            'stress' => 3,
-            'energy' => 7,
-        ]);
+            'mood' => 4,
+            'stress' => 2,
+            'energy' => 5,
+            'score' => 4.3,
+        ], 'health');
+    }
+
+    public function test_checkin_response_does_not_expose_the_health_subject(): void
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson('/api/employee/checkin', ['mood' => 4, 'stress' => 2, 'energy' => 5])
+            ->assertStatus(200);
+
+        $subjectId = app(MappingServiceContract::class)->resolveOwnSubject(
+            $this->employee->id,
+            PurposeCode::HEALTH_SELF_READ,
+        );
+
+        foreach (['/api/employee/checkin/status', '/api/employee/dashboard', '/api/employee/history'] as $endpoint) {
+            $response = $this->actingAs($this->employee, 'sanctum')->getJson($endpoint);
+
+            $response->assertStatus(200);
+            $this->assertStringNotContainsString($subjectId, $response->getContent());
+            $this->assertStringNotContainsString('healthSubjectId', $response->getContent());
+            $this->assertStringNotContainsString('health_subject_id', $response->getContent());
+        }
+    }
+
+    public function test_checkin_rejects_values_outside_the_canonical_scale(): void
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+
+        foreach ([0, 6] as $offScaleValue) {
+            $this->actingAs($this->employee, 'sanctum')
+                ->postJson('/api/employee/checkin', [
+                    'mood' => $offScaleValue,
+                    'stress' => $offScaleValue,
+                    'energy' => $offScaleValue,
+                ])
+                ->assertStatus(422)
+                ->assertJsonValidationErrors(['mood', 'stress', 'energy']);
+        }
+
+        $this->assertSame(0, WellbeingEntry::query()->count());
+    }
+
+    public function test_checkin_rejects_a_supplied_note_instead_of_dropping_it(): void
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson('/api/employee/checkin', [
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 5,
+                'note' => 'Rücken tut weh',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['note']);
+
+        $this->assertSame(0, WellbeingEntry::query()->count());
+    }
+
+    public function test_checkin_repairs_a_missing_subject_mapping(): void
+    {
+        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
+
+        $this->assertSame(0, DB::connection('mapping')->table('subject_mappings')->count());
+
+        $this->actingAs($this->employee, 'sanctum')
+            ->postJson('/api/employee/checkin', ['mood' => 4, 'stress' => 2, 'energy' => 5])
+            ->assertStatus(200);
+
+        $this->assertSame(1, DB::connection('mapping')->table('subject_mappings')->count());
+        $this->assertSame(1, WellbeingEntry::query()->count());
     }
 
     public function test_employee_can_submit_checkin_only_once_per_day()
@@ -95,9 +180,9 @@ class EmployeeTest extends TestCase
         $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
 
         $payload = [
-            'mood' => 8,
-            'stress' => 3,
-            'energy' => 7,
+            'mood' => 4,
+            'stress' => 2,
+            'energy' => 5,
         ];
 
         $this->actingAs($this->employee, 'sanctum')
@@ -122,14 +207,15 @@ class EmployeeTest extends TestCase
 
         $this->actingAs($this->employee, 'sanctum')
             ->postJson('/api/employee/checkin', [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 5,
             ])
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'CHECKIN_ALREADY_DONE');
 
-        $this->assertSame(1, WellbeingEntry::where('user_id', $this->employee->id)
+        $this->assertSame(1, WellbeingEntry::query()
+            ->where('health_subject_id', $this->healthSubjectIdFor($this->employee))
             ->where('period_key', '2026-05-25')
             ->count());
     }
@@ -147,9 +233,9 @@ class EmployeeTest extends TestCase
 
         $this->actingAs($this->employee, 'sanctum')
             ->postJson('/api/employee/checkin', [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 5,
             ])
             ->assertStatus(409);
 
@@ -169,32 +255,33 @@ class EmployeeTest extends TestCase
         $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
         $this->createDailyWellbeingEntry($this->employee, '2026-05-25');
 
-        $service = new class extends WellbeingService
+        // Bypasses the pre-check so the (subject, period_key) unique index is the
+        // thing under test.
+        $service = new class(app(MappingServiceContract::class)) extends WellbeingService
         {
-            public function hasDailyCheckin(User $user, ?string $periodKey = null): bool
+            protected function hasSubjectCheckin(string $subjectId, string $periodKey): bool
             {
                 return false;
             }
         };
 
-        DB::beginTransaction();
+        DB::connection('health')->beginTransaction();
 
         try {
-            $result = $service->submitCheckin($this->employee, [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
+            $result = $service->submitCheckin($this->employee->id, [
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 5,
             ]);
         } finally {
-            DB::rollBack();
+            DB::connection('health')->rollBack();
         }
 
         $this->assertNull($result);
-        $this->assertSame(1, WellbeingEntry::where([
-            'user_id' => $this->employee->id,
-            'company_id' => $this->company->id,
-            'period_key' => '2026-05-25',
-        ])->count());
+        $this->assertSame(1, WellbeingEntry::query()
+            ->where('health_subject_id', $this->healthSubjectIdFor($this->employee))
+            ->where('period_key', '2026-05-25')
+            ->count());
     }
 
     public function test_daily_streak_is_one_when_only_today_exists()
@@ -320,9 +407,9 @@ class EmployeeTest extends TestCase
 
         $this->actingAs($this->employee, 'sanctum')
             ->postJson('/api/employee/checkin', [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 5,
             ])
             ->assertStatus(200);
 
@@ -355,9 +442,9 @@ class EmployeeTest extends TestCase
 
         $this->actingAs($this->employee, 'sanctum')
             ->postJson('/api/employee/checkin', [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 5,
             ])
             ->assertStatus(200);
 
@@ -383,9 +470,9 @@ class EmployeeTest extends TestCase
 
         $this->actingAs($this->employee, 'sanctum')
             ->postJson('/api/employee/checkin', [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 5,
             ])
             ->assertStatus(200);
 
@@ -415,9 +502,9 @@ class EmployeeTest extends TestCase
 
         $this->actingAs($this->employee, 'sanctum')
             ->postJson('/api/employee/checkin', [
-                'mood' => 8,
-                'stress' => 3,
-                'energy' => 7,
+                'mood' => 4,
+                'stress' => 2,
+                'energy' => 5,
             ])
             ->assertStatus(200);
 
@@ -445,38 +532,41 @@ class EmployeeTest extends TestCase
             ->assertJsonPath('streakCount', 1);
     }
 
-    public function test_daily_streak_ignores_entries_from_another_company()
-    {
-        $this->travelTo(Carbon::parse('2026-05-25 10:00:00'));
-        $otherCompany = Company::factory()->create();
-        $this->createDailyWellbeingEntry($this->employee, '2026-05-25');
-        $this->createDailyWellbeingEntry($this->employee, '2026-05-24', $otherCompany);
-        $this->createDailyWellbeingEntry($this->employee, '2026-05-23', $otherCompany);
-
-        $this->actingAs($this->employee, 'sanctum')
-            ->getJson('/api/employee/dashboard')
-            ->assertStatus(200)
-            ->assertJsonPath('streakCount', 1);
-    }
-
     public function test_employee_can_get_history()
     {
-        WellbeingEntry::factory()->create([
-            'user_id' => $this->employee->id,
-            'company_id' => $this->company->id,
-            'period_key' => '2024-W01',
-        ]);
-        WellbeingEntry::factory()->create([
-            'user_id' => $this->employee->id,
-            'company_id' => $this->company->id,
-            'period_key' => '2024-W02',
-        ]);
+        $this->createWellbeingEntry($this->employee, ['period_key' => '2024-W01']);
+        $this->createWellbeingEntry($this->employee, ['period_key' => '2024-W02']);
 
         $response = $this->actingAs($this->employee, 'sanctum')
             ->getJson('/api/employee/history?limit=10');
 
         $response->assertStatus(200)
-            ->assertJsonCount(2, 'entries');
+            ->assertJsonCount(2, 'entries')
+            ->assertJsonMissingPath('entries.0.note');
+    }
+
+    public function test_history_entries_expose_ulid_ids_on_the_canonical_scale()
+    {
+        $this->createWellbeingEntry($this->employee, [
+            'period_key' => '2026-05-25',
+            'mood' => 4,
+            'stress' => 2,
+            'energy' => 5,
+            'score' => 4.3,
+        ]);
+
+        $entry = $this->actingAs($this->employee, 'sanctum')
+            ->getJson('/api/employee/history')
+            ->assertStatus(200)
+            ->json('entries.0');
+
+        $this->assertTrue(Str::isUlid($entry['id']), 'Entry id is not an opaque ULID.');
+        $this->assertSame(['createdAt', 'energy', 'id', 'mood', 'periodKey', 'score', 'stress'],
+            collect($entry)->keys()->sort()->values()->all());
+        $this->assertSame(4, $entry['mood']);
+        $this->assertSame(2, $entry['stress']);
+        $this->assertSame(5, $entry['energy']);
+        $this->assertSame(4.3, $entry['score']);
     }
 
     public function test_employee_can_update_profile()
@@ -1481,11 +1571,9 @@ class EmployeeTest extends TestCase
         ]);
     }
 
-    private function createDailyWellbeingEntry(User $user, string $periodKey, ?Company $company = null): WellbeingEntry
+    private function createDailyWellbeingEntry(User $user, string $periodKey): WellbeingEntry
     {
-        return WellbeingEntry::factory()->create([
-            'user_id' => $user->id,
-            'company_id' => ($company ?? $this->company)->id,
+        return $this->createWellbeingEntry($user, [
             'period_key' => $periodKey,
             'created_at' => Carbon::parse('2026-05-25 08:00:00'),
             'updated_at' => Carbon::parse('2026-05-25 08:00:00'),

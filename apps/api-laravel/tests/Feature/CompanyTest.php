@@ -15,13 +15,16 @@ use App\Models\SurveyResponse;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\UserRole;
-use App\Models\WellbeingEntry;
 use App\Services\MeasureCheckinTokenService;
 use Carbon\Carbon;
+use Tests\Support\ConfiguresPrivacyMapping;
+use Tests\Support\CreatesWellbeingCheckins;
 use Tests\TestCase;
 
 class CompanyTest extends TestCase
 {
+    use ConfiguresPrivacyMapping;
+    use CreatesWellbeingCheckins;
 
     protected $company;
 
@@ -34,6 +37,8 @@ class CompanyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->configurePrivacyMapping('company-feature-test');
 
         $this->company = Company::factory()->create([
             'anonymity_threshold' => 3,
@@ -54,23 +59,27 @@ class CompanyTest extends TestCase
         $this->team->update(['manager_id' => $this->manager->id]);
     }
 
-    public function test_company_dashboard_aggregation_and_threshold()
+    /**
+     * ELYO-91 prompt 09: the wellbeing aggregates lost their live source when
+     * check-ins moved into the health domain, so the dashboard reports the
+     * suppressed block even when check-ins exist. The threshold-suppression
+     * shape itself is unchanged and still asserted here; prompt 09 replaces it
+     * with the reporting-pending state.
+     */
+    public function test_company_dashboard_wellbeing_aggregates_are_suppressed_without_a_reporting_source()
     {
-        // 1. Below threshold
-        $employees = User::factory()->count(2)->create([
+        $employees = User::factory()->count(4)->create([
             'company_id' => $this->company->id,
             'team_id' => $this->team->id,
             'role' => Role::EMPLOYEE,
         ]);
 
-        foreach ($employees as $emp) {
-            WellbeingEntry::factory()->create([
-                'user_id' => $emp->id,
-                'company_id' => $this->company->id,
-                'mood' => 8,
+        foreach ($employees as $employee) {
+            $this->createWellbeingEntry($employee, [
+                'mood' => 4,
                 'stress' => 2,
-                'energy' => 9,
-                'score' => 8.5,
+                'energy' => 5,
+                'score' => 4.3,
                 'period_key' => '2024-W10',
             ]);
         }
@@ -84,31 +93,12 @@ class CompanyTest extends TestCase
         $response->assertJsonPath('company.eligibleEmployeeCount', null);
         $response->assertJsonPath('company.participationRate', null);
         $response->assertJsonPath('company.avgScore', null);
+        $response->assertJsonPath('company.avgMood', null);
+        $response->assertJsonPath('company.avgStress', null);
+        $response->assertJsonPath('company.avgEnergy', null);
         $response->assertJsonPath('company.suppressionReason', 'ANONYMITY_THRESHOLD_NOT_MET');
+        $response->assertJsonCount(0, 'trend');
         $response->assertJsonMissingPath('teams.0.memberCount');
-
-        // 2. Above threshold
-        $emp3 = User::factory()->create([
-            'company_id' => $this->company->id,
-            'team_id' => $this->team->id,
-            'role' => Role::EMPLOYEE,
-        ]);
-        WellbeingEntry::factory()->create([
-            'user_id' => $emp3->id,
-            'company_id' => $this->company->id,
-            'mood' => 5,
-            'stress' => 5,
-            'energy' => 5,
-            'score' => 5.0,
-            'period_key' => '2024-W10',
-        ]);
-
-        $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
-        $response->assertJsonPath('company.isAboveThreshold', true);
-        $response->assertJsonPath('company.responseCount', 3);
-        // (8.5 + 8.5 + 5.0) / 3 = 22 / 3 = 7.333 -> 7.3
-        $response->assertJsonPath('company.avgScore', 7.3);
-        $response->assertJsonMissingPath('trend.0.respondents');
     }
 
     public function test_company_dashboard_participation_counts_distinct_active_employees()
@@ -120,9 +110,7 @@ class CompanyTest extends TestCase
         ]);
 
         foreach (range(1, 10) as $index) {
-            WellbeingEntry::factory()->create([
-                'user_id' => $employees->first()->id,
-                'company_id' => $this->company->id,
+            $this->createWellbeingEntry($employees->first(), [
                 'period_key' => sprintf('2024-W%02d', $index),
             ]);
         }
@@ -137,6 +125,11 @@ class CompanyTest extends TestCase
         $response->assertJsonPath('company.participationRate', null);
     }
 
+    /**
+     * ELYO-91 prompt 09: participation is no longer computable without a
+     * reporting source, so the cap itself is not observable here anymore. The
+     * case is kept so the endpoint stays covered for the state it now reports.
+     */
     public function test_company_dashboard_participation_is_capped_at_one_hundred_percent()
     {
         $employees = User::factory()->count(3)->create([
@@ -147,9 +140,7 @@ class CompanyTest extends TestCase
 
         foreach ($employees as $employee) {
             foreach (range(1, 4) as $index) {
-                WellbeingEntry::factory()->create([
-                    'user_id' => $employee->id,
-                    'company_id' => $this->company->id,
+                $this->createWellbeingEntry($employee, [
                     'period_key' => sprintf('2024-W%02d', $index),
                 ]);
             }
@@ -158,11 +149,11 @@ class CompanyTest extends TestCase
         $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
 
         $response->assertStatus(200);
-        $response->assertJsonPath('company.responseCount', 12);
-        $response->assertJsonPath('company.respondentCount', 3);
-        $response->assertJsonPath('company.eligibleEmployeeCount', 3);
-        $response->assertJsonPath('company.participationRate', 100);
-        $response->assertJsonPath('company.isAboveThreshold', true);
+        $response->assertJsonPath('company.responseCount', null);
+        $response->assertJsonPath('company.respondentCount', null);
+        $response->assertJsonPath('company.eligibleEmployeeCount', null);
+        $response->assertJsonPath('company.participationRate', null);
+        $response->assertJsonPath('company.isAboveThreshold', false);
     }
 
     public function test_manager_scoping_to_team()
@@ -176,7 +167,7 @@ class CompanyTest extends TestCase
             'role' => Role::EMPLOYEE,
         ]);
         foreach ($emps1 as $emp) {
-            WellbeingEntry::factory()->create(['user_id' => $emp->id, 'company_id' => $this->company->id, 'score' => 8.0]);
+            $this->createWellbeingEntry($emp, ['score' => 4.0]);
         }
 
         // Other team entries
@@ -186,19 +177,20 @@ class CompanyTest extends TestCase
             'role' => Role::EMPLOYEE,
         ]);
         foreach ($emps2 as $emp) {
-            WellbeingEntry::factory()->create(['user_id' => $emp->id, 'company_id' => $this->company->id, 'score' => 2.0]);
+            $this->createWellbeingEntry($emp, ['score' => 2.0]);
         }
 
-        // Manager dashboard should only see their team's average (8.0)
+        // Team metadata scoping is unaffected by the missing wellbeing source:
+        // the manager still sees only their own team, the admin sees both. The
+        // scores themselves are suppressed (ELYO-91 prompt 09).
         $response = $this->actingAs($this->manager)->getJson('/api/company/dashboard');
         $response->assertStatus(200);
-        $this->assertEquals(8.0, $response->json('company.avgScore'));
+        $this->assertNull($response->json('company.avgScore'));
         $response->assertJsonCount(1, 'teams');
         $response->assertJsonPath('teams.0.name', 'Tech Team');
 
-        // Admin dashboard should see overall average ( (8*3 + 2*3) / 6 = 30 / 6 = 5.0 )
         $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
-        $this->assertEquals(5.0, $response->json('company.avgScore'));
+        $this->assertNull($response->json('company.avgScore'));
         $response->assertJsonCount(2, 'teams');
     }
 
@@ -559,7 +551,14 @@ class CompanyTest extends TestCase
         $this->assertArrayNotHasKey('falseCount', $questionResult);
     }
 
-    public function test_reports_require_distinct_respondents_for_trend_points()
+    /**
+     * ELYO-91 prompt 09: the report trend has no wellbeing source anymore, so it
+     * stays empty even once enough distinct respondents have checked in. The
+     * "no data leaks below the threshold" half of the original expectation is
+     * unchanged and still asserted; the "enough respondents produce a point"
+     * half returns with the reporting domain.
+     */
+    public function test_reports_return_no_trend_points_without_a_reporting_source()
     {
         $activeEmployee = User::factory()->create([
             'company_id' => $this->company->id,
@@ -574,12 +573,7 @@ class CompanyTest extends TestCase
         ]);
 
         foreach ($inactiveEmployees->prepend($activeEmployee) as $employee) {
-            WellbeingEntry::factory()->create([
-                'user_id' => $employee->id,
-                'company_id' => $this->company->id,
-                'score' => 8.0,
-                'period_key' => '2026-W20',
-            ]);
+            $this->createWellbeingEntry($employee, ['score' => 4.0, 'period_key' => '2026-W20']);
         }
 
         $response = $this->actingAs($this->admin)->getJson('/api/company/reports');
@@ -594,19 +588,13 @@ class CompanyTest extends TestCase
         ]);
 
         foreach ($employees as $employee) {
-            WellbeingEntry::factory()->create([
-                'user_id' => $employee->id,
-                'company_id' => $this->company->id,
-                'score' => 8.0,
-                'period_key' => '2026-W20',
-            ]);
+            $this->createWellbeingEntry($employee, ['score' => 4.0, 'period_key' => '2026-W20']);
         }
 
         $response = $this->actingAs($this->admin)->getJson('/api/company/reports');
 
         $response->assertStatus(200);
-        $response->assertJsonCount(1, 'data');
-        $response->assertJsonMissingPath('data.0.respondents');
+        $response->assertJsonCount(0, 'data');
     }
 
     public function test_draft_surveys_can_be_edited_and_activated_by_allowed_owner()
@@ -1642,18 +1630,17 @@ class CompanyTest extends TestCase
         ]);
 
         foreach ($employees as $employee) {
-            WellbeingEntry::factory()->create([
-                'user_id' => $employee->id,
-                'company_id' => $this->company->id,
-                'score' => 7.0,
-            ]);
+            $this->createWellbeingEntry($employee, ['score' => 4.0]);
         }
 
         $response = $this->actingAs($this->admin)->getJson('/api/company/dashboard');
 
         $response->assertStatus(200);
-        $response->assertJsonPath('company.isAboveThreshold', true);
-        $response->assertJsonPath('company.responseCount', 3);
+        // ELYO-91 prompt 09: aggregates are suppressed for lack of a reporting
+        // source. The point of this case — the endpoint still answers 200 with an
+        // empty team list when the team layer is off — is unchanged.
+        $response->assertJsonPath('company.isAboveThreshold', false);
+        $response->assertJsonPath('company.responseCount', null);
         $response->assertJsonCount(0, 'teams');
     }
 
@@ -1950,14 +1937,11 @@ class CompanyTest extends TestCase
             'role' => Role::EMPLOYEE,
             'email' => 'foreign-managed-member@test.com',
         ]);
-        WellbeingEntry::factory()->create([
-            'user_id' => $managedMember->id,
-            'company_id' => $this->company->id,
-            'mood' => 2,
-            'stress' => 9,
-            'energy' => 3,
-            'score' => 2.3,
-            'note' => 'Private health note',
+        $this->createWellbeingEntry($managedMember, [
+            'mood' => 1,
+            'stress' => 5,
+            'energy' => 2,
+            'score' => 1.3,
         ]);
 
         $response = $this->actingAs($this->manager)->getJson("/api/company/teams/{$this->team->id}/members");
