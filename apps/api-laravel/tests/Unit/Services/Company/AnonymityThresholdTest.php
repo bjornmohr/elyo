@@ -21,4 +21,9 @@ class AnonymityThresholdTest extends TestCase
     {
         $this->assertSame(20, AnonymityThreshold::resolve(20));
     }
+
+    public function test_it_uses_five_as_the_reporting_category_minimum(): void
+    {
+        $this->assertSame(5, AnonymityThreshold::categoryMinimum());
+    }
 }

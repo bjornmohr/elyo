@@ -204,6 +204,76 @@ class HealthLeakAssertionsTest extends TestCase
         $this->assertResponseHasNoHealthLeaks($response, $endpoint);
     }
 
+    public function test_survey_distribution_allowlist_rejects_a_suppressed_error_payload(): void
+    {
+        $response = TestResponse::fromBaseResponse(new JsonResponse([
+            'data' => [
+                'isAboveThreshold' => false,
+                'questions' => [[
+                    'isSuppressed' => true,
+                    'distribution' => [[
+                        'value' => 4,
+                        'count' => 5,
+                    ]],
+                ]],
+            ],
+        ], 403));
+
+        $this->expectException(ExpectationFailedException::class);
+        $this->expectExceptionMessage('$.data.questions.0.distribution.0.value');
+
+        $this->assertResponseHasNoHealthLeaks(
+            $response,
+            '/api/company/surveys/{id}/results',
+        );
+    }
+
+    public function test_survey_distribution_allowlist_rejects_a_small_bucket(): void
+    {
+        $response = TestResponse::fromBaseResponse(new JsonResponse([
+            'data' => [
+                'isAboveThreshold' => true,
+                'questions' => [[
+                    'isSuppressed' => false,
+                    'distribution' => [[
+                        'value' => 4,
+                        'count' => 4,
+                    ]],
+                ]],
+            ],
+        ]));
+
+        $this->expectException(ExpectationFailedException::class);
+        $this->expectExceptionMessage('$.data.questions.0.distribution.0.value');
+
+        $this->assertResponseHasNoHealthLeaks(
+            $response,
+            '/api/company/surveys/{id}/results',
+        );
+    }
+
+    public function test_survey_distribution_allowlist_accepts_a_released_bucket(): void
+    {
+        $response = TestResponse::fromBaseResponse(new JsonResponse([
+            'data' => [
+                'isAboveThreshold' => true,
+                'questions' => [[
+                    'isSuppressed' => false,
+                    'distribution' => [[
+                        'value' => 4,
+                        'count' => 5,
+                    ]],
+                ]],
+            ],
+        ]));
+
+        $this->assertResponseHasNoHealthLeaks(
+            $response,
+            '/api/company/surveys/{id}/results',
+        );
+        $this->addToAssertionCount(1);
+    }
+
     public function test_ulid_is_rejected_at_a_health_related_path(): void
     {
         $response = TestResponse::fromBaseResponse(new JsonResponse([

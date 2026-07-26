@@ -40,7 +40,7 @@ Apply:
 - global anonymity threshold
 - effective threshold `max(10, customer threshold, metric threshold)`; customer
   configuration can never lower the platform minimum of 10
-- bucket-level suppression for small groups
+- bucket-level suppression for categories with fewer than 5 contributors
 - no raw text output
 - no misleading charts when data is suppressed
 

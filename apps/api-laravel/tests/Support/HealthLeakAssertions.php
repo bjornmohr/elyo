@@ -30,17 +30,20 @@ trait HealthLeakAssertions
             '$',
             $endpoint,
             $knownHealthSubjectIds,
+            HealthLeakAllowlist::releasedAggregatePaths($response),
         );
     }
 
     /**
      * @param  list<string>  $knownHealthSubjectIds
+     * @param  list<string>  $releasedAggregatePaths
      */
     private function assertPayloadHasNoHealthLeaks(
         mixed $payload,
         string $path,
         string $endpoint,
         array $knownHealthSubjectIds,
+        array $releasedAggregatePaths,
     ): void {
         if (is_array($payload)) {
             $normalizedKeys = [];
@@ -53,7 +56,12 @@ trait HealthLeakAssertions
 
             foreach (ForbiddenHealthPatternCatalog::COMPOUND_PATTERNS as $pattern) {
                 if (array_diff($pattern['required_keys'], $normalizedKeys) === []) {
-                    $this->rejectUnlessAllowlisted($pattern['id'], $endpoint, $path);
+                    $this->rejectUnlessAllowlisted(
+                        $pattern['id'],
+                        $endpoint,
+                        $path,
+                        $releasedAggregatePaths,
+                    );
                 }
             }
 
@@ -67,7 +75,12 @@ trait HealthLeakAssertions
 
                     foreach (ForbiddenHealthPatternCatalog::KEY_PATTERNS as $pattern) {
                         if (preg_match($pattern['regex'], $normalizedKey) === 1) {
-                            $this->rejectUnlessAllowlisted($pattern['id'], $endpoint, $childPath);
+                            $this->rejectUnlessAllowlisted(
+                                $pattern['id'],
+                                $endpoint,
+                                $childPath,
+                                $releasedAggregatePaths,
+                            );
                         }
                     }
 
@@ -76,7 +89,12 @@ trait HealthLeakAssertions
                             preg_match($pattern['key_regex'], $normalizedKey) === 1
                             && preg_match($pattern['context_regex'], $objectContext) === 1
                         ) {
-                            $this->rejectUnlessAllowlisted($pattern['id'], $endpoint, $childPath);
+                            $this->rejectUnlessAllowlisted(
+                                $pattern['id'],
+                                $endpoint,
+                                $childPath,
+                                $releasedAggregatePaths,
+                            );
                         }
                     }
                 }
@@ -86,6 +104,7 @@ trait HealthLeakAssertions
                     $childPath,
                     $endpoint,
                     $knownHealthSubjectIds,
+                    $releasedAggregatePaths,
                 );
             }
 
@@ -102,6 +121,7 @@ trait HealthLeakAssertions
                     ForbiddenHealthPatternCatalog::KNOWN_HEALTH_SUBJECT['id'],
                     $endpoint,
                     $path,
+                    $releasedAggregatePaths,
                 );
             }
         }
@@ -119,13 +139,24 @@ trait HealthLeakAssertions
                 ForbiddenHealthPatternCatalog::HEALTH_CONTEXT_ULID['id'],
                 $endpoint,
                 $path,
+                $releasedAggregatePaths,
             );
         }
     }
 
-    private function rejectUnlessAllowlisted(string $pattern, string $endpoint, string $path): void
-    {
-        if (HealthLeakAllowlist::allows($pattern, $endpoint, $path)) {
+    /**
+     * @param  list<string>  $releasedAggregatePaths
+     */
+    private function rejectUnlessAllowlisted(
+        string $pattern,
+        string $endpoint,
+        string $path,
+        array $releasedAggregatePaths,
+    ): void {
+        if (
+            in_array($path, $releasedAggregatePaths, true)
+            && HealthLeakAllowlist::allows($pattern, $endpoint, $path)
+        ) {
             return;
         }
 

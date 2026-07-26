@@ -2410,7 +2410,7 @@ paths:
                             answerCount:
                               type: integer
                               nullable: true
-                              description: Null when the question-level anonymity threshold is not met or when a SCALE, YES_NO, or MULTIPLE_CHOICE distribution is suppressed because any non-zero bucket is below the anonymity threshold.
+                              description: Null when the question-level anonymity threshold is not met or when a SCALE, YES_NO, or MULTIPLE_CHOICE distribution is suppressed because any non-zero category has fewer than 5 contributors.
                             avgValue:
                               type: number
                               nullable: true
@@ -2443,21 +2443,21 @@ paths:
                               description: Optional reason returned when a question or distribution is suppressed.
                             distribution:
                               type: array
-                              description: SCALE distribution buckets. Empty when any non-zero bucket is below the anonymity threshold; answerCount is also null in that case.
+                              description: SCALE distribution buckets. Empty when any non-zero category has fewer than 5 contributors; answerCount is also null in that case.
                               items:
                                 type: object
                                 properties:
                                   value: { type: integer }
-                                  count: { type: integer }
+                                  count: { type: integer, minimum: 5 }
                                   percentage: { type: number }
                             trueCount:
                               type: integer
                               nullable: true
-                              description: Null when the YES_NO split is suppressed because either non-zero bucket is below the anonymity threshold; answerCount is also null in that case.
+                              description: Null when the YES_NO split is suppressed because either non-zero category has fewer than 5 contributors; answerCount is also null in that case.
                             falseCount:
                               type: integer
                               nullable: true
-                              description: Null when the YES_NO split is suppressed because either non-zero bucket is below the anonymity threshold; answerCount is also null in that case.
+                              description: Null when the YES_NO split is suppressed because either non-zero category has fewer than 5 contributors; answerCount is also null in that case.
                             truePercentage:
                               type: number
                               nullable: true
@@ -2466,12 +2466,12 @@ paths:
                               nullable: true
                             options:
                               type: array
-                              description: MULTIPLE_CHOICE options. Empty when the distribution is suppressed because any non-zero option bucket is below the anonymity threshold; answerCount is also null in that case.
+                              description: MULTIPLE_CHOICE options. Empty when the distribution is suppressed because any non-zero category has fewer than 5 contributors; answerCount is also null in that case.
                               items:
                                 type: object
                                 properties:
                                   value: { type: string, nullable: true }
-                                  count: { type: integer }
+                                  count: { type: integer, minimum: 5 }
                                   percentage: { type: number }
         403:
           description: User is not eligible for the company portal, anonymity threshold not met, or TEAM_LAYER_DISABLED for team-scoped results when the company team layer is disabled

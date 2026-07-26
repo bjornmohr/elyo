@@ -97,6 +97,24 @@ The same review found a Low OpenAPI gap: the 403
 `AnonymityThresholdError.minRequired` field must document its effective minimum
 of 10.
 
+## Fourth review findings
+
+The first memory-cleared `origin/main...HEAD` review found two further policy
+gaps:
+
+1. A survey distribution allowlist match used only pattern, endpoint and path,
+   so a suppressed or 403 payload at the same path could evade detection.
+   Allowlisting must additionally require a 2xx response, global release,
+   an unsuppressed question and a bucket with at least five contributors.
+2. The global threshold of 10 was also being used for category suppression.
+   ADR-001 §2.5 instead requires separate policies: the effective global
+   threshold is at least 10, while categories below five contributors are
+   suppressed.
+
+Sensitivity tests were added before both fixes. The review also requested the
+task 16 output artifact with route statistics, validation results and known
+ELYO-144 gaps.
+
 ## Additional test seams
 
 - `GET /api/company/surveys/{id}/results` for effective-threshold suppression.
