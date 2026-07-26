@@ -9,6 +9,7 @@ require_once __DIR__.'/../vendor/autoload.php';
 // RefreshDatabase from ever fresh-migrating a development database.
 $testEnvironment = [
     'APP_ENV' => 'testing',
+    'ELYO_RUNTIME' => 'full',
     'DB_URL' => '',
     'DB_CONNECTION' => 'identity',
     'DB_IDENTITY_DATABASE' => 'elyo_identity_test',

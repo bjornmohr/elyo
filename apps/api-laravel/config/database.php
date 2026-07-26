@@ -1,7 +1,13 @@
 <?php
 
+use App\Runtime\RuntimeProfile;
 use Illuminate\Support\Str;
 use Pdo\Mysql;
+
+// Only the connections the active profile's PostgreSQL role holds credentials
+// for are configured; every other connection is absent, so constructing it
+// throws instead of silently reaching another domain (ADR-001 §2.4).
+$runtimeConnections = RuntimeProfile::connections(RuntimeProfile::resolve());
 
 return [
 
@@ -30,7 +36,12 @@ return [
     |
     */
 
-    'connections' => [
+    // Excluded connections must stay unusable. Laravel merges the framework's
+    // own database config for every connection key the application does not
+    // define (LoadConfiguration), which would silently resurrect the stock
+    // sqlite/mysql/mariadb/pgsql/sqlsrv connections in a restricted runtime —
+    // the explicit nulls below keep them unconfigured.
+    'connections' => array_intersect_key([
 
         'sqlite' => [
             'driver' => 'sqlite',
@@ -255,7 +266,13 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
-    ],
+    ], array_flip($runtimeConnections)) + array_fill_keys([
+        'sqlite',
+        'mysql',
+        'mariadb',
+        'pgsql',
+        'sqlsrv',
+    ], null),
 
     /*
     |--------------------------------------------------------------------------

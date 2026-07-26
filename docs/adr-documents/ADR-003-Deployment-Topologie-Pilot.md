@@ -33,6 +33,8 @@ Jede Entscheidung D1–D10 ist wortgleich aus dem Ausführungsplan übernommen; 
 
 - **Begründung:** Drei API-Runtimes aus einem Image über ein `ELYO_RUNTIME`-Startprofil setzen die Prozesstrennung sofort um; nginx-Path-Routing hält für Angular eine einzige Basis-URL, ohne einen aggregierenden Gateway einzuführen (der die Runtime-Grenzen aufweichen würde).
 - **ADR-001-Bezug:** Konkretisiert §2.4 (fünf Runtimes aus einem Image, eigene Rollen, keine Runtime-zu-Runtime-Kommunikation). **Pilot-Konkretisierung:** Reporting-Worker und Privacy/Admin-Runtime werden nur vorbereitet, nicht ausgeliefert; die fünf Runtimes aus §2.4 sind damit gestaffelt, nicht gleichzeitig aktiv.
+- **Konkretisierung Admin-Routen:** Solange die Privacy/Admin-Runtime nicht ausgeliefert wird, laufen die Plattform-Admin-Routen (`/api/admin/*`, inkl. der System-Kataloge für Übungen und Maßnahmen-Templates) im `identity`-Profil — die verwalteten Ressourcen liegen in der Identity-Domäne, das Profil braucht dafür keine zusätzliche Verbindung. Mit der Privacy/Admin-Runtime wandern sie in deren eigenes Startprofil.
+- **Konkretisierung Migrations- und Retention-Rolle:** Kein ausgeliefertes Profil enthält die `*_migrator`-Verbindungen; nach ADR-001 §2.4 liegt die Migrationsrolle nie in einem Runtime-Container. Schema-Migrationen laufen als separater Ops-Schritt, lokal über `full`. Offen: Der Retention-Job (`elyo:enforce-retention`) braucht `health`, `identity` und `audit_migrator` und ist damit an die noch nicht ausgelieferte Privacy/Admin-Runtime gebunden — bis dahin läuft er nicht in einer Pilot-Runtime.
 
 ### D3 — Wellbeing in die Health-Domäne
 
