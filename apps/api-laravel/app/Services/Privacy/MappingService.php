@@ -130,26 +130,48 @@ class MappingService implements MappingServiceContract
         );
     }
 
-    public function revokeSubjectLink(int $userId, PurposeCode $purpose): void
-    {
+    /**
+     * @param  null|callable(string): void  $beforeRevocation
+     * @param  null|callable(): void  $afterRevocationAudit
+     */
+    public function revokeSubjectLink(
+        int $userId,
+        PurposeCode $purpose,
+        ?callable $beforeRevocation = null,
+        ?callable $afterRevocationAudit = null,
+    ): void {
+        $revocationPerformed = false;
+
         $this->performAuditedOperation(
             MappingOperation::REVOKE_SUBJECT_LINK,
             $purpose,
             AuditActorContext::privacyAdmin(),
             $this->cryptography->auditSubjectReferenceForUserId($userId),
-            function () use ($userId): void {
+            function () use ($beforeRevocation, $userId, &$revocationPerformed): void {
                 $mapping = $this->requireMapping($userId);
 
                 if ($mapping->status === SubjectMapping::STATUS_REVOKED) {
                     return;
                 }
 
+                if ($beforeRevocation !== null) {
+                    $beforeRevocation($mapping->health_subject_id);
+                }
+
                 $mapping->status = SubjectMapping::STATUS_REVOKED;
                 $mapping->revoked_at = now();
                 $mapping->save();
+                $revocationPerformed = true;
             },
             ['mapping'],
             [PurposeCode::REVOCATION],
+            $afterRevocationAudit === null
+                ? null
+                : function () use ($afterRevocationAudit, &$revocationPerformed): void {
+                    if ($revocationPerformed) {
+                        $afterRevocationAudit();
+                    }
+                },
         );
     }
 
@@ -241,6 +263,7 @@ class MappingService implements MappingServiceContract
      * @param  callable(): TReturn  $operationCallback
      * @param  list<string>  $transactionConnections
      * @param  array<int, PurposeCode>  $preTransactionPurposes
+     * @param  null|callable(): void  $afterOperationAudit
      * @return TReturn
      */
     private function performAuditedOperation(
@@ -251,6 +274,7 @@ class MappingService implements MappingServiceContract
         callable $operationCallback,
         array $transactionConnections = [],
         array $preTransactionPurposes = [],
+        ?callable $afterOperationAudit = null,
     ): mixed {
         if ($preTransactionPurposes !== []) {
             try {
@@ -274,11 +298,13 @@ class MappingService implements MappingServiceContract
             $actorContext,
             $userReference,
             $operationCallback,
+            $afterOperationAudit,
         ): mixed {
             $outcome = AuditOutcome::SUCCESS;
+            $result = null;
 
             try {
-                return $operationCallback();
+                $result = $operationCallback();
             } catch (
                 InvalidPurposeCodeException
                 |MappingNotFoundException
@@ -303,6 +329,12 @@ class MappingService implements MappingServiceContract
                     $outcome,
                 );
             }
+
+            if ($afterOperationAudit !== null) {
+                $afterOperationAudit();
+            }
+
+            return $result;
         };
 
         return $this->runInTransactions($transactionConnections, $executeAndAudit);
