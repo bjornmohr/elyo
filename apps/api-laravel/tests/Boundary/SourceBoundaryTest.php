@@ -11,6 +11,9 @@ use PhpParser\Node\Identifier;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\NodeFinder;
+use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor\NameResolver;
+use PhpParser\Parser;
 use PhpParser\ParserFactory;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -21,6 +24,161 @@ use SplFileInfo;
 
 class SourceBoundaryTest extends BoundaryTestCase
 {
+    /**
+     * ADR-001 §2.4 / ADR-003 D7: company and admin HTTP paths cannot read the
+     * health domain. Runtime grants are the final barrier; this source check
+     * keeps forbidden dependencies from entering those namespaces at all.
+     */
+    public function test_company_and_admin_http_paths_have_no_health_read_dependency(): void
+    {
+        $violations = [];
+        $directories = [
+            app_path('Http/Controllers/Company'),
+            app_path('Http/Controllers/Admin'),
+            app_path('Http/Resources/Company'),
+            app_path('Http/Resources/Admin'),
+            app_path('Services/Company'),
+        ];
+        $parser = (new ParserFactory)->createForNewestSupportedVersion();
+        $nodeFinder = new NodeFinder;
+        $applicationFiles = $this->applicationClassFiles();
+        $dependencyGraph = $this->applicationDependencyGraph(
+            $applicationFiles,
+            $parser,
+            $nodeFinder,
+        );
+
+        foreach ($directories as $directory) {
+            if (! is_dir($directory)) {
+                continue;
+            }
+
+            foreach ($this->phpFiles($directory) as $file) {
+                $dependencyPath = $this->healthReadDependencyPath(
+                    $file->getPathname(),
+                    $dependencyGraph,
+                );
+
+                if ($dependencyPath !== null) {
+                    $relativePath = array_map(
+                        fn (string $path): string => str_replace(base_path().DIRECTORY_SEPARATOR, '', $path),
+                        $dependencyPath,
+                    );
+                    $violations[] = implode(' -> ', $relativePath);
+                }
+            }
+        }
+
+        $this->assertSame(
+            [],
+            $violations,
+            "Company/Admin HTTP paths must not read the health domain:\n".implode("\n", $violations),
+        );
+    }
+
+    /**
+     * @param  array<string, array{dependencies: list<string>, readsHealth: bool}>  $dependencyGraph
+     * @param  array<string, true>  $visited
+     * @return list<string>|null
+     */
+    private function healthReadDependencyPath(
+        string $filePath,
+        array $dependencyGraph,
+        array $visited = [],
+    ): ?array {
+        if (isset($visited[$filePath])) {
+            return null;
+        }
+
+        $visited[$filePath] = true;
+        $dependency = $dependencyGraph[$filePath] ?? null;
+
+        if ($dependency === null) {
+            return null;
+        }
+
+        if ($dependency['readsHealth']) {
+            return [$filePath];
+        }
+
+        foreach ($dependency['dependencies'] as $dependencyFile) {
+            $healthDependencyPath = $this->healthReadDependencyPath(
+                $dependencyFile,
+                $dependencyGraph,
+                $visited,
+            );
+
+            if ($healthDependencyPath !== null) {
+                return [$filePath, ...$healthDependencyPath];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<class-string, string>  $applicationFiles
+     * @return array<string, array{dependencies: list<string>, readsHealth: bool}>
+     */
+    private function applicationDependencyGraph(
+        array $applicationFiles,
+        Parser $parser,
+        NodeFinder $nodeFinder,
+    ): array {
+        $graph = [];
+
+        foreach ($applicationFiles as $filePath) {
+            $source = file_get_contents($filePath);
+
+            if ($source === false) {
+                $this->fail("Could not read {$filePath}.");
+            }
+
+            $ast = $parser->parse($source) ?? [];
+            $traverser = new NodeTraverser;
+            $traverser->addVisitor(new NameResolver);
+            $ast = $traverser->traverse($ast);
+            $dependencies = [];
+
+            /** @var list<Node\Name> $names */
+            $names = $nodeFinder->findInstanceOf($ast, Node\Name::class);
+
+            foreach ($names as $name) {
+                $class = ltrim($name->toString(), '\\');
+
+                if (isset($applicationFiles[$class]) && $applicationFiles[$class] !== $filePath) {
+                    $dependencies[] = $applicationFiles[$class];
+                }
+            }
+
+            $graph[$filePath] = [
+                'dependencies' => array_values(array_unique($dependencies)),
+                'readsHealth' => $nodeFinder->findFirst(
+                    $ast,
+                    fn (Node $node): bool => $this->isCompanyHealthReadReference($node),
+                ) !== null,
+            ];
+        }
+
+        return $graph;
+    }
+
+    /**
+     * @return array<class-string, string>
+     */
+    private function applicationClassFiles(): array
+    {
+        $files = [];
+
+        foreach ($this->phpFiles(app_path()) as $file) {
+            $relative = str_replace([app_path().DIRECTORY_SEPARATOR, '.php'], '', $file->getPathname());
+            $class = 'App\\'.str_replace(DIRECTORY_SEPARATOR, '\\', $relative);
+            $files[$class] = $file->getPathname();
+        }
+
+        return $files;
+    }
+
     public function test_code_outside_mapping_service_cannot_access_mapping_connection_directly(): void
     {
         $violations = [];
@@ -170,5 +328,25 @@ class SourceBoundaryTest extends BoundaryTestCase
 
         return $node instanceof String_
             && $node->value === 'database.connections.mapping';
+    }
+
+    private function isCompanyHealthReadReference(Node $node): bool
+    {
+        if ($node instanceof Node\Name) {
+            $name = ltrim($node->toString(), '\\');
+
+            return str_starts_with($name, 'App\\Models\\Health\\')
+                || str_starts_with($name, 'App\\Services\\Health\\');
+        }
+
+        if ($node instanceof StaticCall || $node instanceof MethodCall) {
+            return $node->name instanceof Identifier
+                && $node->name->toString() === 'connection'
+                && isset($node->args[0])
+                && $this->resolvedString($node->args[0]->value) === 'health';
+        }
+
+        return $node instanceof String_
+            && $node->value === 'database.connections.health';
     }
 }

@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { EmployeeService, WellbeingEntry } from '../../services/employee.service';
+import { getMoodEmoji, getScoreColor } from '../../wellbeing-scale';
 
 @Component({
   selector: 'app-history',
@@ -28,13 +29,13 @@ import { EmployeeService, WellbeingEntry } from '../../services/employee.service
                     {{ getMoodEmoji(entry.mood) }}
                   </div>
                   <div>
-                    <div class="font-bold text-slate-800">Mood {{ entry.mood ?? '-' }}/10</div>
+                    <div class="font-bold text-slate-800">Mood {{ entry.mood }}/5</div>
                     <div class="text-sm text-slate-400">{{ entry.createdAt | date:'EEEE, d. MMMM' }}</div>
                   </div>
                 </div>
                 <div class="text-right">
                   <div class="text-2xl font-black" [style.color]="getScoreColor(entry.score)">
-                    {{ entry.score.toFixed(1) }}
+                    {{ entry.score.toFixed(1) }}/5
                   </div>
                   <div class="text-[10px] font-bold uppercase tracking-widest text-slate-300">Score</div>
                 </div>
@@ -43,23 +44,17 @@ import { EmployeeService, WellbeingEntry } from '../../services/employee.service
               <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-50">
                  <div class="text-center p-2 rounded-xl bg-slate-50">
                    <div class="text-xs text-slate-400">Stress</div>
-                   <div class="font-bold text-slate-700">{{ entry.stress ?? '-' }}/10</div>
+                   <div class="font-bold text-slate-700">{{ entry.stress }}/5</div>
                  </div>
                  <div class="text-center p-2 rounded-xl bg-slate-50">
                    <div class="text-xs text-slate-400">Energy</div>
-                   <div class="font-bold text-slate-700">{{ entry.energy ?? '-' }}/10</div>
+                   <div class="font-bold text-slate-700">{{ entry.energy }}/5</div>
                  </div>
                  <div class="text-center p-2 rounded-xl bg-slate-50">
                    <div class="text-xs text-slate-400">Mood</div>
-                   <div class="font-bold text-slate-700">{{ entry.mood ?? '-' }}/10</div>
+                   <div class="font-bold text-slate-700">{{ entry.mood }}/5</div>
                  </div>
               </div>
-
-              @if (entry.notes) {
-                <div class="bg-teal-50/50 p-3 rounded-xl text-sm text-slate-600 italic border-l-2 border-teal-200">
-                  "{{ entry.notes }}"
-                </div>
-              }
             </div>
           }
         </div>
@@ -80,25 +75,12 @@ export class HistoryComponent implements OnInit {
   private employeeService = inject(EmployeeService);
   entries = signal<WellbeingEntry[]>([]);
 
+  protected readonly getScoreColor = getScoreColor;
+  protected readonly getMoodEmoji = getMoodEmoji;
+
   ngOnInit() {
     this.employeeService.getHistory().subscribe(entries => {
       this.entries.set(entries);
     });
-  }
-
-  getScoreColor(score: number) {
-    if (score >= 7.5) return "#14b8a6";
-    if (score >= 6) return "#4c8448";
-    if (score >= 4.5) return "#d97706";
-    return "#ef4444";
-  }
-
-  getMoodEmoji(mood: number | null) {
-    if (mood === null) return '✨';
-    if (mood >= 9) return '🤩';
-    if (mood >= 7) return '😊';
-    if (mood >= 5) return '😐';
-    if (mood >= 3) return '😟';
-    return '😫';
   }
 }

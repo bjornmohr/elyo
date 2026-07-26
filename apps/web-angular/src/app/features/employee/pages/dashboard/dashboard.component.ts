@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { EmployeeService, DashboardData } from '../../services/employee.service';
+import { getMoodEmoji, getScoreColor } from '../../wellbeing-scale';
 
 @Component({
   selector: 'app-dashboard',
@@ -53,12 +54,12 @@ import { EmployeeService, DashboardData } from '../../services/employee.service'
                       {{ getMoodEmoji(entry.mood) }}
                     </div>
                     <div>
-                      <div class="font-medium text-slate-800">Score {{ entry.score.toFixed(1) }}</div>
+                      <div class="font-medium text-slate-800">Score {{ entry.score.toFixed(1) }}/5</div>
                       <div class="text-xs text-slate-500">{{ entry.createdAt | date:'MMM d, HH:mm' }}</div>
                     </div>
                   </div>
                   <div class="font-bold" [style.color]="getScoreColor(entry.score)">
-                    {{ entry.score.toFixed(1) }}
+                    {{ entry.score.toFixed(1) }}/5
                   </div>
                 </div>
               }
@@ -98,25 +99,12 @@ export class DashboardComponent implements OnInit {
   private employeeService = inject(EmployeeService);
   data = signal<DashboardData | null>(null);
 
+  protected readonly getScoreColor = getScoreColor;
+  protected readonly getMoodEmoji = getMoodEmoji;
+
   ngOnInit() {
     this.employeeService.getDashboard().subscribe(data => {
       this.data.set(data);
     });
-  }
-
-  getScoreColor(score: number) {
-    if (score >= 7.5) return "#14b8a6";
-    if (score >= 6) return "#4c8448";
-    if (score >= 4.5) return "#d97706";
-    return "#ef4444";
-  }
-
-  getMoodEmoji(mood: number | null) {
-    if (mood === null) return '✨';
-    if (mood >= 9) return '😊';
-    if (mood >= 7) return '🙂';
-    if (mood >= 5) return '😐';
-    if (mood >= 3) return '🙁';
-    return '😫';
   }
 }

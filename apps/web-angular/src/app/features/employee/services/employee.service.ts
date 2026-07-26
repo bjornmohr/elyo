@@ -6,10 +6,9 @@ import { map } from 'rxjs/operators';
 export interface WellbeingEntry {
   id: string;
   score: number;
-  mood: number | null;
-  stress: number | null;
-  energy: number | null;
-  notes?: string | null;
+  mood: number;
+  stress: number;
+  energy: number;
   createdAt: string;
 }
 
@@ -106,13 +105,11 @@ export class EmployeeService {
     mood: number;
     stress: number;
     energy: number;
-    notes?: string;
   }): Observable<any> {
     return this.api.post('/employee/checkin', {
       mood: data.mood,
       stress: data.stress,
       energy: data.energy,
-      note: data.notes,
     });
   }
 

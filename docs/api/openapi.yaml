@@ -92,6 +92,24 @@ components:
           type: object
           nullable: true
 
+    ReportingPendingBlock:
+      type: object
+      description: >-
+        Block-level pending state, returned with HTTP 200. Wellbeing data lives in
+        the health domain and is keyed on health_subject_id (ADR-003 D3); the company
+        runtime has no read path to it and live aggregation is not conform with
+        ADR-001 §2.5. These blocks stay empty until the reporting domain (separate
+        reporting epic, ADR-003 D7) delivers suppressed quarterly snapshots. No
+        partial values and no counts of withheld data are reported.
+      required: [status, data]
+      properties:
+        status: { type: string, enum: [reporting_pending] }
+        data:
+          type: object
+          nullable: true
+          enum: [null]
+          description: Always null while reporting is pending.
+
     User:
       type: object
       properties:
@@ -1599,7 +1617,12 @@ paths:
     get:
       tags: [Company]
       summary: Get company dashboard data
-      description: Company-level dashboard remains available to company admins and owners when the team layer is disabled. Team-level aggregates are omitted in that state. Manager-only users are not company-portal eligible while the team layer is disabled and receive PORTAL_FORBIDDEN.
+      description: >-
+        Company-level dashboard remains available to company admins and owners when the team layer is disabled.
+        Team-level aggregates are omitted in that state. Manager-only users are not company-portal eligible while
+        the team layer is disabled and receive PORTAL_FORBIDDEN.
+        The wellbeing blocks (`company`, `trend`, `teams[].metrics`) carry no data since ELYO-91: they report the
+        reporting-pending state until the reporting domain delivers quarterly snapshots (ADR-003 D7).
       security: [{ Sanctum: [] }]
       responses:
         200:
@@ -1610,31 +1633,18 @@ paths:
                 type: object
                 properties:
                   company:
-                    type: object
-                    properties:
-                      avgMood: { type: number, nullable: true }
-                      avgStress: { type: number, nullable: true }
-                      avgEnergy: { type: number, nullable: true }
-                      avgScore: { type: number, nullable: true }
-                      responseCount: { type: integer, nullable: true }
-                      respondentCount: { type: integer, nullable: true }
-                      eligibleEmployeeCount: { type: integer, nullable: true }
-                      participationRate: { type: integer, nullable: true }
-                      isAboveThreshold: { type: boolean }
-                      suppressionReason:
-                        type: string
-                        nullable: true
-                        enum: [ANONYMITY_THRESHOLD_NOT_MET]
+                    allOf:
+                      - $ref: '#/components/schemas/ReportingPendingBlock'
+                      - type: object
+                        description: >-
+                          `isAboveThreshold` and `responseCount` are legacy fields kept present but empty for the
+                          existing company dashboard UI. They never carry values while reporting is pending.
+                        required: [isAboveThreshold, responseCount]
+                        properties:
+                          isAboveThreshold: { type: boolean, nullable: true, enum: [null] }
+                          responseCount: { type: integer, nullable: true, enum: [null] }
                   trend:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        period: { type: string }
-                        avgScore: { type: number }
-                        avgMood: { type: number }
-                        avgStress: { type: number }
-                        avgEnergy: { type: number }
+                    $ref: '#/components/schemas/ReportingPendingBlock'
                   teams:
                     type: array
                     items:
@@ -1645,22 +1655,7 @@ paths:
                         description: { type: string, nullable: true }
                         color: { type: string, nullable: true }
                         managerId: { type: integer, nullable: true }
-                        metrics:
-                          type: object
-                          properties:
-                            isAboveThreshold: { type: boolean }
-                            responseCount: { type: integer, nullable: true }
-                            respondentCount: { type: integer, nullable: true }
-                            eligibleEmployeeCount: { type: integer, nullable: true }
-                            participationRate: { type: integer, nullable: true }
-                            avgScore: { type: number, nullable: true }
-                            avgMood: { type: number, nullable: true }
-                            avgStress: { type: number, nullable: true }
-                            avgEnergy: { type: number, nullable: true }
-                            suppressionReason:
-                              type: string
-                              nullable: true
-                              enum: [ANONYMITY_THRESHOLD_NOT_MET]
+                        metrics: { $ref: '#/components/schemas/ReportingPendingBlock' }
         403:
           $ref: '#/components/responses/PortalForbidden'
 
@@ -2300,7 +2295,13 @@ paths:
     get:
       tags: [Company]
       summary: Get aggregated report trend
-      description: Company-level trend reports remain available when the team layer is disabled. teamId filters return TEAM_LAYER_DISABLED; manager-only users without the team layer receive PORTAL_FORBIDDEN at the company portal guard.
+      description: >-
+        Company-level trend reports remain available when the team layer is disabled. teamId filters return
+        TEAM_LAYER_DISABLED; manager-only users without the team layer receive PORTAL_FORBIDDEN at the company
+        portal guard. Scope and authorization checks are unchanged, but the trend itself carries no data since
+        ELYO-91: the endpoint reports the reporting-pending state until the reporting domain delivers quarterly
+        snapshots (ADR-003 D7). `limit` remains accepted but is ignored while reporting is pending; `teamId` remains
+        subject to the existing team-layer and company-scope authorization checks.
       security: [{ Sanctum: [] }]
       parameters:
         - name: limit
@@ -2311,22 +2312,11 @@ paths:
           schema: { type: string }
       responses:
         200:
-          description: Trend data
+          description: Reporting-pending trend data
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        period: { type: string }
-                        avgScore: { type: number }
-                        avgMood: { type: number }
-                        avgStress: { type: number }
-                        avgEnergy: { type: number }
+                $ref: '#/components/schemas/ReportingPendingBlock'
         403:
           $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
 
