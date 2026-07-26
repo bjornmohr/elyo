@@ -3,15 +3,21 @@
 namespace Tests\Privacy;
 
 use App\Enums\Role;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Route as RouteFacade;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\ExpectationFailedException;
+use Tests\Support\HealthLeakAssertions;
 use Tests\Support\PrivacySeeder;
 use Tests\TestCase;
 
 class LabAccessPrivacyTest extends TestCase
 {
+    use HealthLeakAssertions;
+
     private const MIN_LAB_ROUTES = 4;
 
     /**
@@ -54,8 +60,16 @@ class LabAccessPrivacyTest extends TestCase
                 ? ['markerKey' => 'ferritin', 'value' => 42.1, 'measuredAt' => '2026-07-20']
                 : [];
 
-            $this->actingAs($user, 'sanctum')
-                ->json($method, '/'.$uri, $payload)
+            $response = $this->actingAs($user, 'sanctum')
+                ->json($method, '/'.$uri, $payload);
+
+            $this->assertResponseHasNoHealthLeaks(
+                $response,
+                '/'.$route->uri(),
+                $fixtures->healthSubjectIds(),
+            );
+
+            $response
                 ->assertStatus(403)
                 ->assertJsonPath('error.code', 'FORBIDDEN');
         }
@@ -90,11 +104,37 @@ class LabAccessPrivacyTest extends TestCase
                 ? ['markerKey' => 'ferritin', 'value' => 42.1, 'measuredAt' => '2026-07-20']
                 : [];
 
-            $this->withToken($token)
-                ->json($method, '/'.$uri, $payload)
+            $response = $this->withToken($token)
+                ->json($method, '/'.$uri, $payload);
+
+            $this->assertResponseHasNoHealthLeaks(
+                $response,
+                '/'.$route->uri(),
+                $fixtures->healthSubjectIds(),
+            );
+
+            $response
                 ->assertStatus(403)
                 ->assertJsonPath('error.code', 'FORBIDDEN');
         }
+    }
+
+    public function test_forbidden_lab_error_response_is_leak_checked(): void
+    {
+        $response = TestResponse::fromBaseResponse(new JsonResponse([
+            'error' => [
+                'code' => 'FORBIDDEN',
+                'markerKey' => 'ferritin',
+            ],
+        ], 403));
+
+        $this->expectException(ExpectationFailedException::class);
+        $this->expectExceptionMessage('$.error.markerKey');
+
+        $this->assertResponseHasNoHealthLeaks(
+            $response,
+            '/api/employee/lab-markers',
+        );
     }
 
     /**

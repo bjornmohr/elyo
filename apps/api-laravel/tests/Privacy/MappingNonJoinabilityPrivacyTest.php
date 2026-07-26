@@ -31,7 +31,7 @@ class MappingNonJoinabilityPrivacyTest extends BoundaryTestCase
     {
         $this->assertSame(
             [],
-            $this->healthRelationMethodsDeclaredOn(new User),
+            $this->healthRelationMethodsVisibleOn(new User),
             'User must not expose an Eloquent relation path to health-domain models.',
         );
     }
@@ -48,21 +48,28 @@ class MappingNonJoinabilityPrivacyTest extends BoundaryTestCase
 
         $this->assertSame(
             ['leakedHealthSubjects()'],
-            $this->healthRelationMethodsDeclaredOn($userWithUntypedLeak),
+            $this->healthRelationMethodsVisibleOn($userWithUntypedLeak),
+        );
+    }
+
+    public function test_relation_guard_detects_an_inherited_health_relation(): void
+    {
+        $this->assertSame(
+            ['inheritedHealthSubjects()'],
+            $this->healthRelationMethodsVisibleOn(new UserWithInheritedHealthRelation),
         );
     }
 
     /**
      * @return list<string>
      */
-    private function healthRelationMethodsDeclaredOn(User $user): array
+    private function healthRelationMethodsVisibleOn(User $user): array
     {
-        $declaredClass = $user::class;
         $violations = [];
 
-        foreach ((new ReflectionClass($declaredClass))->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+        foreach ((new ReflectionClass($user))->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
             if (
-                $method->getDeclaringClass()->getName() !== $declaredClass
+                ! is_a($method->getDeclaringClass()->getName(), User::class, true)
                 || $method->getNumberOfRequiredParameters() > 0
                 || $method->isStatic()
             ) {
@@ -84,4 +91,16 @@ class MappingNonJoinabilityPrivacyTest extends BoundaryTestCase
 
         return $violations;
     }
+}
+
+class UserWithHealthRelation extends User
+{
+    public function inheritedHealthSubjects()
+    {
+        return $this->hasMany(HealthSubject::class, 'health_subject_id');
+    }
+}
+
+class UserWithInheritedHealthRelation extends UserWithHealthRelation
+{
 }

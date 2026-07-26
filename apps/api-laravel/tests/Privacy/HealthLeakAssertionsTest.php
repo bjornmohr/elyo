@@ -26,6 +26,7 @@ class HealthLeakAssertionsTest extends TestCase
             'measurement timestamp' => [['data' => ['measuredAt' => '2026-07-20']], '$.data.measuredAt'],
             'health subject key' => [['data' => ['healthSubjectId' => 'synthetic']], '$.data.healthSubjectId'],
             'raw text answer' => [['data' => ['textValue' => 'synthetic']], '$.data.textValue'],
+            'raw answer text' => [['data' => ['answerText' => 'synthetic']], '$.data.answerText'],
             'singular wellbeing record' => [['data' => ['wellbeingEntry' => ['id' => 17]]], '$.data.wellbeingEntry'],
         ];
     }
@@ -41,6 +42,20 @@ class HealthLeakAssertionsTest extends TestCase
             'upper bound' => ['high', 300],
             'group' => ['group', 'synthetic'],
             'source' => ['source', 'manual'],
+            'name' => ['name', 'Synthetic Ferritin'],
+            'status' => ['status', 'below_range'],
+        ];
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function contextualScoreKeys(): array
+    {
+        return [
+            'health score' => ['healthScore'],
+            'average score' => ['averageScore'],
+            'score value' => ['scoreValue'],
         ];
     }
 
@@ -176,6 +191,19 @@ class HealthLeakAssertionsTest extends TestCase
             'data' => ['score' => 4.2],
         ]));
         $this->assertResponseHasNoHealthLeaks($identityResponse, '/api/admin/system-exercises');
+    }
+
+    #[DataProvider('contextualScoreKeys')]
+    public function test_score_variants_are_rejected_on_company_reporting_surfaces(string $key): void
+    {
+        $response = TestResponse::fromBaseResponse(new JsonResponse([
+            'data' => [$key => 4.2],
+        ]));
+
+        $this->expectException(ExpectationFailedException::class);
+        $this->expectExceptionMessage('$.data.'.$key);
+
+        $this->assertResponseHasNoHealthLeaks($response, '/api/company/dashboard');
     }
 
     #[DataProvider('companyReportingEndpoints')]

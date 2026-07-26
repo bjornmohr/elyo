@@ -115,6 +115,22 @@ Sensitivity tests were added before both fixes. The review also requested the
 task 16 output artifact with route statistics, validation results and known
 ELYO-144 gaps.
 
+## Fifth review findings
+
+The second memory-cleared review found three Medium coverage gaps:
+
+1. Lab-route 403 responses asserted authorization but were not passed through
+   the shared leak scanner.
+2. Normalized variants `answerText`, `healthScore`, `averageScore` and
+   `scoreValue` were missing from the catalog.
+3. Actual lab response fields `name` and `status` were not rejected when the
+   endpoint or JSON path established lab context.
+
+Sensitivity tests were added first and failed for the six missing catalog
+variants. Lab access tests now scan every forbidden response before asserting
+403. The relation guard and handoff structure were also tightened to close the
+two Low findings from the same review.
+
 ## Additional test seams
 
 - `GET /api/company/surveys/{id}/results` for effective-threshold suppression.

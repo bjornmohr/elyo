@@ -41,7 +41,7 @@ final class ForbiddenHealthPatternCatalog
         ],
         [
             'id' => 'raw_health_text',
-            'regex' => '/^(?:raw_answer|free_text|text_answer|text_value|health_note)$/',
+            'regex' => '/^(?:raw_answer|answer_text|free_text|text_answer|text_value|health_note)$/',
             'rationale' => 'Raw free text can contain identifying or sensitive health information.',
         ],
         [
@@ -59,15 +59,15 @@ final class ForbiddenHealthPatternCatalog
     public const CONTEXTUAL_KEY_PATTERNS = [
         [
             'id' => 'score_in_health_context',
-            'key_regex' => '/^(?:score|value)$/',
+            'key_regex' => '/^(?:score|value|health_score|average_score|score_value)$/',
             'context_regex' => '/(?:health|wellbeing|checkin|mood|stress|energy|lab|marker|measurement|biometric|anamnesis|wearable|company\/(?:dashboard|reports?(?:\b|\/)|surveys\/[^\/\s]+\/results))/',
             'rationale' => 'Generic score/value fields are health data inside health-related or company-reporting contexts.',
         ],
         [
             'id' => 'lab_metadata_in_lab_context',
-            'key_regex' => '/^(?:unit|low|high|group|source)$/',
+            'key_regex' => '/^(?:name|status|unit|low|high|group|source)$/',
             'context_regex' => '/(?:lab|marker|measurement|biometric)/',
-            'rationale' => 'Lab units, bounds, groups and sources reveal lab-domain data in a lab-related context.',
+            'rationale' => 'Lab names, statuses, units, bounds, groups and sources reveal lab-domain data in a lab-related context.',
         ],
     ];
 

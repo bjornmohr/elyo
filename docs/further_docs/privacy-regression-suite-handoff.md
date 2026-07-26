@@ -46,8 +46,8 @@ payload.
 
 ## Validation
 
-- `php artisan test --testsuite=privacy`: 51 tests, 336 assertions.
-- `php artisan test`: 562 tests, 3,257 assertions.
+- `php artisan test --testsuite=privacy`: 59 tests, 351 assertions.
+- `php artisan test`: 570 tests, 3,272 assertions.
 - Boundary suite: 21 tests, 97 assertions.
 - Deptrac: 0 violations, 0 errors.
 - Angular production build: passed.
@@ -62,6 +62,45 @@ payload.
 | `/api/company/*` | 24 |
 | `/api/admin/*` | 24 |
 | `/api/employee/lab-markers/*` access matrix | 4 |
+
+## Tests & Validation
+
+- Test-first applied: yes
+- Tests added/updated:
+  - `HealthLeakAssertionsTest` sensitivity cases were written first and shown
+    red for suppressed allowlist payloads, sub-five buckets, singular
+    wellbeing records, normalized raw-text/score variants and lab-context
+    `name`/`status`.
+  - `CompanyTest` proves global release at 10 and category release/suppression
+    at 5.
+  - `LabAccessPrivacyTest` leak-checks every forbidden-role response, including
+    a real Partner token, before asserting 403.
+  - `MappingNonJoinabilityPrivacyTest` detects untyped and inherited User-to-
+    health relation paths.
+  - Threshold unit and measure/survey feature tests cover the production
+    fix-forward changes.
+- ACs covered by tests:
+  - Dynamic company/admin discovery, explicit valid requests, route-count
+    guards and at least one 2xx response per route.
+  - Lab access bans, employee ownership isolation, mapping non-joinability,
+    reporting-pending responses and audit user/subject separation.
+  - Recursive pattern detection, safe diagnostics, response-state-aware
+    allowlisting, global threshold 10 and category threshold 5.
+- Validation commands executed:
+  - `docker compose exec api-tooling php artisan test --testsuite=privacy`
+  - `docker compose exec api-tooling php artisan test`
+  - `docker compose exec api-tooling php artisan test --testsuite=boundary`
+  - `docker compose exec api-tooling composer deptrac`
+  - `docker compose exec api-tooling ./vendor/bin/pint --dirty`
+  - `docker compose exec web npm run build`
+  - `docker compose config --quiet`
+  - YAML parsing for `docs/api/openapi.yaml` and
+    `.github/workflows/privacy.yml`
+  - `git diff --check HEAD`
+- Known gaps / intentionally not tested:
+  - Reporting-worker snapshots and future metric-specific thresholds remain
+    ELYO-144 work; no production reporting worker exists to exercise.
+  - No medical/lab aggregate or raw-text allowlist is intentionally provided.
 
 ## Open questions / ELYO-144 gaps
 
