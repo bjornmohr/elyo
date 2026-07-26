@@ -249,6 +249,9 @@ class LabMarkerEndpointTest extends TestCase
         return [
             'missing marker key' => [['value' => 1, 'measuredAt' => '2026-07-20'], 'markerKey'],
             'non numeric value' => [['markerKey' => 'ferritin', 'value' => 'high', 'measuredAt' => '2026-07-20'], 'value'],
+            'negative value' => [['markerKey' => 'ferritin', 'value' => -0.0001, 'measuredAt' => '2026-07-20'], 'value'],
+            'more than four decimal places' => [['markerKey' => 'ferritin', 'value' => 1.12345, 'measuredAt' => '2026-07-20'], 'value'],
+            'value above storage maximum' => [['markerKey' => 'ferritin', 'value' => 100000000, 'measuredAt' => '2026-07-20'], 'value'],
             'missing value' => [['markerKey' => 'ferritin', 'measuredAt' => '2026-07-20'], 'value'],
             'missing measurement date' => [['markerKey' => 'ferritin', 'value' => 1], 'measuredAt'],
             'malformed measurement date' => [['markerKey' => 'ferritin', 'value' => 1, 'measuredAt' => '20.07.2026'], 'measuredAt'],

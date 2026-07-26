@@ -1757,9 +1757,10 @@ paths:
       description: >-
         Per ELYO-102 §1.4: the MVP write path is manual self-entry. `source` is set by the
         server to `manual` and is not client-settable — a supplied value is rejected with
-        422 rather than silently overwritten. Validation is generic (numeric value, real
-        date, not in the future); per-marker plausibility ranges are ELYO-114. An unknown
-        or inactive `markerKey` returns 404.
+        422 rather than silently overwritten. Validation is generic (non-negative value
+        up to 99999999.9999 with at most four decimal places, real date, not in the
+        future); per-marker plausibility ranges are ELYO-114. An unknown or inactive
+        `markerKey` returns 404.
       security: [{ Sanctum: [] }]
       requestBody:
         required: true
@@ -1770,7 +1771,18 @@ paths:
               required: [markerKey, value, measuredAt]
               properties:
                 markerKey: { type: string, maxLength: 64, example: ferritin }
-                value: { type: number, example: 42.125 }
+                value:
+                  type: number
+                  minimum: 0
+                  maximum: 99999999.9999
+                  description: >-
+                    Non-negative value with at most four decimal places (the `decimal(12,4)`
+                    storage shape). The precision limit is stated rather than expressed as
+                    `multipleOf: 0.0001`: that keyword is evaluated in floating point, where
+                    even the documented maximum `99999999.9999` fails the integrality check
+                    and a legal value would be rejected by the schema while the server
+                    accepts it.
+                  example: 42.125
                 measuredAt: { type: string, format: date, example: "2026-07-20" }
                 source:
                   description: Server-set provenance; any supplied value is invalid (§1.4).
@@ -1800,7 +1812,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/LabMarkerNotFoundError'
         422:
-          description: Validation failed — missing field, non-numeric value, malformed or future date, or a supplied `source`.
+          description: Validation failed — missing field, invalid numeric bounds or precision, malformed or future date, or a supplied `source`.
           content:
             application/json:
               schema:
