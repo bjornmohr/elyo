@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Services\Health\LabMarkerService;
 use App\Services\Health\WellbeingScoreCalculator;
 use App\Services\Privacy\MappingServiceContract;
 use App\Services\Privacy\PurposeCode;
@@ -15,10 +16,21 @@ use Throwable;
 
 class DemoDataSeeder extends Seeder
 {
-    public function __construct(private readonly MappingServiceContract $mappingService) {}
+    public function __construct(
+        private readonly MappingServiceContract $mappingService,
+        private readonly LabMarkerService $labMarkerService,
+    ) {}
 
     public function run(): void
     {
+        // The catalog is a prerequisite of the synthetic lab history and is
+        // normally seeded by DatabaseSeeder. Seed it here only when a direct
+        // `db:seed --class=DemoDataSeeder` run finds it missing, so a full seed
+        // does not run the catalog twice.
+        if (! $this->labMarkerCatalogIsComplete()) {
+            $this->call(LabMarkerCatalogSeeder::class);
+        }
+
         $now = now();
         $password = Hash::make('demo1234');
 
@@ -94,6 +106,7 @@ class DemoDataSeeder extends Seeder
         );
 
         $this->seedWellbeingEntries($employeeIds, $now, 12);
+        $this->seedSyntheticLabMarkerReadings($employeeIds[0], $now);
 
         $surveyId = DB::table('surveys')->where('company_id', $companyId)->where('title', 'Quarterly Pulse Check')->value('id');
         if (! $surveyId) {
@@ -395,6 +408,46 @@ class DemoDataSeeder extends Seeder
                     'updated_at' => $now,
                 ]);
             }
+        }
+    }
+
+    private function labMarkerCatalogIsComplete(): bool
+    {
+        $keys = LabMarkerCatalogSeeder::markerKeys();
+
+        return DB::connection('health')
+            ->table('lab_markers')
+            ->whereIn('marker_key', $keys)
+            ->count() === count($keys);
+    }
+
+    /**
+     * Synthetic demo-only lab history. Values are not imported clinical data
+     * and must never be exposed to company or reporting actors.
+     */
+    private function seedSyntheticLabMarkerReadings(int $employeeId, mixed $now): void
+    {
+        $subjectId = $this->provisionSubjects([$employeeId])[$employeeId];
+
+        DB::connection('health')
+            ->table('lab_marker_readings')
+            ->where('health_subject_id', $subjectId)
+            ->delete();
+
+        foreach ([
+            ['ferritin', '24.0000', 120],
+            ['ferritin', '31.0000', 60],
+            ['ferritin', '42.0000', 5],
+            ['crp', '7.0000', 90],
+            ['crp', '2.0000', 5],
+        ] as [$markerKey, $value, $daysAgo]) {
+            $this->labMarkerService->createReading(
+                $subjectId,
+                $markerKey,
+                $value,
+                $now->copy()->subDays($daysAgo),
+                'manual',
+            );
         }
     }
 
