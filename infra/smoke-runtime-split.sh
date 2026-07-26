@@ -151,6 +151,9 @@ expect_env_present "api-identity" "$IDENTITY_ENV" '^ELYO_RUNTIME=identity$' 'ELY
 expect_env_present "api-identity" "$IDENTITY_ENV" '^DB_IDENTITY_USERNAME=elyo_identity_rt$' 'the identity runtime role'
 expect_env_absent  "api-identity" "$IDENTITY_ENV" '^DB_MAPPING_|elyo_mapping_svc' 'mapping credentials'
 expect_env_absent  "api-identity" "$IDENTITY_ENV" '^DB_HEALTH_' 'health credentials'
+# elyo_identity_rt has no CONNECT on elyo_audit and nothing in this runtime
+# emits audit events, so the connection must not be configured at all.
+expect_env_absent  "api-identity" "$IDENTITY_ENV" '^DB_AUDIT_' 'audit credentials'
 expect_env_absent  "api-identity" "$IDENTITY_ENV" '^MAPPING_(ENCRYPTION|HMAC|SUBJECT_DERIVATION)_KEY=.+' 'mapping key material'
 expect_env_absent  "api-identity" "$IDENTITY_ENV" 'elyo_employee_rt|elyo_company_rt' 'foreign runtime roles'
 
@@ -167,6 +170,21 @@ expect_env_absent  "api-company" "$COMPANY_ENV" '^DB_MAPPING_|elyo_mapping_svc' 
 expect_env_absent  "api-company" "$COMPANY_ENV" '^DB_HEALTH_' 'health credentials'
 expect_env_absent  "api-company" "$COMPANY_ENV" '^MAPPING_(ENCRYPTION|HMAC|SUBJECT_DERIVATION)_KEY=.+' 'mapping key material'
 expect_env_absent  "api-company" "$COMPANY_ENV" 'elyo_identity_rt|elyo_employee_rt' 'foreign runtime roles'
+
+# api-tooling is a local development convenience and the only container allowed
+# to hold every credential. Assert it is the ONLY one, so the concentration
+# cannot silently spread to a runtime.
+migrator_holders=""
+for service in api-identity api-employee api-company api-tooling; do
+  if $COMPOSE exec -T "$service" env 2>/dev/null | grep -Eq '^DB_MIGRATOR_|elyo_migrator'; then
+    migrator_holders="$migrator_holders $service"
+  fi
+done
+if [ "$migrator_holders" = " api-tooling" ]; then
+  pass "api-tooling is the only running container with migrator credentials"
+else
+  die "unexpected migrator credential holders:${migrator_holders:- (none)}"
+fi
 
 echo
 echo "== 2. route topology per runtime ===================================="
@@ -218,6 +236,18 @@ expect_status 404 GET /employee/not-a-route
 expect_status 404 GET /company/not-a-route
 expect_status 404 GET /auth/not-a-route
 expect_status 404 GET /admin/not-a-route
+
+# The invite endpoints are the identity runtime's only unauthenticated write
+# path. They used to 500 here because the controller constructor-injected the
+# mapping service, which this runtime holds no credentials for — a 404 for an
+# unknown token proves the request reached the controller instead.
+expect_status 404 GET '/auth/invite/verify?token=smoke-unknown-invite-token'
+
+# Same path with the invite the demo seed leaves pending. Depends on the
+# documented `docker compose run --rm migrate` prerequisite, like the login
+# checks below. Acceptance itself is not idempotent, so it is covered
+# deterministically by tests/Feature/Runtime/RuntimeCredentialTest.php instead.
+expect_status 200 GET '/auth/invite/verify?token=demo-invite-token'
 
 echo
 echo "== 4. session continuity across runtimes ============================"

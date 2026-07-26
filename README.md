@@ -99,18 +99,30 @@ Copy the root environment file:
 cp .env.example .env
 ```
 
-The default database settings are:
+There is no single application database. ELYO-104 split the data into four
+PostgreSQL databases on one cluster, each with its own runtime role:
 
 ```env
-DB_CONNECTION=pgsql
+DB_CONNECTION=identity
 DB_HOST=postgres
 DB_PORT=5432
-DB_DATABASE=elyo
-DB_USERNAME=elyo
-DB_PASSWORD=elyo_secret
+
+DB_IDENTITY_DATABASE=elyo_identity          # elyo_identity_rt
+DB_MAPPING_DATABASE=elyo_subject_mapping    # elyo_mapping_svc
+DB_HEALTH_DATABASE=elyo_health              # elyo_employee_rt
+DB_AUDIT_DATABASE=elyo_audit                # elyo_employee_rt / elyo_company_rt
 ```
 
-These values are used by `docker-compose.yml` to create the PostgreSQL database and by the Laravel container to connect to it.
+`infra/postgres/initdb/01-databases-and-roles.sh` creates these databases, the
+roles and their grants on first start. The dev-only role passwords
+(`ELYO_*_PASSWORD`) live in the root `.env`.
+
+The legacy `DB_DATABASE=elyo` / `DB_USERNAME=elyo` pair still exists in
+`.env.example`, but only as the bootstrap superuser for the container and for
+n8n. It is not the application's database anymore.
+
+Which credentials each API container receives is decided per service in
+`docker-compose.yml`, not in this file — see [The API Runtime Split](#the-api-runtime-split).
 
 Create the Laravel API environment file:
 
@@ -118,30 +130,11 @@ Create the Laravel API environment file:
 cp apps/api-laravel/.env.example apps/api-laravel/.env
 ```
 
-Edit `apps/api-laravel/.env` so the database points to the Docker PostgreSQL service:
-
-```env
-APP_NAME=ELYO_API
-APP_ENV=local
-APP_DEBUG=true
-APP_URL=http://localhost:8080
-
-DB_CONNECTION=pgsql
-DB_HOST=postgres
-DB_PORT=5432
-DB_DATABASE=elyo
-DB_USERNAME=elyo
-DB_PASSWORD=elyo_secret
-
-CACHE_STORE=database
-QUEUE_CONNECTION=database
-SESSION_DRIVER=database
-
-REDIS_HOST=redis
-MAIL_MAILER=smtp
-MAIL_HOST=mailpit
-MAIL_PORT=1025
-```
+The checked-in template already targets the Docker PostgreSQL service and the
+domain-separated connections, so it normally needs no edits. Values Compose sets
+for a container (database credentials, `ELYO_RUNTIME`, `REDIS_HOST`, mail) take
+precedence over this file; it matters mainly when you run the API locally
+without Docker.
 
 Install local dependencies:
 

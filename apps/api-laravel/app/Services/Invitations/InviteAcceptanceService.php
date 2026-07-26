@@ -5,17 +5,28 @@ namespace App\Services\Invitations;
 use App\Models\InviteToken;
 use App\Models\User;
 use App\Models\UserRole;
-use App\Services\Privacy\MappingServiceContract;
-use App\Services\Privacy\PurposeCode;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Throwable;
 
+/**
+ * Invite acceptance is an identity-domain operation only.
+ *
+ * It deliberately does NOT provision a health subject. Prompt 05 originally
+ * provisioned synchronously here; the runtime split (ADR-003 D2) superseded
+ * that, because `/api/auth/invite/accept` is served by the identity runtime,
+ * which holds no mapping connection and no mapping key material — so a
+ * health-domain write from this class is a boundary violation, not an
+ * optimisation.
+ *
+ * Provisioning is idempotent and happens where the credentials legitimately
+ * exist: `App\Services\Health\ResolvesOwnSubject` provisions on the employee
+ * runtime at first health access, and `elyo:provision-subjects` backfills in
+ * bulk. A user who never opens a health feature never gets a health-domain
+ * row, which is the better data-minimisation outcome.
+ */
 class InviteAcceptanceService
 {
     public function __construct(
         private readonly InviteTeamValidator $teamValidator,
-        private readonly MappingServiceContract $mappingService,
     ) {}
 
     public function accept(string $token, string $name, string $password): User
@@ -100,15 +111,6 @@ class InviteAcceptanceService
 
             return $user->load('roles', 'company');
         });
-
-        try {
-            $this->mappingService->provisionOwnSubject($user->id, PurposeCode::PROVISIONING);
-        } catch (Throwable) {
-            // ADR-001 §2.2 accepts retry as compensation for cross-database
-            // partial failure; registration remains valid and the idempotent
-            // elyo:provision-subjects sweep repairs the missing mapping.
-            Log::warning('Health subject provisioning failed after invite acceptance; run elyo:provision-subjects.');
-        }
 
         return $user;
     }

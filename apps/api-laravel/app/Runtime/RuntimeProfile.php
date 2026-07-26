@@ -39,8 +39,14 @@ final class RuntimeProfile
      * @var array<string, array<int, string>>
      */
     private const CONNECTIONS = [
-        self::IDENTITY => ['identity', 'audit'],
+        // No `audit`: `elyo_identity_rt` has no CONNECT on `elyo_audit`
+        // (infra/postgres/initdb/01-databases-and-roles.sh) and nothing in the
+        // identity runtime emits audit events. An allowlist states what a
+        // runtime can actually reach, never what it might one day want — the
+        // entry returns together with the grant and the emitting code.
+        self::IDENTITY => ['identity'],
         self::EMPLOYEE => ['identity', 'mapping', 'health', 'audit'],
+        // `company` keeps `audit`: `elyo_company_rt` does hold CONNECT + INSERT.
         self::COMPANY => ['identity', 'audit'],
         self::FULL => [
             'sqlite',

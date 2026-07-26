@@ -65,7 +65,9 @@ services:
   # ---------------------------------------------------------------------------
 
   # Identity runtime: /api/auth/*, /api/admin/*, /api/partner/*, /api/health.
-  # Holds elyo_identity_rt only — no mapping, no health, no migrator credentials.
+  # Holds elyo_identity_rt and nothing else — no mapping, no health, no audit,
+  # no migrator credentials, no mapping key material. Its single connection is
+  # the whole of its reach.
   api-identity:
     <<: *api-build
     environment:
@@ -74,9 +76,6 @@ services:
       DB_IDENTITY_DATABASE: elyo_identity
       DB_IDENTITY_USERNAME: elyo_identity_rt
       DB_IDENTITY_PASSWORD: ${ELYO_IDENTITY_RT_PASSWORD:-identity_rt_dev}
-      DB_AUDIT_DATABASE: elyo_audit
-      DB_AUDIT_USERNAME: elyo_identity_rt
-      DB_AUDIT_PASSWORD: ${ELYO_IDENTITY_RT_PASSWORD:-identity_rt_dev}
     volumes: *api-volumes
     networks:
       - elyo-network
