@@ -99,6 +99,15 @@ those tables are empty. Cleanup now removes the mapping row, the health subject,
 the identity rows and the company. Audit events are deliberately left in place —
 the audit log is append-only and deleting from it would defeat its purpose.
 
+Because cleanup runs in `finally`, it must not throw — an assertion there would
+replace whatever exception the test body raised. So cleanup reports failures to
+STDERR, and the invariant is enforced as a `setUp()` **precondition** instead:
+each test asserts that `subject_mappings` and `health_subjects` are empty before
+it runs. That can never mask a failure, it also catches residue from an earlier
+crashed run, and it converts "three confusing boundary failures in unrelated
+files" into one actionable message naming this class. Verified by injecting a
+stray `health_subjects` row and confirming the guard fires.
+
 ## 4. Commands run and results
 
 | Command | Result |

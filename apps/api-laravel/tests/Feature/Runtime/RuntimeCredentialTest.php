@@ -25,6 +25,49 @@ use Symfony\Component\Process\Process;
 class RuntimeCredentialTest extends TestCase
 {
     /**
+     * This class commits rows so a separate process can see them, which puts it
+     * outside RefreshDatabase. Leftovers break the boundary suite, which asserts
+     * the mapping and health tables are empty — and those failures point at the
+     * wrong files.
+     *
+     * Checked as a PRECONDITION rather than after cleanup on purpose: an
+     * assertion in a `finally` block would replace whatever exception the test
+     * body raised, hiding the real failure. Here it runs before the test body,
+     * so it can never mask anything, and it also catches residue left by an
+     * earlier crashed run.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        foreach (['mapping' => 'subject_mappings', 'health' => 'health_subjects'] as $connection => $table) {
+            $this->assertSame(
+                0,
+                $this->committedRowCount($connection, $table),
+                "Leftover rows in {$connection}.{$table} before this test. A previous "
+                .'RuntimeCredentialTest run did not clean up; reset with '
+                .'`docker compose run --rm migrate` or re-run the suite after fixing cleanup.',
+            );
+        }
+    }
+
+    private function committedRowCount(string $connection, string $table): int
+    {
+        $code = <<<'PHP'
+require 'vendor/autoload.php';
+$app = require 'bootstrap/app.php';
+$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+fwrite(STDOUT, (string) \Illuminate\Support\Facades\DB::connection($argv[1])->table($argv[2])->count());
+PHP;
+
+        $process = $this->runPhp($code, 'full', [], [$connection, $table]);
+
+        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput().$process->getOutput());
+
+        return (int) trim($process->getOutput());
+    }
+
+    /**
      * Credentials handed to `api-employee` in docker-compose.yml: identity is
      * reached as `elyo_employee_rt`, which has SELECT and nothing more.
      *
@@ -235,7 +278,7 @@ if ($companyIds !== []) {
 }
 PHP;
 
-        $this->runPhp($code, 'full', [], [$email]);
+        $this->reportIfFailed($this->runPhp($code, 'full', [], [$email]));
     }
 
     private function deleteInvite(string $email): void
@@ -259,7 +302,7 @@ if ($companyIds !== []) {
 }
 PHP;
 
-        $this->runPhp($code, 'full', [], [$email]);
+        $this->reportIfFailed($this->runPhp($code, 'full', [], [$email]));
     }
 
     /**
@@ -333,6 +376,22 @@ PHP;
         $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput().$process->getOutput());
 
         return json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Cleanup runs inside `finally`, so it must not throw — that would replace
+     * the test body's exception. Report loudly instead; the setUp precondition
+     * turns any surviving residue into a hard failure on the next run.
+     */
+    private function reportIfFailed(Process $process): void
+    {
+        if ($process->getExitCode() !== 0) {
+            fwrite(
+                STDERR,
+                PHP_EOL.'[RuntimeCredentialTest] cleanup failed: '
+                .$process->getErrorOutput().$process->getOutput().PHP_EOL,
+            );
+        }
     }
 
     /**
