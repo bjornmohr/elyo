@@ -958,6 +958,137 @@ components:
         type: { type: string }
         verificationStatus: { type: string, enum: [PENDING_DOCS, PENDING_REVIEW, VERIFIED, SUSPENDED, REJECTED] }
 
+    LabMarkerStatus:
+      type: string
+      description: >-
+        Soft status with stable technical keys per ELYO-102 §1.2, derived from the
+        orientation range and never stored. Display wording is a frontend/catalog concern
+        (ELYO-94) and deliberately not part of the contract. These are not diagnostic
+        statements.
+      enum: [below_range, in_range, above_range]
+
+    LabMarkerSource:
+      type: string
+      description: >-
+        Provenance per ELYO-102 §1.4. The MVP writes `manual` only; `document_import` and
+        `bgm_import` are reserved so later import paths can be added additively. The value
+        is server-set and never accepted from a client.
+      enum: [manual, document_import, bgm_import]
+
+    LabMarkerGroup:
+      type: string
+      description: Catalog grouping per ELYO-102 §1.1.
+      enum: [blutbild, immun, mikro, sonstige]
+
+    LabMarkerReading:
+      type: object
+      description: One lab reading with its catalog metadata, per ELYO-102 §1.1.
+      required: [id, markerKey, name, unit, value, measuredAt, status, low, high, group, source]
+      additionalProperties: false
+      properties:
+        id: { type: string, description: Opaque ULID of the reading. }
+        markerKey: { type: string, example: ferritin }
+        name: { type: string, example: Ferritin }
+        unit: { type: string, example: ng/ml }
+        value: { type: number, example: 42.125 }
+        measuredAt: { type: string, format: date, example: "2026-07-20" }
+        status: { $ref: '#/components/schemas/LabMarkerStatus' }
+        low:
+          type: number
+          nullable: true
+          description: Lower orientation bound; content candidate pending ELYO-94 review.
+        high:
+          type: number
+          nullable: true
+          description: Upper orientation bound; content candidate pending ELYO-94 review.
+        group: { $ref: '#/components/schemas/LabMarkerGroup' }
+        source: { $ref: '#/components/schemas/LabMarkerSource' }
+
+    LabMarkerHistoryEntry:
+      type: object
+      description: One history entry of a single marker, per ELYO-102 §1.3.
+      required: [id, markerKey, value, measuredAt, status, source]
+      additionalProperties: false
+      properties:
+        id: { type: string, description: Opaque ULID of the reading. }
+        markerKey: { type: string, example: ferritin }
+        value: { type: number, example: 42.125 }
+        measuredAt: { type: string, format: date, example: "2026-07-20" }
+        status: { $ref: '#/components/schemas/LabMarkerStatus' }
+        source: { $ref: '#/components/schemas/LabMarkerSource' }
+
+    LabMarkerHistoryResponse:
+      type: object
+      description: Chronologically ascending history page (ELYO-102 §1.3).
+      required: [data, links, meta]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/LabMarkerHistoryEntry' }
+        links:
+          type: object
+          properties:
+            first: { type: string, nullable: true }
+            last: { type: string, nullable: true }
+            prev: { type: string, nullable: true }
+            next: { type: string, nullable: true }
+        meta:
+          type: object
+          properties:
+            current_page: { type: integer }
+            from: { type: integer, nullable: true }
+            last_page: { type: integer }
+            per_page: { type: integer }
+            to: { type: integer, nullable: true }
+            total: { type: integer }
+
+    LabMarkerNotFoundError:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          additionalProperties: false
+          properties:
+            code: { type: string, enum: [LAB_MARKER_NOT_FOUND] }
+            message: { type: string }
+
+    LabReadingNotFoundError:
+      type: object
+      description: >-
+        Returned for a reading that does not exist and for a reading owned by another
+        health subject — the two cases are deliberately indistinguishable (ELYO-102 §1.5).
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          additionalProperties: false
+          properties:
+            code: { type: string, enum: [LAB_READING_NOT_FOUND] }
+            message: { type: string }
+
+    LabMarkerValidationError:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message, details]
+          additionalProperties: false
+          properties:
+            code: { type: string, enum: [VALIDATION_ERROR] }
+            message: { type: string }
+            details:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+
 paths:
   /auth/login:
     post:
@@ -1575,6 +1706,216 @@ paths:
                   ok: { type: boolean }
         404:
           description: Survey not found, not active, or unavailable because the company team layer is disabled
+
+  /employee/lab-markers:
+    get:
+      tags: [Employee]
+      summary: List the latest lab reading per marker
+      description: >-
+        Per ELYO-102 §1.1: one entry per marker, each carrying the most recent reading of a
+        history-capable series plus its catalog metadata. `status` is derived from the
+        orientation range and never stored (§1.2). Employee-only, own data exclusively
+        (§1.5) — the response never contains a health subject id. Markers without a reading
+        are absent; an employee without readings receives an empty list.
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Latest reading per marker, newest measurement first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/LabMarkerReading' }
+              example:
+                data:
+                  - id: "01JY0000000000000000000001"
+                    markerKey: ferritin
+                    name: Ferritin
+                    unit: ng/ml
+                    value: 42.125
+                    measuredAt: "2026-07-20"
+                    status: in_range
+                    low: 30
+                    high: 300
+                    group: mikro
+                    source: manual
+        401:
+          description: Unauthenticated
+        403:
+          description: The authenticated user is not an employee (§1.5).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodedForbiddenError'
+    post:
+      tags: [Employee]
+      summary: Add a manual lab reading
+      description: >-
+        Per ELYO-102 §1.4: the MVP write path is manual self-entry. `source` is set by the
+        server to `manual` and is not client-settable — a supplied value is rejected with
+        422 rather than silently overwritten. Validation is generic (non-negative value
+        up to 99999999.9999 with at most four decimal places, real date, not in the
+        future); per-marker plausibility ranges are ELYO-114. An unknown or inactive
+        `markerKey` returns 404.
+      security: [{ Sanctum: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [markerKey, value, measuredAt]
+              properties:
+                markerKey: { type: string, maxLength: 64, example: ferritin }
+                value:
+                  type: number
+                  minimum: 0
+                  maximum: 99999999.9999
+                  description: >-
+                    Non-negative value with at most four decimal places (the `decimal(12,4)`
+                    storage shape). The precision limit is stated rather than expressed as
+                    `multipleOf: 0.0001`: that keyword is evaluated in floating point, where
+                    even the documented maximum `99999999.9999` fails the integrality check
+                    and a legal value would be rejected by the schema while the server
+                    accepts it.
+                  example: 42.125
+                measuredAt: { type: string, format: date, example: "2026-07-20" }
+                source:
+                  description: Server-set provenance; any supplied value is invalid (§1.4).
+                  not: {}
+      responses:
+        201:
+          description: Reading created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/LabMarkerReading' }
+        401:
+          description: Unauthenticated
+        403:
+          description: The authenticated user is not an employee (§1.5).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodedForbiddenError'
+        404:
+          description: Unknown marker key, or a marker that is no longer active.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabMarkerNotFoundError'
+        422:
+          description: Validation failed — missing field, invalid numeric bounds or precision, malformed or future date, or a supplied `source`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabMarkerValidationError'
+              examples:
+                futureDate:
+                  summary: Measurement date in the future
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: The given data was invalid.
+                      details:
+                        measuredAt: ["The measured at field must be a date before or equal to today."]
+                sourceProhibited:
+                  summary: Client-supplied provenance
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: The given data was invalid.
+                      details:
+                        source: ["Die Herkunft eines Messwerts wird serverseitig gesetzt."]
+
+  /employee/lab-markers/{markerKey}/history:
+    get:
+      tags: [Employee]
+      summary: Get one marker's reading history
+      description: >-
+        Per ELYO-102 §1.3: chronologically ascending readings of the authenticated employee
+        for a single marker, paginated with `page`/`perPage`. A known marker without
+        readings returns 200 with an empty list; an unknown marker key returns 404. Catalog
+        metadata is not repeated per entry — it is carried by `GET /employee/lab-markers`.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: markerKey
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[a-z0-9_]+$' }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: perPage
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+      responses:
+        200:
+          description: Chronological history page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabMarkerHistoryResponse'
+        401:
+          description: Unauthenticated
+        403:
+          description: The authenticated user is not an employee (§1.5).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodedForbiddenError'
+        404:
+          description: Unknown marker key. An existing marker without readings returns 200 with an empty list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabMarkerNotFoundError'
+        422:
+          description: Pagination parameters outside the contract bounds.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabMarkerValidationError'
+
+  /employee/lab-markers/{id}:
+    delete:
+      tags: [Employee]
+      summary: Delete an own lab reading
+      description: >-
+        Own-data correction per ELYO-102 §1.4. Only readings of the authenticated employee's
+        health subject are deletable; a reading belonging to someone else is indistinguishable
+        from a non-existent one and returns 404, never 403 (§1.5).
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Opaque ULID of the reading.
+          schema: { type: string }
+      responses:
+        204:
+          description: Reading deleted
+        401:
+          description: Unauthenticated
+        403:
+          description: The authenticated user is not an employee (§1.5).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodedForbiddenError'
+        404:
+          description: No reading with this id belongs to the authenticated employee.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabReadingNotFoundError'
 
   /partner/login:
     post:

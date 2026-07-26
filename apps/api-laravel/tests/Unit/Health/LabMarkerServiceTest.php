@@ -4,11 +4,21 @@ namespace Tests\Unit\Health;
 
 use App\Models\Health\LabMarker;
 use App\Services\Health\LabMarkerService;
+use App\Services\Privacy\MappingServiceContract;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class LabMarkerServiceTest extends TestCase
 {
+    /**
+     * Status derivation is pure — it never touches the mapping domain, so a stub
+     * keeps this a unit test without a booted application.
+     */
+    private function service(): LabMarkerService
+    {
+        return new LabMarkerService($this->createStub(MappingServiceContract::class));
+    }
+
     /**
      * @return array<string, array{0: string, 1: string}>
      */
@@ -35,7 +45,7 @@ class LabMarkerServiceTest extends TestCase
 
         $this->assertSame(
             $expectedStatus,
-            (new LabMarkerService)->deriveStatus($marker, $value),
+            $this->service()->deriveStatus($marker, $value),
         );
     }
 
@@ -64,7 +74,7 @@ class LabMarkerServiceTest extends TestCase
 
         $this->assertSame(
             $expectedStatus,
-            (new LabMarkerService)->deriveStatus($marker, $value),
+            $this->service()->deriveStatus($marker, $value),
         );
     }
 }
