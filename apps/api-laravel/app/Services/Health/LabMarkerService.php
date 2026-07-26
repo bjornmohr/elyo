@@ -4,19 +4,92 @@ namespace App\Services\Health;
 
 use App\Models\Health\LabMarker;
 use App\Models\Health\LabMarkerReading;
+use App\Services\Privacy\MappingServiceContract;
+use App\Services\Privacy\PurposeCode;
 use DateTimeInterface;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
+/**
+ * Health-domain access to lab markers (ELYO-105/ELYO-113, ADR-003 D4).
+ *
+ * The `*ForUser` methods are the entry points for self-service HTTP callers:
+ * they take an identity user id, resolve it to a `health_subject_id` through the
+ * mapping domain with an explicit purpose code, and never hand the subject id
+ * back. The subject-based methods stay public for seeders and for callers that
+ * already hold a resolved subject.
+ */
 class LabMarkerService
 {
+    use ResolvesOwnSubject;
+
     public const STATUS_BELOW_RANGE = 'below_range';
 
     public const STATUS_IN_RANGE = 'in_range';
 
     public const STATUS_ABOVE_RANGE = 'above_range';
+
+    public const SOURCE_MANUAL = 'manual';
+
+    public function __construct(private readonly MappingServiceContract $mappingService) {}
+
+    protected function mappingService(): MappingServiceContract
+    {
+        return $this->mappingService;
+    }
+
+    /**
+     * @return Collection<int, LabMarkerReading>
+     */
+    public function latestForUser(int $userId): Collection
+    {
+        return $this->latestPerMarker(
+            $this->resolveSubjectId($userId, PurposeCode::HEALTH_SELF_READ),
+        );
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, LabMarkerReading>
+     */
+    public function historyForUser(int $userId, string $markerKey, int $perPage): LengthAwarePaginator
+    {
+        $subjectId = $this->resolveSubjectId($userId, PurposeCode::HEALTH_SELF_READ);
+
+        LabMarker::query()->whereKey($markerKey)->firstOrFail();
+
+        return $this->historyQuery($subjectId, $markerKey)->paginate($perPage);
+    }
+
+    /**
+     * Manual self-entry per ELYO-102 §1.4: the MVP has exactly one provenance,
+     * and it is set here rather than accepted from the client.
+     */
+    public function createReadingForUser(
+        int $userId,
+        string $markerKey,
+        mixed $value,
+        string $measuredAt,
+    ): LabMarkerReading {
+        return $this->createReading(
+            $this->resolveSubjectId($userId, PurposeCode::HEALTH_SELF_WRITE),
+            $markerKey,
+            $value,
+            $measuredAt,
+            self::SOURCE_MANUAL,
+        );
+    }
+
+    public function deleteReadingForUser(int $userId, string $readingId): bool
+    {
+        return $this->deleteReading(
+            $this->resolveSubjectId($userId, PurposeCode::HEALTH_SELF_WRITE),
+            $readingId,
+        );
+    }
 
     /**
      * @param  mixed  $value  Generic numeric sanity checks only. Marker-specific
@@ -100,14 +173,24 @@ class LabMarkerService
     {
         LabMarker::query()->whereKey($markerKey)->firstOrFail();
 
+        return $this->historyQuery($subjectId, $markerKey)->get();
+    }
+
+    /**
+     * Shared chronological history query, so the paginated and the full read
+     * cannot drift apart in ordering.
+     *
+     * @return Builder<LabMarkerReading>
+     */
+    private function historyQuery(string $subjectId, string $markerKey): Builder
+    {
         return LabMarkerReading::query()
             ->with('marker')
             ->where('health_subject_id', $subjectId)
             ->where('marker_key', $markerKey)
             ->orderBy('measured_at')
             ->orderBy('created_at')
-            ->orderBy('id')
-            ->get();
+            ->orderBy('id');
     }
 
     public function deleteReading(string $subjectId, string $readingId): bool
