@@ -183,12 +183,44 @@ docker compose ps
 The important services are:
 
 - `web`: Angular frontend on <http://localhost:4200>
-- `nginx`: Laravel API proxy on <http://localhost:8080>
-- `api`: Laravel PHP-FPM container
+- `nginx`: single API entry point on <http://localhost:8080>
+- `api-identity`, `api-employee`, `api-company`: the three Laravel runtimes
+- `api-tooling`: local-only container for tests and artisan commands
 - `postgres`: PostgreSQL database on local port `5432`
 - `redis`: Redis on local port `6379`
 - `mailpit`: test mailbox UI on <http://localhost:8025>
 - `n8n`: workflow automation on <http://localhost:5678>
+
+### The API Runtime Split
+
+The Laravel API is not one container. It is built as **one image** and started as
+**three containers**, each selecting its route subset and its database connection
+allowlist through `ELYO_RUNTIME` (ADR-001 §2.4, ADR-003 D2). Every container
+receives only the PostgreSQL credentials its own domain needs.
+
+| Service | `ELYO_RUNTIME` | Serves | PostgreSQL roles |
+| --- | --- | --- | --- |
+| `api-identity` | `identity` | `/api/auth/*`, `/api/admin/*`, `/api/partner/*`, `/api/health` | `elyo_identity_rt` |
+| `api-employee` | `employee` | `/api/employee/*`, `/api/health` | `elyo_employee_rt` (identity read, health, audit), `elyo_mapping_svc` (mapping) |
+| `api-company` | `company` | `/api/company/*`, `/api/health` | `elyo_company_rt` (identity, audit) |
+| `migrate` | `full` | one-shot schema + seed | `elyo_migrator` |
+| `api-tooling` | `full` | tests and artisan, local only | all runtime roles + `elyo_migrator` |
+
+`nginx` routes by path prefix, so the frontend keeps one base URL
+(`http://localhost:8080/api`) and knows nothing about the split. A runtime that
+does not own a prefix simply has no such route and answers `404` — there is no
+aggregator container and no runtime-to-runtime traffic.
+
+`api-tooling` exists because the test suite needs every route and every
+connection, which only `ELYO_RUNTIME=full` provides. It has no published port and
+no nginx upstream. It is a development convenience and is never deployed.
+
+Two further services are prepared but not implemented; they start idle
+placeholders and are not wired into nginx:
+
+```bash
+docker compose --profile future up -d reporting-worker api-privacy
+```
 
 Follow logs when something does not start:
 
@@ -199,7 +231,9 @@ docker compose logs -f
 Or follow one service:
 
 ```bash
-docker compose logs -f api
+docker compose logs -f api-identity
+docker compose logs -f api-employee
+docker compose logs -f api-company
 docker compose logs -f web
 docker compose logs -f postgres
 ```
@@ -212,17 +246,17 @@ Wait until PostgreSQL is healthy:
 docker compose ps postgres
 ```
 
-Run Laravel migrations inside the API container:
+Build the schema for all four domain databases and seed them. This runs in the
+one-shot `migrate` service, the only container that ever receives the
+`elyo_migrator` role:
 
 ```bash
-docker compose exec api php artisan migrate
+docker compose run --rm migrate
 ```
 
-Seed the database with the default and demo data:
-
-```bash
-docker compose exec api php artisan db:seed
-```
+The service runs `php artisan elyo:migrate-fresh --seed`, which fresh-migrates
+`identity`, `mapping`, `health` and `audit` in that order and then seeds. It
+exits when done; `--rm` removes the container.
 
 The demo seed creates these useful accounts:
 
@@ -236,7 +270,7 @@ The demo seed creates these useful accounts:
 To create or update a local admin account with the helper script:
 
 ```bash
-docker compose exec api php scripts/create_admin.php
+docker compose exec api-tooling php scripts/create_admin.php
 ```
 
 Optional custom credentials:
@@ -245,7 +279,7 @@ Optional custom credentials:
 docker compose exec \
   -e ADMIN_EMAIL=admin@elyo.local \
   -e ADMIN_PASSWORD='ChangeMe123!' \
-  api php scripts/create_admin.php
+  api-tooling php scripts/create_admin.php
 ```
 
 Verify the API and database connection:
@@ -254,10 +288,18 @@ Verify the API and database connection:
 curl http://localhost:8080/api/health
 ```
 
-Expected result:
+Expected result (`/api/health` is served by every runtime; the default nginx
+upstream is identity):
 
 ```json
-{"status":"up","database":"connected"}
+{"status":"up","runtime":"identity"}
+```
+
+Verify the runtime split itself — credential isolation, path routing and session
+continuity across the three containers:
+
+```bash
+bash infra/smoke-runtime-split.sh
 ```
 
 ## Daily Development
@@ -284,22 +326,39 @@ docker compose down
 Restart a single service:
 
 ```bash
-docker compose restart api
+docker compose restart api-employee
 docker compose restart web
 ```
 
-Rebuild after Dockerfile, dependency, or environment changes:
+Rebuild after Dockerfile, dependency, or environment changes. All API runtimes
+share one image tag, so this builds once:
 
 ```bash
 docker compose up -d --build
 ```
 
-Run Laravel commands:
+Run Laravel commands. Tests and cross-domain artisan commands go to
+`api-tooling`, because only `ELYO_RUNTIME=full` registers every route and
+connection:
 
 ```bash
-docker compose exec api php artisan route:list
-docker compose exec api php artisan migrate
-docker compose exec api php artisan test
+docker compose exec api-tooling php artisan test
+docker compose exec api-tooling php artisan test --testsuite=boundary
+docker compose exec api-tooling composer deptrac
+```
+
+To see what a single runtime actually serves, ask that runtime:
+
+```bash
+docker compose exec api-identity php artisan route:list
+docker compose exec api-employee php artisan route:list
+docker compose exec api-company php artisan route:list
+```
+
+Schema changes always run through the one-shot migrator:
+
+```bash
+docker compose run --rm migrate
 ```
 
 Run frontend commands locally:
@@ -324,18 +383,19 @@ If you run the API locally instead of through Docker, change `DB_HOST` in `apps/
 
 ## Reset the Database
 
-To reset only the Laravel tables and seed fresh data:
+To reset every domain database and seed fresh data:
 
 ```bash
-docker compose exec api php artisan migrate:fresh --seed
+docker compose run --rm migrate
 ```
 
-To remove the PostgreSQL Docker volume completely:
+To remove the PostgreSQL Docker volume completely (this also re-runs the initdb
+script that creates the databases, roles and grants):
 
 ```bash
 docker compose down -v
 docker compose up -d --build
-docker compose exec api php artisan migrate --seed
+docker compose run --rm migrate
 ```
 
 `docker compose down -v` deletes Docker volumes for this project, including database data. Use it only when you want a clean local database.
@@ -358,29 +418,48 @@ If `4200`, `5432`, `5678`, `6379`, `8025`, or `8080` is already used by another 
 
 ### API Cannot Connect to Database
 
-Check that `apps/api-laravel/.env` uses:
-
-```env
-DB_CONNECTION=pgsql
-DB_HOST=postgres
-DB_PORT=5432
-DB_DATABASE=elyo
-DB_USERNAME=elyo
-DB_PASSWORD=elyo_secret
-```
-
-Then restart the API container:
+Each API runtime receives its database credentials from `docker-compose.yml`,
+not from `apps/api-laravel/.env`. Check which role the failing runtime is using:
 
 ```bash
-docker compose restart api
+docker compose exec api-employee env | grep DB_
 ```
+
+The role names must match the ones created by
+`infra/postgres/initdb/01-databases-and-roles.sh`. Passwords come from the root
+`.env` (`ELYO_*_PASSWORD`). Verify the grants themselves with:
+
+```bash
+bash infra/postgres/check-grants.sh
+```
+
+Then restart the affected runtime:
+
+```bash
+docker compose restart api-employee
+```
+
+If a runtime reports `Database connection [x] not configured`, the connection is
+not in that profile's allowlist. That is intentional — the feature belongs in a
+different runtime, not in a widened credential set.
 
 ### Laravel Key Missing
 
 If Laravel reports that no application encryption key is set:
 
 ```bash
-docker compose exec api php artisan key:generate
+docker compose exec api-tooling php artisan key:generate
+```
+
+### Stale Configuration Cache
+
+All API containers share the same bind-mounted source, so they also share
+`bootstrap/cache/config.php`. A config cache built under one `ELYO_RUNTIME` is
+rejected by the other runtimes on boot. Do not run `config:cache` or `optimize`
+locally. If you already did:
+
+```bash
+docker compose exec api-tooling php artisan config:clear
 ```
 
 ### Laravel Storage Permissions
@@ -388,7 +467,7 @@ docker compose exec api php artisan key:generate
 If the API cannot write logs, cache, or uploaded files:
 
 ```bash
-docker compose exec api chown -R www-data:www-data storage bootstrap/cache
+docker compose exec api-tooling chown -R www-data:www-data storage bootstrap/cache
 ```
 
 ### Frontend Dependencies
@@ -409,10 +488,11 @@ docker volume ls
 
 ### Composer Dependencies in the API Container
 
-If `vendor` is missing or outdated:
+`vendor/` is installed in the image, but the bind mount shadows it with the host
+copy, so all API containers share one `vendor/`. If it is missing or outdated:
 
 ```bash
-docker compose exec api composer install
+docker compose exec api-tooling composer install
 ```
 
 ### npm Dependencies in the Web Container
@@ -428,7 +508,11 @@ docker compose exec web npm install
 - `docker-compose.yml`: all local services and ports
 - `.env.example`: root Docker/database defaults
 - `apps/api-laravel/.env.example`: Laravel environment template
-- `apps/api-laravel/Dockerfile`: API PHP-FPM image
+- `apps/api-laravel/Dockerfile`: API PHP-FPM image, shared by all three runtimes
 - `apps/web-angular/Dockerfile`: Angular development image
-- `infra/docker/nginx/default.conf`: Nginx config for the Laravel public directory
+- `infra/docker/nginx/default.conf`: Nginx path routing to the three API runtimes
+- `infra/smoke-runtime-split.sh`: runtime-split smoke test
+- `infra/postgres/initdb/01-databases-and-roles.sh`: databases, roles and grants
+- `infra/postgres/check-grants.sh`: asserts the PostgreSQL role boundaries
+- `apps/api-laravel/app/Runtime/RuntimeProfile.php`: route and connection sets per `ELYO_RUNTIME`
 - `apps/api-laravel/database/seeders`: default and demo data seeders

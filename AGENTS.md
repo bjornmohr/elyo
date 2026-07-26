@@ -43,19 +43,35 @@ Use:
 - Policies and middleware for authorization
 - Feature tests for API behavior
 
+The API runs as three containers (`api-identity`, `api-employee`, `api-company`)
+built from one image; see the Docker Rules below. There is no `api` service.
+
 Important validation commands:
 
-    docker compose exec api php artisan test
-    docker compose exec api php artisan test --testsuite=boundary
-    docker compose exec api composer deptrac
-    docker compose exec api php artisan route:list
+    docker compose exec api-tooling php artisan test
+    docker compose exec api-tooling php artisan test --testsuite=boundary
+    docker compose exec api-tooling composer deptrac
+    docker compose exec api-tooling php artisan route:list
+
+`api-tooling` is the local-only development/test container. It runs
+`ELYO_RUNTIME=full`, which is the only profile that registers every route and
+every connection, so it is the only place the suite can run. It is never
+deployed and never reachable through nginx.
+
+To inspect what a single runtime actually serves, target that runtime directly:
+
+    docker compose exec api-employee php artisan route:list
 
 The boundary suite requires the Dockerized PostgreSQL test databases and runtime
 role credentials. Missing PostgreSQL setup is a test failure, never a skipped test.
 
 If migrations change:
 
-    docker compose exec api php artisan migrate:fresh
+    docker compose run --rm migrate
+
+`migrate` is a one-shot service running `php artisan elyo:migrate-fresh --seed`.
+It is the only container that ever receives the `elyo_migrator` role; runtime
+containers must never carry migrator credentials (ADR-001 §2.4).
 
 ## Frontend Rules
 
@@ -88,8 +104,37 @@ Use service names such as:
 - postgres
 - redis
 - mailpit
-- api
 - web
+- nginx
+
+The API is split per runtime (ADR-001 §2.4, ADR-003 D2). One image, three
+containers, each with its own `ELYO_RUNTIME` profile and only its own PostgreSQL
+role:
+
+| Service | Profile | Paths served | PostgreSQL roles |
+| --- | --- | --- | --- |
+| `api-identity` | `identity` | `/api/auth/*`, `/api/admin/*`, `/api/partner/*`, `/api/health` | `elyo_identity_rt` |
+| `api-employee` | `employee` | `/api/employee/*`, `/api/health` | `elyo_employee_rt`, `elyo_mapping_svc` |
+| `api-company` | `company` | `/api/company/*`, `/api/health` | `elyo_company_rt` |
+| `migrate` | `full` | — (one-shot) | `elyo_migrator` |
+| `api-tooling` | `full` | — (local only) | all runtime roles + `elyo_migrator` |
+
+nginx routes by path prefix, so Angular keeps a single base URL
+(`http://localhost:8080/api`). Rules for changes in this area:
+
+- No aggregator or gateway container, and no runtime-to-runtime HTTP calls.
+- A new route must be added to the route file of the runtime that owns its
+  domain, and nginx must route its prefix to that runtime.
+- Never widen a runtime's credential set to make a feature work. If a runtime
+  needs data it has no role for, the feature belongs in another runtime.
+- `api-tooling` is a local development convenience only. Never add it to a
+  deployment topology and never treat "it works in api-tooling" as evidence
+  that a runtime can serve a request.
+
+After infrastructure changes, run:
+
+    docker compose config
+    bash infra/smoke-runtime-split.sh
 
 ## Health Data and Company Reporting Rules
 
