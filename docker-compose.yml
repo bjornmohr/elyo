@@ -1,3 +1,49 @@
+# ELYO local stack.
+#
+# Runtime split (ADR-001 §2.4, ADR-003 D2): the Laravel API runs as three
+# separate containers built from ONE image. Each container selects its route
+# subset and its connection allowlist via ELYO_RUNTIME and carries ONLY the
+# PostgreSQL credentials its domain needs. nginx routes by path prefix, so
+# Angular keeps a single base URL (http://localhost:8080/api).
+#
+# There is no aggregator/gateway container and no runtime-to-runtime traffic.
+# The migrator role never appears in a runtime container; schema work happens
+# in the one-shot `migrate` service.
+
+# Shared build definition. All API containers resolve to the same image tag, so
+# the image is built once and reused by every runtime.
+x-api-build: &api-build
+  image: elyo-api-laravel:local
+  build:
+    context: ./apps/api-laravel
+    dockerfile: Dockerfile
+
+# Source bind mount. One mount shared by every API container (dev hot reload).
+# vendor/ is installed in the image; the bind mount shadows it with the host
+# copy, so `composer install` is run once on the host or via api-tooling — the
+# alternative (a named volume per runtime) would triple disk usage for no gain.
+x-api-volumes: &api-volumes
+  - ./apps/api-laravel:/var/www
+
+# Environment shared by every API container. Credentials are deliberately NOT
+# part of this block — each service adds only its own role.
+x-api-env: &api-env
+  APP_ENV: local
+  APP_DEBUG: "true"
+  DB_CONNECTION: identity
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  REDIS_HOST: redis
+  MAIL_MAILER: smtp
+  MAIL_HOST: mailpit
+  MAIL_PORT: "1025"
+
+x-api-depends: &api-depends
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_started
+
 services:
   # Angular Frontend
   web:
@@ -14,53 +60,187 @@ services:
     networks:
       - elyo-network
 
-  # Laravel API (PHP-FPM)
-  api:
-    build:
-      context: ./apps/api-laravel
-      dockerfile: Dockerfile
-    volumes:
-      - ./apps/api-laravel:/var/www
+  # ---------------------------------------------------------------------------
+  # API runtimes — one image, three profiles, three credential sets
+  # ---------------------------------------------------------------------------
+
+  # Identity runtime: /api/auth/*, /api/admin/*, /api/partner/*, /api/health.
+  # Holds elyo_identity_rt only — no mapping, no health, no migrator credentials.
+  api-identity:
+    <<: *api-build
     environment:
-      - APP_ENV=local
-      - APP_DEBUG=true
-      # Domain-separated connections (ELYO-104). Each carries its own PG role;
-      # the OS/DB boundary — not PHP — enforces access.
-      - DB_CONNECTION=identity
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_IDENTITY_DATABASE=elyo_identity
-      - DB_IDENTITY_USERNAME=elyo_identity_rt
-      - DB_IDENTITY_PASSWORD=${ELYO_IDENTITY_RT_PASSWORD:-identity_rt_dev}
-      - DB_MAPPING_DATABASE=elyo_subject_mapping
-      - DB_MAPPING_USERNAME=elyo_mapping_svc
-      - DB_MAPPING_PASSWORD=${ELYO_MAPPING_SVC_PASSWORD:-mapping_svc_dev}
-      - MAPPING_ENCRYPTION_KEY=${MAPPING_ENCRYPTION_KEY:-}
-      - MAPPING_HMAC_KEY=${MAPPING_HMAC_KEY:-}
-      - MAPPING_SUBJECT_DERIVATION_KEY=${MAPPING_SUBJECT_DERIVATION_KEY:-}
-      - DB_HEALTH_DATABASE=elyo_health
-      - DB_HEALTH_USERNAME=elyo_employee_rt
-      - DB_HEALTH_PASSWORD=${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
-      - ELYO_COMPANY_RT_PASSWORD=${ELYO_COMPANY_RT_PASSWORD:-company_rt_dev}
-      - DB_AUDIT_DATABASE=elyo_audit
-      - DB_AUDIT_USERNAME=elyo_employee_rt
-      - DB_AUDIT_PASSWORD=${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
-      # Migrator role: owns the schema, runs all DDL (php artisan elyo:migrate-fresh).
-      - DB_MIGRATOR_USERNAME=elyo_migrator
-      - DB_MIGRATOR_PASSWORD=${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
-      - REDIS_HOST=redis
-      - MAIL_MAILER=smtp
-      - MAIL_HOST=mailpit
-      - MAIL_PORT=1025
+      <<: *api-env
+      ELYO_RUNTIME: identity
+      DB_IDENTITY_DATABASE: elyo_identity
+      DB_IDENTITY_USERNAME: elyo_identity_rt
+      DB_IDENTITY_PASSWORD: ${ELYO_IDENTITY_RT_PASSWORD:-identity_rt_dev}
+      DB_AUDIT_DATABASE: elyo_audit
+      DB_AUDIT_USERNAME: elyo_identity_rt
+      DB_AUDIT_PASSWORD: ${ELYO_IDENTITY_RT_PASSWORD:-identity_rt_dev}
+    volumes: *api-volumes
     networks:
       - elyo-network
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
+    depends_on: *api-depends
 
-  # Nginx Proxy for Laravel
+  # Employee runtime: /api/employee/*, /api/health.
+  # Holds elyo_employee_rt (identity read, health, audit) and elyo_mapping_svc
+  # (mapping connection + mapping key material). No migrator, no company role.
+  api-employee:
+    <<: *api-build
+    environment:
+      <<: *api-env
+      ELYO_RUNTIME: employee
+      DB_IDENTITY_DATABASE: elyo_identity
+      DB_IDENTITY_USERNAME: elyo_employee_rt
+      DB_IDENTITY_PASSWORD: ${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
+      DB_MAPPING_DATABASE: elyo_subject_mapping
+      DB_MAPPING_USERNAME: elyo_mapping_svc
+      DB_MAPPING_PASSWORD: ${ELYO_MAPPING_SVC_PASSWORD:-mapping_svc_dev}
+      MAPPING_ENCRYPTION_KEY: ${MAPPING_ENCRYPTION_KEY:-}
+      MAPPING_HMAC_KEY: ${MAPPING_HMAC_KEY:-}
+      MAPPING_SUBJECT_DERIVATION_KEY: ${MAPPING_SUBJECT_DERIVATION_KEY:-}
+      DB_HEALTH_DATABASE: elyo_health
+      DB_HEALTH_USERNAME: elyo_employee_rt
+      DB_HEALTH_PASSWORD: ${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
+      DB_AUDIT_DATABASE: elyo_audit
+      DB_AUDIT_USERNAME: elyo_employee_rt
+      DB_AUDIT_PASSWORD: ${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
+    volumes: *api-volumes
+    networks:
+      - elyo-network
+    depends_on: *api-depends
+
+  # Company runtime: /api/company/*, /api/health.
+  # Holds elyo_company_rt only — no mapping, no health, no migrator credentials
+  # and no mapping key material (ADR-001 §2.10).
+  api-company:
+    <<: *api-build
+    environment:
+      <<: *api-env
+      ELYO_RUNTIME: company
+      DB_IDENTITY_DATABASE: elyo_identity
+      DB_IDENTITY_USERNAME: elyo_company_rt
+      DB_IDENTITY_PASSWORD: ${ELYO_COMPANY_RT_PASSWORD:-company_rt_dev}
+      DB_AUDIT_DATABASE: elyo_audit
+      DB_AUDIT_USERNAME: elyo_company_rt
+      DB_AUDIT_PASSWORD: ${ELYO_COMPANY_RT_PASSWORD:-company_rt_dev}
+    volumes: *api-volumes
+    networks:
+      - elyo-network
+    depends_on: *api-depends
+
+  # ---------------------------------------------------------------------------
+  # Schema and tooling — never deployed alongside the runtimes
+  # ---------------------------------------------------------------------------
+
+  # One-shot migrator. `docker compose run --rm migrate`.
+  # The ONLY container that ever sees elyo_migrator. Behind the `tools` profile
+  # so `docker compose up` never starts it; `docker compose run` activates the
+  # profile automatically.
+  migrate:
+    <<: *api-build
+    profiles: ["tools"]
+    restart: "no"
+    environment:
+      <<: *api-env
+      ELYO_RUNTIME: full
+      # Every connection runs as elyo_migrator: DDL for all four domains plus
+      # the seeders, which write through the identity connection and provision
+      # subjects through the mapping connection.
+      DB_IDENTITY_DATABASE: elyo_identity
+      DB_IDENTITY_USERNAME: elyo_migrator
+      DB_IDENTITY_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
+      DB_MAPPING_DATABASE: elyo_subject_mapping
+      DB_MAPPING_USERNAME: elyo_migrator
+      DB_MAPPING_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
+      DB_HEALTH_DATABASE: elyo_health
+      DB_HEALTH_USERNAME: elyo_migrator
+      DB_HEALTH_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
+      DB_AUDIT_DATABASE: elyo_audit
+      DB_AUDIT_USERNAME: elyo_migrator
+      DB_AUDIT_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
+      DB_MIGRATOR_USERNAME: elyo_migrator
+      DB_MIGRATOR_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
+      MAPPING_ENCRYPTION_KEY: ${MAPPING_ENCRYPTION_KEY:-}
+      MAPPING_HMAC_KEY: ${MAPPING_HMAC_KEY:-}
+      MAPPING_SUBJECT_DERIVATION_KEY: ${MAPPING_SUBJECT_DERIVATION_KEY:-}
+    command: ["php", "artisan", "elyo:migrate-fresh", "--seed"]
+    volumes: *api-volumes
+    networks:
+      - elyo-network
+    depends_on: *api-depends
+
+  # LOCAL DEVELOPMENT ONLY — never deploy this service.
+  # Runs ELYO_RUNTIME=full so the whole test suite (which needs all connections
+  # and all routes) has a home: `docker compose exec api-tooling php artisan test`.
+  # It is the one container that holds every credential, which is exactly why it
+  # has no ports, no nginx upstream and no place in any deployed topology.
+  api-tooling:
+    <<: *api-build
+    environment:
+      <<: *api-env
+      ELYO_RUNTIME: full
+      DB_IDENTITY_DATABASE: elyo_identity
+      DB_IDENTITY_USERNAME: elyo_identity_rt
+      DB_IDENTITY_PASSWORD: ${ELYO_IDENTITY_RT_PASSWORD:-identity_rt_dev}
+      DB_MAPPING_DATABASE: elyo_subject_mapping
+      DB_MAPPING_USERNAME: elyo_mapping_svc
+      DB_MAPPING_PASSWORD: ${ELYO_MAPPING_SVC_PASSWORD:-mapping_svc_dev}
+      MAPPING_ENCRYPTION_KEY: ${MAPPING_ENCRYPTION_KEY:-}
+      MAPPING_HMAC_KEY: ${MAPPING_HMAC_KEY:-}
+      MAPPING_SUBJECT_DERIVATION_KEY: ${MAPPING_SUBJECT_DERIVATION_KEY:-}
+      DB_HEALTH_DATABASE: elyo_health
+      DB_HEALTH_USERNAME: elyo_employee_rt
+      DB_HEALTH_PASSWORD: ${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
+      DB_AUDIT_DATABASE: elyo_audit
+      DB_AUDIT_USERNAME: elyo_employee_rt
+      DB_AUDIT_PASSWORD: ${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
+      ELYO_COMPANY_RT_PASSWORD: ${ELYO_COMPANY_RT_PASSWORD:-company_rt_dev}
+      DB_MIGRATOR_USERNAME: elyo_migrator
+      DB_MIGRATOR_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
+    command: ["sleep", "infinity"]
+    volumes: *api-volumes
+    networks:
+      - elyo-network
+    depends_on: *api-depends
+
+  # ---------------------------------------------------------------------------
+  # Prepared, not implemented (ADR-003 D2). `docker compose --profile future up`
+  # starts idle placeholders only — neither has a worker or an HTTP entry point
+  # yet, and neither is wired into nginx.
+  # ---------------------------------------------------------------------------
+
+  # Reporting worker: consumes the (still empty) elyo_reporting database once the
+  # reporting domain exists. No credentials assigned yet on purpose.
+  reporting-worker:
+    <<: *api-build
+    profiles: ["future"]
+    environment:
+      <<: *api-env
+      ELYO_RUNTIME: full
+    command: ["sleep", "infinity"]
+    volumes: *api-volumes
+    networks:
+      - elyo-network
+    depends_on: *api-depends
+
+  # Privacy runtime: future home of retention enforcement and data-subject
+  # requests (the only place allowed to hold audit_migrator). Placeholder only.
+  api-privacy:
+    <<: *api-build
+    profiles: ["future"]
+    environment:
+      <<: *api-env
+      ELYO_RUNTIME: full
+    command: ["sleep", "infinity"]
+    volumes: *api-volumes
+    networks:
+      - elyo-network
+    depends_on: *api-depends
+
+  # ---------------------------------------------------------------------------
+
+  # Nginx: single public entry point, routes /api/* to the matching runtime.
   nginx:
     image: nginx:stable-alpine
     ports:
@@ -71,7 +251,9 @@ services:
     networks:
       - elyo-network
     depends_on:
-      - api
+      - api-identity
+      - api-employee
+      - api-company
 
   # PostgreSQL Database
   postgres:
