@@ -1,0 +1,31 @@
+name: Privacy regression
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  privacy:
+    name: PostgreSQL privacy suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Start PostgreSQL-backed tooling runtime
+        run: docker compose up -d --build postgres redis api-tooling
+
+      - name: Install Laravel dependencies in bind-mounted workspace
+        run: docker compose exec -T api-tooling composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run standalone privacy suite
+        run: docker compose exec -T api-tooling php artisan test --testsuite=privacy
+
+      - name: Stop ephemeral stack
+        if: always()
+        run: docker compose down --volumes

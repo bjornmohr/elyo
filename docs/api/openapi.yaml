@@ -126,7 +126,9 @@ components:
         name: { type: string }
         slug: { type: string }
         status: { type: string, enum: [active, inactive, suspended] }
-        anonymity_threshold: { type: integer }
+        anonymity_threshold:
+          type: integer
+          description: Customer-configured threshold. The effective reporting threshold is never lower than the platform minimum of 10.
         team_layer_enabled:
           type: boolean
           description: Whether this company uses team-level affiliation and team-scoped manager workflows.
@@ -141,7 +143,10 @@ components:
       properties:
         name: { type: string, maxLength: 255 }
         slug: { type: string, maxLength: 255, nullable: true }
-        anonymity_threshold: { type: integer, minimum: 1 }
+        anonymity_threshold:
+          type: integer
+          minimum: 1
+          description: Customer-configured threshold. Values below 10 do not lower the effective platform minimum.
         team_layer_enabled:
           type: boolean
           description: Defaults to false on create when omitted.
@@ -155,7 +160,10 @@ components:
           maxLength: 255
           description: Optional on update, but must be a non-null string when provided.
         status: { type: string, enum: [active, inactive, suspended] }
-        anonymity_threshold: { type: integer, minimum: 1 }
+        anonymity_threshold:
+          type: integer
+          minimum: 1
+          description: Customer-configured threshold. Values below 10 do not lower the effective platform minimum.
         team_layer_enabled:
           type: boolean
           description: Whether this company uses team-level affiliation and team-scoped manager workflows.
@@ -718,7 +726,8 @@ components:
         participationRate:
           type: number
           nullable: true
-          description: Percentage of scoped eligible employees who participated, null when suppressed.
+          multipleOf: 5
+          description: Percentage of scoped eligible employees who participated, rounded to the nearest 5 percentage points. Null when suppressed.
         suppressionReason:
           type: string
           nullable: true
@@ -736,7 +745,11 @@ components:
               isAboveThreshold: { type: boolean }
               eligibleCount: { type: integer, nullable: true }
               participantCount: { type: integer, nullable: true }
-              participationRate: { type: number, nullable: true }
+              participationRate:
+                type: number
+                nullable: true
+                multipleOf: 5
+                description: Rounded to the nearest 5 percentage points; null when suppressed.
               suppressionReason: { type: string, nullable: true }
             description: Always null for this measure-level aggregate endpoint.
 
@@ -943,7 +956,10 @@ components:
       additionalProperties: false
       properties:
         error: { type: string }
-        minRequired: { type: integer }
+        minRequired:
+          type: integer
+          minimum: 10
+          description: Effective anonymity threshold after applying the platform minimum of 10.
         isAboveThreshold: { type: boolean }
         suppressionReason:
           type: string
@@ -2380,11 +2396,16 @@ paths:
                         properties:
                           eligibleCount: { type: integer }
                           responseCount: { type: integer }
-                          rate: { type: number }
+                          rate:
+                            type: number
+                            multipleOf: 5
+                            description: Participation percentage rounded to the nearest 5 percentage points.
                       responseCount: { type: integer }
                       minRequired:
                         type: integer
+                        minimum: 10
                         nullable: true
+                        description: Effective threshold after applying the platform minimum of 10 and any stricter customer threshold.
                       isAboveThreshold: { type: boolean }
                       questions:
                         type: array
@@ -2397,7 +2418,7 @@ paths:
                             answerCount:
                               type: integer
                               nullable: true
-                              description: Null when the question-level anonymity threshold is not met or when a SCALE, YES_NO, or MULTIPLE_CHOICE distribution is suppressed because any non-zero bucket is below the anonymity threshold.
+                              description: Null when the question-level anonymity threshold is not met or when a SCALE, YES_NO, or MULTIPLE_CHOICE distribution is suppressed because any non-zero category has fewer than 5 contributors.
                             avgValue:
                               type: number
                               nullable: true
@@ -2430,36 +2451,46 @@ paths:
                               description: Optional reason returned when a question or distribution is suppressed.
                             distribution:
                               type: array
-                              description: SCALE distribution buckets. Empty when any non-zero bucket is below the anonymity threshold; answerCount is also null in that case.
+                              description: SCALE distribution buckets. Empty when any non-zero category has fewer than 5 contributors; answerCount is also null in that case.
                               items:
                                 type: object
                                 properties:
                                   value: { type: integer }
-                                  count: { type: integer }
-                                  percentage: { type: number }
+                                  count: { type: integer, minimum: 5 }
+                                  percentage:
+                                    type: number
+                                    multipleOf: 5
+                                    description: Bucket percentage rounded to the nearest 5 percentage points.
                             trueCount:
                               type: integer
                               nullable: true
-                              description: Null when the YES_NO split is suppressed because either non-zero bucket is below the anonymity threshold; answerCount is also null in that case.
+                              description: Null when the YES_NO split is suppressed because either non-zero category has fewer than 5 contributors; answerCount is also null in that case.
                             falseCount:
                               type: integer
                               nullable: true
-                              description: Null when the YES_NO split is suppressed because either non-zero bucket is below the anonymity threshold; answerCount is also null in that case.
+                              description: Null when the YES_NO split is suppressed because either non-zero category has fewer than 5 contributors; answerCount is also null in that case.
                             truePercentage:
                               type: number
                               nullable: true
+                              multipleOf: 5
+                              description: Percentage rounded to the nearest 5 percentage points; null when suppressed.
                             falsePercentage:
                               type: number
                               nullable: true
+                              multipleOf: 5
+                              description: Percentage rounded to the nearest 5 percentage points; null when suppressed.
                             options:
                               type: array
-                              description: MULTIPLE_CHOICE options. Empty when the distribution is suppressed because any non-zero option bucket is below the anonymity threshold; answerCount is also null in that case.
+                              description: MULTIPLE_CHOICE options. Empty when the distribution is suppressed because any non-zero category has fewer than 5 contributors; answerCount is also null in that case.
                               items:
                                 type: object
                                 properties:
                                   value: { type: string, nullable: true }
-                                  count: { type: integer }
-                                  percentage: { type: number }
+                                  count: { type: integer, minimum: 5 }
+                                  percentage:
+                                    type: number
+                                    multipleOf: 5
+                                    description: Bucket percentage rounded to the nearest 5 percentage points.
         403:
           description: User is not eligible for the company portal, anonymity threshold not met, or TEAM_LAYER_DISABLED for team-scoped results when the company team layer is disabled
           content:

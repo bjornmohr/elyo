@@ -15,19 +15,19 @@ class MeasureParticipationSummaryTest extends TestCase
 
     public function test_company_admin_can_fetch_measure_participation_summary(): void
     {
-        $company = Company::factory()->create(['anonymity_threshold' => 3]);
+        $company = Company::factory()->create(['anonymity_threshold' => 10]);
         $admin = $this->companyUser($company, Role::COMPANY_ADMIN);
         $measure = Measure::factory()->create([
             'company_id' => $company->id,
             'team_id' => null,
             'created_by' => $admin->id,
         ]);
-        $employees = User::factory()->count(5)->create([
+        $employees = User::factory()->count(20)->create([
             'company_id' => $company->id,
             'role' => Role::EMPLOYEE,
         ]);
 
-        $employees->take(3)->each(fn (User $employee) => MeasureParticipation::factory()->create([
+        $employees->take(12)->each(fn (User $employee) => MeasureParticipation::factory()->create([
             'measure_id' => $measure->id,
             'user_id' => $employee->id,
             'company_id' => $company->id,
@@ -45,13 +45,43 @@ class MeasureParticipationSummaryTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.measureId', $measure->id)
             ->assertJsonPath('data.isAboveThreshold', true)
-            ->assertJsonPath('data.eligibleCount', 5)
-            ->assertJsonPath('data.participantCount', 3)
+            ->assertJsonPath('data.eligibleCount', 20)
+            ->assertJsonPath('data.participantCount', 12)
             ->assertJsonPath('data.participationRate', 60)
             ->assertJsonPath('data.suppressionReason', null)
             ->assertJsonPath('data.teamBreakdown', null);
 
         $this->assertNoIndividualParticipationData($response->getContent());
+    }
+
+    public function test_summary_rounds_the_participation_rate_to_five_points(): void
+    {
+        $company = Company::factory()->create(['anonymity_threshold' => 10]);
+        $admin = $this->companyUser($company, Role::COMPANY_ADMIN);
+        $measure = Measure::factory()->create([
+            'company_id' => $company->id,
+            'team_id' => null,
+            'created_by' => $admin->id,
+        ]);
+        $employees = User::factory()->count(12)->create([
+            'company_id' => $company->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+
+        $employees->take(11)->each(fn (User $employee) => MeasureParticipation::factory()->create([
+            'measure_id' => $measure->id,
+            'user_id' => $employee->id,
+            'company_id' => $company->id,
+            'team_id' => $employee->team_id,
+        ]));
+
+        $response = $this->actingAs($admin)->getJson("/api/company/measures/{$measure->id}/participation-summary");
+
+        // 11 of 12 is 91.66…, released as 90 per ADR-001 §2.5.
+        $response->assertOk()
+            ->assertJsonPath('data.eligibleCount', 12)
+            ->assertJsonPath('data.participantCount', 11)
+            ->assertJsonPath('data.participationRate', 90);
     }
 
     public function test_summary_suppresses_counts_when_anonymity_threshold_is_not_met(): void
@@ -63,12 +93,12 @@ class MeasureParticipationSummaryTest extends TestCase
             'team_id' => null,
             'created_by' => $admin->id,
         ]);
-        $employees = User::factory()->count(5)->create([
+        $employees = User::factory()->count(10)->create([
             'company_id' => $company->id,
             'role' => Role::EMPLOYEE,
         ]);
 
-        $employees->take(2)->each(fn (User $employee) => MeasureParticipation::factory()->create([
+        $employees->take(5)->each(fn (User $employee) => MeasureParticipation::factory()->create([
             'measure_id' => $measure->id,
             'user_id' => $employee->id,
             'company_id' => $company->id,
@@ -102,7 +132,7 @@ class MeasureParticipationSummaryTest extends TestCase
     public function test_team_specific_summary_counts_only_target_team_scope(): void
     {
         $company = Company::factory()->create([
-            'anonymity_threshold' => 3,
+            'anonymity_threshold' => 10,
             'team_layer_enabled' => true,
         ]);
         $admin = $this->companyUser($company, Role::COMPANY_ADMIN);
@@ -113,24 +143,24 @@ class MeasureParticipationSummaryTest extends TestCase
             'team_id' => $team->id,
             'created_by' => $admin->id,
         ]);
-        $teamEmployees = User::factory()->count(4)->create([
+        $teamEmployees = User::factory()->count(20)->create([
             'company_id' => $company->id,
             'team_id' => $team->id,
             'role' => Role::EMPLOYEE,
         ]);
-        $otherTeamEmployees = User::factory()->count(4)->create([
+        $otherTeamEmployees = User::factory()->count(20)->create([
             'company_id' => $company->id,
             'team_id' => $otherTeam->id,
             'role' => Role::EMPLOYEE,
         ]);
 
-        $teamEmployees->take(3)->each(fn (User $employee) => MeasureParticipation::factory()->create([
+        $teamEmployees->take(15)->each(fn (User $employee) => MeasureParticipation::factory()->create([
             'measure_id' => $measure->id,
             'user_id' => $employee->id,
             'company_id' => $company->id,
             'team_id' => $team->id,
         ]));
-        $otherTeamEmployees->take(3)->each(fn (User $employee) => MeasureParticipation::factory()->create([
+        $otherTeamEmployees->take(15)->each(fn (User $employee) => MeasureParticipation::factory()->create([
             'measure_id' => $measure->id,
             'user_id' => $employee->id,
             'company_id' => $company->id,
@@ -141,15 +171,15 @@ class MeasureParticipationSummaryTest extends TestCase
             ->getJson("/api/company/measures/{$measure->id}/participation-summary")
             ->assertOk()
             ->assertJsonPath('data.isAboveThreshold', true)
-            ->assertJsonPath('data.eligibleCount', 4)
-            ->assertJsonPath('data.participantCount', 3)
+            ->assertJsonPath('data.eligibleCount', 20)
+            ->assertJsonPath('data.participantCount', 15)
             ->assertJsonPath('data.participationRate', 75);
     }
 
     public function test_manager_summary_for_company_wide_measure_is_scoped_to_managed_team(): void
     {
         $company = Company::factory()->create([
-            'anonymity_threshold' => 3,
+            'anonymity_threshold' => 10,
             'team_layer_enabled' => true,
         ]);
         $manager = $this->companyUser($company, Role::COMPANY_MANAGER);
@@ -162,18 +192,18 @@ class MeasureParticipationSummaryTest extends TestCase
             'company_id' => $company->id,
             'team_id' => null,
         ]);
-        $managedEmployees = User::factory()->count(5)->create([
+        $managedEmployees = User::factory()->count(20)->create([
             'company_id' => $company->id,
             'team_id' => $managedTeam->id,
             'role' => Role::EMPLOYEE,
         ]);
-        $otherEmployees = User::factory()->count(5)->create([
+        $otherEmployees = User::factory()->count(20)->create([
             'company_id' => $company->id,
             'team_id' => $otherTeam->id,
             'role' => Role::EMPLOYEE,
         ]);
 
-        $managedEmployees->take(3)->each(fn (User $employee) => MeasureParticipation::factory()->create([
+        $managedEmployees->take(12)->each(fn (User $employee) => MeasureParticipation::factory()->create([
             'measure_id' => $measure->id,
             'user_id' => $employee->id,
             'company_id' => $company->id,
@@ -190,15 +220,15 @@ class MeasureParticipationSummaryTest extends TestCase
             ->getJson("/api/company/measures/{$measure->id}/participation-summary")
             ->assertOk()
             ->assertJsonPath('data.isAboveThreshold', true)
-            ->assertJsonPath('data.eligibleCount', 5)
-            ->assertJsonPath('data.participantCount', 3)
+            ->assertJsonPath('data.eligibleCount', 20)
+            ->assertJsonPath('data.participantCount', 12)
             ->assertJsonPath('data.participationRate', 60);
     }
 
     public function test_manager_summary_counts_participants_through_current_managed_team_scope(): void
     {
         $company = Company::factory()->create([
-            'anonymity_threshold' => 3,
+            'anonymity_threshold' => 10,
             'team_layer_enabled' => true,
         ]);
         $manager = $this->companyUser($company, Role::COMPANY_MANAGER);
@@ -211,7 +241,7 @@ class MeasureParticipationSummaryTest extends TestCase
             'company_id' => $company->id,
             'team_id' => null,
         ]);
-        $currentManagedEmployees = User::factory()->count(3)->create([
+        $currentManagedEmployees = User::factory()->count(10)->create([
             'company_id' => $company->id,
             'team_id' => $managedTeam->id,
             'role' => Role::EMPLOYEE,
@@ -244,8 +274,8 @@ class MeasureParticipationSummaryTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('data.isAboveThreshold', true)
-            ->assertJsonPath('data.eligibleCount', 3)
-            ->assertJsonPath('data.participantCount', 3)
+            ->assertJsonPath('data.eligibleCount', 10)
+            ->assertJsonPath('data.participantCount', 10)
             ->assertJsonPath('data.participationRate', 100)
             ->assertJsonPath('data.teamBreakdown', null);
 
@@ -316,7 +346,7 @@ class MeasureParticipationSummaryTest extends TestCase
 
     public function test_qr_participations_remain_aggregate_only_in_summary(): void
     {
-        $company = Company::factory()->create(['anonymity_threshold' => 3]);
+        $company = Company::factory()->create(['anonymity_threshold' => 10]);
         $admin = $this->companyUser($company, Role::COMPANY_ADMIN);
         $measure = Measure::factory()->create([
             'company_id' => $company->id,
@@ -324,12 +354,12 @@ class MeasureParticipationSummaryTest extends TestCase
             'created_by' => $admin->id,
             'verification_requirement' => 'QR_CODE',
         ]);
-        $employees = User::factory()->count(5)->create([
+        $employees = User::factory()->count(20)->create([
             'company_id' => $company->id,
             'role' => Role::EMPLOYEE,
         ]);
 
-        $employees->take(4)->each(fn (User $employee) => MeasureParticipation::factory()->create([
+        $employees->take(16)->each(fn (User $employee) => MeasureParticipation::factory()->create([
             'measure_id' => $measure->id,
             'user_id' => $employee->id,
             'company_id' => $company->id,
@@ -343,8 +373,8 @@ class MeasureParticipationSummaryTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.measureId', $measure->id)
             ->assertJsonPath('data.isAboveThreshold', true)
-            ->assertJsonPath('data.eligibleCount', 5)
-            ->assertJsonPath('data.participantCount', 4)
+            ->assertJsonPath('data.eligibleCount', 20)
+            ->assertJsonPath('data.participantCount', 16)
             ->assertJsonPath('data.participationRate', 80)
             ->assertJsonPath('data.suppressionReason', null);
 
