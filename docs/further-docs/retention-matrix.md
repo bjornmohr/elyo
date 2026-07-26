@@ -90,6 +90,21 @@ of those periods. Scheduler registration remains commented until legal review
 marks every enforced period `DECIDED` and a dedicated maintenance runtime/role
 is available.
 
+### Where the command can run (ELYO-106 runtime split)
+
+The command needs `health`, `identity` and `audit_migrator`. The
+`audit_migrator` requirement is structural, not incidental: the audit database
+is append-only for every runtime role (INSERT but no UPDATE/DELETE), so pruning
+expired audit rows can only be performed by the migrator role.
+
+No deployable runtime holds a `*_migrator` connection — ADR-001 §2.4 forbids it
+— so `elyo:enforce-retention` **cannot** run in the `identity`, `employee` or
+`company` runtime. It runs locally in the `api-tooling` container and, in the
+pilot, only as an explicit ops step. Enabling the schedule is blocked on the
+Privacy/Admin runtime from ADR-003 D2 existing, and on deciding whether that
+runtime receives `audit_migrator` or a narrower `elyo_audit_pruner` role
+scoped to audit pruning alone.
+
 Backup deletion is not performed by this command. Per ADR-001 §2.8/§2.9,
 encrypted domain backups expire through the separate 90-day rotation and
 restores must consult the deletion list.

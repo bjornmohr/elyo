@@ -54,6 +54,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Last Used At Tracking
+    |--------------------------------------------------------------------------
+    |
+    | Disabled because Sanctum otherwise writes `last_used_at` to
+    | `personal_access_tokens` on EVERY authenticated request. The employee
+    | runtime authenticates as `elyo_employee_rt`, which is granted SELECT only
+    | on the identity database by design ("employee: read identity for auth
+    | only", infra/postgres/initdb/01-databases-and-roles.sh) — so tracking it
+    | would turn every authenticated employee request into a permission error.
+    |
+    | Turned off globally rather than per runtime, so authentication behaves
+    | identically everywhere and a test passing under ELYO_RUNTIME=full means
+    | the same thing in a deployed runtime. Nothing reads the column; token
+    | usage belongs in the append-only audit domain instead.
+    |
+    */
+
+    'last_used_at' => false,
+
+    /*
+    |--------------------------------------------------------------------------
     | Token Prefix
     |--------------------------------------------------------------------------
     |

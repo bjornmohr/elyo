@@ -26,7 +26,11 @@ class RuntimeProfileBootTest extends TestCase
         $health = $this->databaseStateFor('identity', 'health');
         $mapping = $this->databaseStateFor('identity', 'mapping');
 
-        $this->assertSame(['audit', 'identity'], $health['connections']);
+        // Identity reaches exactly one database. `audit` was removed together
+        // with the last identity-side audit write: elyo_identity_rt has no
+        // CONNECT on elyo_audit, so declaring it promised a connection the role
+        // cannot open.
+        $this->assertSame(['identity'], $health['connections']);
         $this->assertFalse($health['configured']);
         $this->assertSame(\InvalidArgumentException::class, $health['exception']);
         $this->assertFalse($mapping['configured']);

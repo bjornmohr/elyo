@@ -8,12 +8,12 @@ use App\Models\InviteToken;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\UserRole;
+use App\Services\Privacy\Exceptions\MappingNotFoundException;
+use App\Services\Privacy\MappingCryptography;
 use App\Services\Privacy\MappingService;
 use App\Services\Privacy\MappingServiceContract;
 use App\Services\Privacy\PurposeCode;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Log;
-use RuntimeException;
 use Tests\Support\ConfiguresPrivacyMapping;
 use Tests\TestCase;
 
@@ -669,13 +669,14 @@ class AuthTest extends TestCase
         ]);
         $manager = User::where('email', 'manager-with-team@test.com')->firstOrFail();
         $this->assertTrue($manager->hasRole(Role::COMPANY_MANAGER));
-        $subjectId = app(MappingServiceContract::class)->resolveOwnSubject(
-            $manager->id,
-            PurposeCode::HEALTH_SELF_READ,
-        );
 
-        $this->assertNotSame('', $subjectId);
-        $this->assertStringNotContainsString($subjectId, $acceptResponse->getContent());
+        // Invite acceptance is identity-only (ADR-003 D2), so no subject is
+        // provisioned here. The id that WOULD be derived for this user must
+        // still never appear in the response.
+        $this->assertStringNotContainsString(
+            app(MappingCryptography::class)->healthSubjectIdForUserId($manager->id),
+            $acceptResponse->getContent(),
+        );
     }
 
     public function test_manager_cannot_invite_non_employee_roles(): void
@@ -776,57 +777,133 @@ class AuthTest extends TestCase
         $this->assertDatabaseHas('user_roles', ['role' => 'EMPLOYEE']);
 
         $user = User::where('email', 'invited@test.com')->firstOrFail();
+
+        // See above: identity-only acceptance, no provisioning, no subject id
+        // in the payload.
+        $this->assertStringNotContainsString(
+            app(MappingCryptography::class)->healthSubjectIdForUserId($user->id),
+            $response->getContent(),
+        );
+    }
+
+    /**
+     * Invite acceptance is identity-only (ADR-003 D2). It must not touch the
+     * mapping domain: `/api/auth/invite/accept` is served by the identity
+     * runtime, which holds no mapping connection and no mapping key material.
+     *
+     * This replaces the former
+     * `test_invite_accept_succeeds_after_provisioning_failure_and_command_repairs_mapping`,
+     * which mocked the synchronous provisioning call failing. That call no
+     * longer exists, so the test now pins the stronger property: no mapping is
+     * created at all.
+     */
+    public function test_invite_accept_creates_the_user_without_provisioning_a_subject(): void
+    {
+        $company = Company::factory()->create();
+        $rawToken = 'identity-only-invite-token';
+
+        InviteToken::create([
+            'company_id' => $company->id,
+            'email' => 'identity-only@test.com',
+            'role' => Role::EMPLOYEE,
+            'token_hash' => hash('sha256', $rawToken),
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        $mappingService = $this->createMock(MappingServiceContract::class);
+        $mappingService->expects($this->never())->method('provisionOwnSubject');
+        app()->instance(MappingServiceContract::class, $mappingService);
+
+        $response = $this->postJson('/api/auth/invite/accept', [
+            'token' => $rawToken,
+            'name' => 'Identity Only',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $response->assertOk();
+        $this->assertDatabaseHas('users', ['email' => 'identity-only@test.com']);
+
+        app()->forgetInstance(MappingServiceContract::class);
+        app()->bind(MappingServiceContract::class, MappingService::class);
+
+        $user = User::where('email', 'identity-only@test.com')->firstOrFail();
+
+        // Asserted through the service contract rather than the mapping table,
+        // so the test stays on the public boundary and does not import a
+        // privacy-domain model.
+        $this->expectException(MappingNotFoundException::class);
+
+        app(MappingServiceContract::class)->resolveOwnSubject(
+            $user->id,
+            PurposeCode::HEALTH_SELF_READ,
+        );
+    }
+
+    /**
+     * The employee runtime provisions on demand, where the mapping credentials
+     * legitimately exist (`App\Services\Health\ResolvesOwnSubject`).
+     */
+    public function test_first_health_access_provisions_the_subject_lazily(): void
+    {
+        $company = Company::factory()->create();
+        $rawToken = 'lazy-provisioning-token';
+
+        InviteToken::create([
+            'company_id' => $company->id,
+            'email' => 'lazy-provisioning@test.com',
+            'role' => Role::EMPLOYEE,
+            'token_hash' => hash('sha256', $rawToken),
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        $this->postJson('/api/auth/invite/accept', [
+            'token' => $rawToken,
+            'name' => 'Lazy Provisioning',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertOk();
+
+        $user = User::where('email', 'lazy-provisioning@test.com')->firstOrFail();
+
+        $this->actingAs($user)->getJson('/api/employee/dashboard')->assertOk();
+
         $subjectId = app(MappingServiceContract::class)->resolveOwnSubject(
             $user->id,
             PurposeCode::HEALTH_SELF_READ,
         );
 
         $this->assertNotSame('', $subjectId);
-        $this->assertStringNotContainsString($subjectId, $response->getContent());
     }
 
-    public function test_invite_accept_succeeds_after_provisioning_failure_and_command_repairs_mapping(): void
+    /**
+     * The bulk repair path stays available for users who never trigger a health
+     * request, and must not leak the subject id or the email into its output.
+     */
+    public function test_provision_subjects_command_backfills_users_without_a_mapping(): void
     {
         $company = Company::factory()->create();
-        $rawToken = 'provisioning-failure-token';
-        $sensitiveSubjectId = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+        $rawToken = 'backfill-token';
 
         InviteToken::create([
             'company_id' => $company->id,
-            'email' => 'provisioning-failure@test.com',
+            'email' => 'backfill@test.com',
             'role' => Role::EMPLOYEE,
             'token_hash' => hash('sha256', $rawToken),
             'expires_at' => now()->addDays(7),
         ]);
 
-        $failingMappingService = $this->createMock(MappingServiceContract::class);
-        $failingMappingService->expects($this->once())
-            ->method('provisionOwnSubject')
-            ->with($this->isInt(), PurposeCode::PROVISIONING)
-            ->willThrowException(new RuntimeException("Failed for subject {$sensitiveSubjectId}."));
-        app()->instance(MappingServiceContract::class, $failingMappingService);
-        Log::spy();
-
-        $response = $this->postJson('/api/auth/invite/accept', [
+        $this->postJson('/api/auth/invite/accept', [
             'token' => $rawToken,
-            'name' => 'Provisioning Failure',
+            'name' => 'Backfill',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-        ]);
-
-        $response->assertOk();
-        $this->assertDatabaseHas('users', ['email' => 'provisioning-failure@test.com']);
-        $this->assertStringNotContainsString($sensitiveSubjectId, $response->getContent());
-        Log::shouldHaveReceived('warning')
-            ->once()
-            ->with('Health subject provisioning failed after invite acceptance; run elyo:provision-subjects.');
-
-        app()->forgetInstance(MappingServiceContract::class);
-        app()->bind(MappingServiceContract::class, MappingService::class);
+        ])->assertOk();
 
         $this->assertSame(0, Artisan::call('elyo:provision-subjects'));
         $commandOutput = Artisan::output();
-        $user = User::where('email', 'provisioning-failure@test.com')->firstOrFail();
+
+        $user = User::where('email', 'backfill@test.com')->firstOrFail();
         $subjectId = app(MappingServiceContract::class)->resolveOwnSubject(
             $user->id,
             PurposeCode::HEALTH_SELF_READ,
