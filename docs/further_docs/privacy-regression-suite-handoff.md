@@ -46,8 +46,8 @@ payload.
 
 ## Validation
 
-- `php artisan test --testsuite=privacy`: 64 tests, 360 assertions.
-- `php artisan test`: 575 tests, 3,281 assertions.
+- `php artisan test --testsuite=privacy`: 68 tests, 368 assertions.
+- `php artisan test`: 579 tests, 3,289 assertions.
 - Boundary suite: 21 tests, 97 assertions.
 - Deptrac: 0 violations, 0 errors.
 - Angular production build: passed.

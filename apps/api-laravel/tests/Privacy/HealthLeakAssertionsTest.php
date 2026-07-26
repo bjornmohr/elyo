@@ -62,6 +62,26 @@ class HealthLeakAssertionsTest extends TestCase
     }
 
     /**
+     * @return array<string, array{array<string, mixed>}>
+     */
+    public static function invalidAggregateReleaseCounts(): array
+    {
+        return [
+            'missing global counts' => [[]],
+            'insufficient contributors' => [[
+                'minRequired' => 10,
+                'responseCount' => 5,
+                'participation' => ['eligibleCount' => 10],
+            ]],
+            'insufficient eligible population' => [[
+                'minRequired' => 10,
+                'responseCount' => 10,
+                'participation' => ['eligibleCount' => 9],
+            ]],
+        ];
+    }
+
+    /**
      * @return array<string, array{string}>
      */
     public static function companyReportingEndpoints(): array
@@ -227,6 +247,21 @@ class HealthLeakAssertionsTest extends TestCase
         );
     }
 
+    public function test_note_is_rejected_in_a_wellbeing_context(): void
+    {
+        $response = TestResponse::fromBaseResponse(new JsonResponse([
+            'data' => ['note' => 'Synthetic sensitive note'],
+        ]));
+
+        $this->expectException(ExpectationFailedException::class);
+        $this->expectExceptionMessage('$.data.note');
+
+        $this->assertResponseHasNoHealthLeaks(
+            $response,
+            '/api/company/wellbeing',
+        );
+    }
+
     #[DataProvider('companyReportingEndpoints')]
     public function test_score_is_rejected_on_company_reporting_surfaces(string $endpoint): void
     {
@@ -258,6 +293,9 @@ class HealthLeakAssertionsTest extends TestCase
         $response = TestResponse::fromBaseResponse(new JsonResponse([
             'data' => [
                 'isAboveThreshold' => false,
+                'minRequired' => 10,
+                'responseCount' => 10,
+                'participation' => ['eligibleCount' => 10],
                 'questions' => [[
                     'type' => 'SCALE',
                     'isSuppressed' => true,
@@ -283,6 +321,9 @@ class HealthLeakAssertionsTest extends TestCase
         $response = TestResponse::fromBaseResponse(new JsonResponse([
             'data' => [
                 'isAboveThreshold' => true,
+                'minRequired' => 10,
+                'responseCount' => 10,
+                'participation' => ['eligibleCount' => 10],
                 'questions' => [[
                     'type' => 'SCALE',
                     'isSuppressed' => false,
@@ -308,6 +349,9 @@ class HealthLeakAssertionsTest extends TestCase
         $response = TestResponse::fromBaseResponse(new JsonResponse([
             'data' => [
                 'isAboveThreshold' => true,
+                'minRequired' => 10,
+                'responseCount' => 10,
+                'participation' => ['eligibleCount' => 10],
                 'questions' => [[
                     'type' => 'SCALE',
                     'isSuppressed' => false,
@@ -326,11 +370,44 @@ class HealthLeakAssertionsTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    /**
+     * @param  array<string, mixed>  $releaseCounts
+     */
+    #[DataProvider('invalidAggregateReleaseCounts')]
+    public function test_survey_distribution_allowlist_rejects_invalid_global_release_counts(
+        array $releaseCounts,
+    ): void {
+        $response = TestResponse::fromBaseResponse(new JsonResponse([
+            'data' => array_merge([
+                'isAboveThreshold' => true,
+                'questions' => [[
+                    'type' => 'SCALE',
+                    'isSuppressed' => false,
+                    'distribution' => [[
+                        'value' => 4,
+                        'count' => 5,
+                    ]],
+                ]],
+            ], $releaseCounts),
+        ]));
+
+        $this->expectException(ExpectationFailedException::class);
+        $this->expectExceptionMessage('$.data.questions.0.distribution.0.value');
+
+        $this->assertResponseHasNoHealthLeaks(
+            $response,
+            '/api/company/surveys/{id}/results',
+        );
+    }
+
     public function test_survey_distribution_allowlist_rejects_a_non_scale_question(): void
     {
         $response = TestResponse::fromBaseResponse(new JsonResponse([
             'data' => [
                 'isAboveThreshold' => true,
+                'minRequired' => 10,
+                'responseCount' => 10,
+                'participation' => ['eligibleCount' => 10],
                 'questions' => [[
                     'type' => 'TEXT',
                     'isSuppressed' => false,

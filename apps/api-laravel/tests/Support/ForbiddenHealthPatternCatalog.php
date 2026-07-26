@@ -70,6 +70,12 @@ final class ForbiddenHealthPatternCatalog
             'rationale' => 'A generic text field inside an answer collection is raw survey content.',
         ],
         [
+            'id' => 'raw_note_in_health_context',
+            'key_regex' => '/^note$/',
+            'context_regex' => '/(?:health|wellbeing|checkin)/',
+            'rationale' => 'A note in health, wellbeing or check-in context is forbidden raw health text.',
+        ],
+        [
             'id' => 'lab_metadata_in_lab_context',
             'key_regex' => '/^(?:name|status|unit|low|high|group|source)$/',
             'context_regex' => '/(?:lab|marker|measurement|biometric)/',

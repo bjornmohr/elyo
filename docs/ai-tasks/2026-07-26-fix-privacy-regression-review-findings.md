@@ -159,6 +159,20 @@ guard now classifies both Health and Privacy model namespaces as forbidden.
 The foreign-resource response now uses the shared leak scanner with seeded
 subject IDs before its 404 assertions.
 
+## Eighth review findings
+
+The fifth memory-cleared review found two Medium release/catalog gaps:
+
+1. Aggregate allowlisting trusted `isAboveThreshold` without independently
+   verifying `minRequired >= 10`, contributor count and eligible count.
+2. A generic `note` in wellbeing/check-in context was not rejected as raw
+   health text.
+
+Four sensitivity cases covering missing/insufficient global counts and a
+wellbeing note were added first and failed. Released survey paths now require
+integer global counts satisfying the effective threshold, and contextual notes
+are forbidden.
+
 ## Additional test seams
 
 - `GET /api/company/surveys/{id}/results` for effective-threshold suppression.

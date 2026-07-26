@@ -67,10 +67,22 @@ final class HealthLeakAllowlist
 
         $payload = $response->json();
         $data = is_array($payload) ? ($payload['data'] ?? null) : null;
+        $participation = is_array($data) ? ($data['participation'] ?? null) : null;
+        $minRequired = is_array($data) ? ($data['minRequired'] ?? null) : null;
+        $responseCount = is_array($data) ? ($data['responseCount'] ?? null) : null;
+        $eligibleCount = is_array($participation)
+            ? ($participation['eligibleCount'] ?? null)
+            : null;
 
         if (
             ! is_array($data)
             || ($data['isAboveThreshold'] ?? null) !== true
+            || ! is_int($minRequired)
+            || $minRequired < 10
+            || ! is_int($responseCount)
+            || $responseCount < $minRequired
+            || ! is_int($eligibleCount)
+            || $eligibleCount < $minRequired
             || ! is_array($data['questions'] ?? null)
         ) {
             return [];
