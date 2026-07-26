@@ -54,7 +54,9 @@ class HealthLeakAssertionsTest extends TestCase
     {
         return [
             'health score' => ['healthScore'],
+            'wellbeing score' => ['wellbeingScore'],
             'average score' => ['averageScore'],
+            'overall score' => ['overallScore'],
             'score value' => ['scoreValue'],
         ];
     }
@@ -206,6 +208,25 @@ class HealthLeakAssertionsTest extends TestCase
         $this->assertResponseHasNoHealthLeaks($response, '/api/company/dashboard');
     }
 
+    public function test_generic_text_is_rejected_inside_an_answer_collection(): void
+    {
+        $response = TestResponse::fromBaseResponse(new JsonResponse([
+            'data' => [
+                'answers' => [[
+                    'text' => 'Synthetic sensitive answer',
+                ]],
+            ],
+        ]));
+
+        $this->expectException(ExpectationFailedException::class);
+        $this->expectExceptionMessage('$.data.answers.0.text');
+
+        $this->assertResponseHasNoHealthLeaks(
+            $response,
+            '/api/company/surveys/17/results',
+        );
+    }
+
     #[DataProvider('companyReportingEndpoints')]
     public function test_score_is_rejected_on_company_reporting_surfaces(string $endpoint): void
     {
@@ -238,6 +259,7 @@ class HealthLeakAssertionsTest extends TestCase
             'data' => [
                 'isAboveThreshold' => false,
                 'questions' => [[
+                    'type' => 'SCALE',
                     'isSuppressed' => true,
                     'distribution' => [[
                         'value' => 4,
@@ -262,6 +284,7 @@ class HealthLeakAssertionsTest extends TestCase
             'data' => [
                 'isAboveThreshold' => true,
                 'questions' => [[
+                    'type' => 'SCALE',
                     'isSuppressed' => false,
                     'distribution' => [[
                         'value' => 4,
@@ -286,6 +309,7 @@ class HealthLeakAssertionsTest extends TestCase
             'data' => [
                 'isAboveThreshold' => true,
                 'questions' => [[
+                    'type' => 'SCALE',
                     'isSuppressed' => false,
                     'distribution' => [[
                         'value' => 4,
@@ -300,6 +324,31 @@ class HealthLeakAssertionsTest extends TestCase
             '/api/company/surveys/{id}/results',
         );
         $this->addToAssertionCount(1);
+    }
+
+    public function test_survey_distribution_allowlist_rejects_a_non_scale_question(): void
+    {
+        $response = TestResponse::fromBaseResponse(new JsonResponse([
+            'data' => [
+                'isAboveThreshold' => true,
+                'questions' => [[
+                    'type' => 'TEXT',
+                    'isSuppressed' => false,
+                    'distribution' => [[
+                        'value' => 4,
+                        'count' => 5,
+                    ]],
+                ]],
+            ],
+        ]));
+
+        $this->expectException(ExpectationFailedException::class);
+        $this->expectExceptionMessage('$.data.questions.0.distribution.0.value');
+
+        $this->assertResponseHasNoHealthLeaks(
+            $response,
+            '/api/company/surveys/{id}/results',
+        );
     }
 
     public function test_ulid_is_rejected_at_a_health_related_path(): void

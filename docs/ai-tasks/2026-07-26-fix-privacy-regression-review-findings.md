@@ -131,6 +131,20 @@ variants. Lab access tests now scan every forbidden response before asserting
 403. The relation guard and handoff structure were also tightened to close the
 two Low findings from the same review.
 
+## Sixth review findings
+
+The third memory-cleared review found two Medium hardening gaps:
+
+1. Generic `answers[*].text` and broader score variants such as
+   `wellbeingScore` and `overallScore` were not detected.
+2. The survey distribution exception validated release state and bucket size
+   but did not require the question type to be `SCALE`.
+
+Four focused sensitivity tests were added first and failed. The contextual
+catalog now rejects generic text only in answer collections and any normalized
+score token on health/reporting surfaces. The aggregate exception now requires
+`type: SCALE`.
+
 ## Additional test seams
 
 - `GET /api/company/surveys/{id}/results` for effective-threshold suppression.

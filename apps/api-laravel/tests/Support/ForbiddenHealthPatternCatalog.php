@@ -59,9 +59,15 @@ final class ForbiddenHealthPatternCatalog
     public const CONTEXTUAL_KEY_PATTERNS = [
         [
             'id' => 'score_in_health_context',
-            'key_regex' => '/^(?:score|value|health_score|average_score|score_value)$/',
+            'key_regex' => '/^(?:(?:.+_)?score(?:_.+)?|value)$/',
             'context_regex' => '/(?:health|wellbeing|checkin|mood|stress|energy|lab|marker|measurement|biometric|anamnesis|wearable|company\/(?:dashboard|reports?(?:\b|\/)|surveys\/[^\/\s]+\/results))/',
-            'rationale' => 'Generic score/value fields are health data inside health-related or company-reporting contexts.',
+            'rationale' => 'Score variants and generic value fields are health data inside health-related or company-reporting contexts.',
+        ],
+        [
+            'id' => 'raw_text_in_answer_context',
+            'key_regex' => '/^text$/',
+            'context_regex' => '/\banswers?\b/',
+            'rationale' => 'A generic text field inside an answer collection is raw survey content.',
         ],
         [
             'id' => 'lab_metadata_in_lab_context',

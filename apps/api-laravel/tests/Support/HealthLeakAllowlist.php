@@ -81,6 +81,7 @@ final class HealthLeakAllowlist
         foreach ($data['questions'] as $questionIndex => $question) {
             if (
                 ! is_array($question)
+                || ($question['type'] ?? null) !== 'SCALE'
                 || ($question['isSuppressed'] ?? null) !== false
                 || ! is_array($question['distribution'] ?? null)
             ) {
