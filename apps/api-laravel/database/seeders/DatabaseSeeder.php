@@ -36,6 +36,7 @@ class DatabaseSeeder extends Seeder
 
         $this->call(PointSettingsSeeder::class);
         $this->call(SystemExerciseSeeder::class);
+        $this->call(LabMarkerCatalogSeeder::class);
         $this->call(DemoDataSeeder::class);
     }
 }
