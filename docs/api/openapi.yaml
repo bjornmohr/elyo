@@ -726,7 +726,8 @@ components:
         participationRate:
           type: number
           nullable: true
-          description: Percentage of scoped eligible employees who participated, null when suppressed.
+          multipleOf: 5
+          description: Percentage of scoped eligible employees who participated, rounded to the nearest 5 percentage points. Null when suppressed.
         suppressionReason:
           type: string
           nullable: true
@@ -744,7 +745,11 @@ components:
               isAboveThreshold: { type: boolean }
               eligibleCount: { type: integer, nullable: true }
               participantCount: { type: integer, nullable: true }
-              participationRate: { type: number, nullable: true }
+              participationRate:
+                type: number
+                nullable: true
+                multipleOf: 5
+                description: Rounded to the nearest 5 percentage points; null when suppressed.
               suppressionReason: { type: string, nullable: true }
             description: Always null for this measure-level aggregate endpoint.
 
@@ -2393,6 +2398,7 @@ paths:
                           responseCount: { type: integer }
                           rate:
                             type: number
+                            multipleOf: 5
                             description: Participation percentage rounded to the nearest 5 percentage points.
                       responseCount: { type: integer }
                       minRequired:
@@ -2453,6 +2459,7 @@ paths:
                                   count: { type: integer, minimum: 5 }
                                   percentage:
                                     type: number
+                                    multipleOf: 5
                                     description: Bucket percentage rounded to the nearest 5 percentage points.
                             trueCount:
                               type: integer
@@ -2465,10 +2472,12 @@ paths:
                             truePercentage:
                               type: number
                               nullable: true
+                              multipleOf: 5
                               description: Percentage rounded to the nearest 5 percentage points; null when suppressed.
                             falsePercentage:
                               type: number
                               nullable: true
+                              multipleOf: 5
                               description: Percentage rounded to the nearest 5 percentage points; null when suppressed.
                             options:
                               type: array
@@ -2480,6 +2489,7 @@ paths:
                                   count: { type: integer, minimum: 5 }
                                   percentage:
                                     type: number
+                                    multipleOf: 5
                                     description: Bucket percentage rounded to the nearest 5 percentage points.
         403:
           description: User is not eligible for the company portal, anonymity threshold not met, or TEAM_LAYER_DISABLED for team-scoped results when the company team layer is disabled

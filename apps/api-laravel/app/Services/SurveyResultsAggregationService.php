@@ -8,6 +8,7 @@ use App\Models\SurveyAnswer;
 use App\Models\SurveyResponse;
 use App\Models\User;
 use App\Services\Company\AnonymityThreshold;
+use App\Services\Company\ReportingPercentage;
 use Illuminate\Database\Eloquent\Builder;
 
 class SurveyResultsAggregationService
@@ -91,7 +92,7 @@ class SurveyResultsAggregationService
                         ->map(fn ($item) => [
                             'value' => (int) $item->value,
                             'count' => (int) $item->count,
-                            'percentage' => $this->roundedPercentage(
+                            'percentage' => ReportingPercentage::of(
                                 (int) $item->count,
                                 $answerCount,
                             ),
@@ -106,10 +107,10 @@ class SurveyResultsAggregationService
                 $result['trueCount'] = $isSuppressed ? null : $trueCount;
                 $result['falseCount'] = $isSuppressed ? null : $falseCount;
                 $result['truePercentage'] = ! $isSuppressed && $answerCount > 0
-                    ? $this->roundedPercentage($trueCount, $answerCount)
+                    ? ReportingPercentage::of($trueCount, $answerCount)
                     : null;
                 $result['falsePercentage'] = ! $isSuppressed && $answerCount > 0
-                    ? $this->roundedPercentage($falseCount, $answerCount)
+                    ? ReportingPercentage::of($falseCount, $answerCount)
                     : null;
                 if ($isSuppressed) {
                     $result['suppressionReason'] = 'DISTRIBUTION_SUPPRESSED';
@@ -131,7 +132,7 @@ class SurveyResultsAggregationService
                         ->map(fn ($item) => [
                             'value' => $item->value,
                             'count' => (int) $item->count,
-                            'percentage' => $this->roundedPercentage(
+                            'percentage' => ReportingPercentage::of(
                                 (int) $item->count,
                                 $answerCount,
                             ),
@@ -195,17 +196,8 @@ class SurveyResultsAggregationService
         return [
             'eligibleCount' => $eligibleCount,
             'responseCount' => $responseCount,
-            'rate' => $this->roundedPercentage($responseCount, $eligibleCount),
+            'rate' => ReportingPercentage::of($responseCount, $eligibleCount),
         ];
-    }
-
-    private function roundedPercentage(int $count, int $total): int
-    {
-        if ($total <= 0) {
-            return 0;
-        }
-
-        return (int) (round((($count / $total) * 100) / 5) * 5);
     }
 
     private function isSmallBucket(int $count): bool

@@ -54,6 +54,36 @@ class MeasureParticipationSummaryTest extends TestCase
         $this->assertNoIndividualParticipationData($response->getContent());
     }
 
+    public function test_summary_rounds_the_participation_rate_to_five_points(): void
+    {
+        $company = Company::factory()->create(['anonymity_threshold' => 10]);
+        $admin = $this->companyUser($company, Role::COMPANY_ADMIN);
+        $measure = Measure::factory()->create([
+            'company_id' => $company->id,
+            'team_id' => null,
+            'created_by' => $admin->id,
+        ]);
+        $employees = User::factory()->count(12)->create([
+            'company_id' => $company->id,
+            'role' => Role::EMPLOYEE,
+        ]);
+
+        $employees->take(11)->each(fn (User $employee) => MeasureParticipation::factory()->create([
+            'measure_id' => $measure->id,
+            'user_id' => $employee->id,
+            'company_id' => $company->id,
+            'team_id' => $employee->team_id,
+        ]));
+
+        $response = $this->actingAs($admin)->getJson("/api/company/measures/{$measure->id}/participation-summary");
+
+        // 11 of 12 is 91.66…, released as 90 per ADR-001 §2.5.
+        $response->assertOk()
+            ->assertJsonPath('data.eligibleCount', 12)
+            ->assertJsonPath('data.participantCount', 11)
+            ->assertJsonPath('data.participationRate', 90);
+    }
+
     public function test_summary_suppresses_counts_when_anonymity_threshold_is_not_met(): void
     {
         $company = Company::factory()->create(['anonymity_threshold' => 3]);
