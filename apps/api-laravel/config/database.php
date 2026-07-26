@@ -3,7 +3,55 @@
 use Illuminate\Support\Str;
 use Pdo\Mysql;
 
+$appEnvironment = trim((string) env('APP_ENV', 'production'));
+$configuredRuntime = trim((string) env('ELYO_RUNTIME', ''));
+$localEnvironments = ['local', 'testing'];
+
+if ($configuredRuntime === '') {
+    if (! in_array($appEnvironment, $localEnvironments, true)) {
+        throw new RuntimeException(
+            'ELYO_RUNTIME is required outside local/testing environments. Expected one of: identity, employee, company.',
+        );
+    }
+
+    $configuredRuntime = 'full';
+}
+
+if (! in_array($configuredRuntime, ['identity', 'employee', 'company', 'full'], true)) {
+    throw new RuntimeException(
+        "Invalid ELYO_RUNTIME [{$configuredRuntime}]. Expected one of: identity, employee, company, full.",
+    );
+}
+
+if ($configuredRuntime === 'full' && ! in_array($appEnvironment, $localEnvironments, true)) {
+    throw new RuntimeException(
+        'ELYO_RUNTIME [full] is allowed only when APP_ENV is local or testing.',
+    );
+}
+
+$runtimeConnections = match ($configuredRuntime) {
+    'identity' => ['identity', 'audit'],
+    'employee' => ['identity', 'mapping', 'health', 'audit'],
+    'company' => ['identity', 'audit'],
+    'full' => [
+        'sqlite',
+        'mysql',
+        'mariadb',
+        'identity',
+        'mapping',
+        'health',
+        'audit',
+        'identity_migrator',
+        'mapping_migrator',
+        'health_migrator',
+        'audit_migrator',
+        'pgsql',
+        'sqlsrv',
+    ],
+};
+
 return [
+    'runtime' => $configuredRuntime,
 
     /*
     |--------------------------------------------------------------------------
@@ -30,7 +78,13 @@ return [
     |
     */
 
-    'connections' => [
+    'connections' => ($configuredRuntime === 'full' ? [] : array_fill_keys([
+        'sqlite',
+        'mysql',
+        'mariadb',
+        'pgsql',
+        'sqlsrv',
+    ], null)) + array_intersect_key([
 
         'sqlite' => [
             'driver' => 'sqlite',
@@ -255,7 +309,7 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
-    ],
+    ], array_flip($runtimeConnections)),
 
     /*
     |--------------------------------------------------------------------------
