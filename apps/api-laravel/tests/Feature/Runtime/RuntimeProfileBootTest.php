@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\Runtime;
 
+use App\Runtime\RuntimeProfile;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Symfony\Component\Process\Process;
 
 class RuntimeProfileBootTest extends TestCase
@@ -162,6 +164,42 @@ class RuntimeProfileBootTest extends TestCase
         );
     }
 
+    public function test_cached_configuration_from_another_runtime_fails_boot(): void
+    {
+        $cachePath = dirname(__DIR__, 3).'/bootstrap/cache/config-runtime-profile-test.php';
+
+        try {
+            $cache = $this->runArtisan(['config:cache'], 'full', 'testing', ['APP_CONFIG_CACHE' => $cachePath]);
+
+            $this->assertSame(0, $cache->getExitCode(), $cache->getErrorOutput().$cache->getOutput());
+
+            $failure = $this->runArtisan(['route:list'], 'company', 'testing', ['APP_CONFIG_CACHE' => $cachePath]);
+
+            $this->assertNotSame(0, $failure->getExitCode());
+            $this->assertStringContainsString(
+                'Cached configuration was built with ELYO_RUNTIME [full] but this process runs with [company].',
+                $failure->getErrorOutput().$failure->getOutput(),
+            );
+        } finally {
+            @unlink($cachePath);
+        }
+    }
+
+    public function test_unknown_runtime_has_no_route_or_connection_set(): void
+    {
+        foreach ([
+            fn (): array => RuntimeProfile::routeFiles('privacy'),
+            fn (): array => RuntimeProfile::connections('privacy'),
+        ] as $call) {
+            try {
+                $call();
+                $this->fail('Expected an unknown runtime profile to be rejected.');
+            } catch (RuntimeException $exception) {
+                $this->assertStringContainsString('Unknown runtime profile [privacy]', $exception->getMessage());
+            }
+        }
+    }
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -294,16 +332,19 @@ PHP;
 
     /**
      * @param  array<int, string>  $arguments
+     * @param  array<string, string>  $environment
      */
     private function runArtisan(
         array $arguments,
         string $runtime,
         string $appEnvironment,
+        array $environment = [],
     ): Process {
         return $this->runProcess(
             [PHP_BINARY, 'artisan', ...$arguments],
             $runtime,
             $appEnvironment,
+            $environment,
         );
     }
 
@@ -325,11 +366,13 @@ PHP;
 
     /**
      * @param  array<int, string>  $command
+     * @param  array<string, string>  $environment
      */
     private function runProcess(
         array $command,
         string $runtime,
         string $appEnvironment,
+        array $environment = [],
     ): Process {
         $process = new Process(
             $command,
@@ -337,6 +380,9 @@ PHP;
             [
                 'APP_ENV' => $appEnvironment,
                 'ELYO_RUNTIME' => $runtime,
+                // Keep the console from wrapping asserted failure messages.
+                'COLUMNS' => '400',
+                ...$environment,
             ],
         );
         $process->setTimeout(30);

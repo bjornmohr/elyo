@@ -1,14 +1,11 @@
 <?php
 
-$runtime = config('database.runtime');
+use App\Runtime\RuntimeProfile;
+
+$runtime = (string) config('runtime.profile');
 
 require __DIR__.'/api/health.php';
 
-foreach (match ($runtime) {
-    'identity' => ['identity', 'identity-partner'],
-    'employee' => ['employee'],
-    'company' => ['company'],
-    'full' => ['identity', 'company', 'employee', 'identity-partner'],
-} as $profile) {
+foreach (RuntimeProfile::routeFiles($runtime) as $profile) {
     require __DIR__."/api/{$profile}.php";
 }

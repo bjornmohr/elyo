@@ -9,12 +9,12 @@ Route::get('/health', function () {
 
         return response()->json([
             'status' => 'up',
-            'runtime' => config('database.runtime'),
+            'runtime' => config('runtime.profile'),
         ]);
     } catch (Throwable) {
         return response()->json([
             'status' => 'down',
-            'runtime' => config('database.runtime'),
+            'runtime' => config('runtime.profile'),
         ], 503);
     }
 });

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Runtime\RuntimeProfile;
 use App\Services\Privacy\AuditLoggerContract;
 use App\Services\Privacy\DatabaseAuditLogger;
 use App\Services\Privacy\MappingCryptography;
@@ -32,6 +33,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Runs even when the configuration is cached, where the fail-safe
+        // checks inside config/runtime.php would never execute.
+        RuntimeProfile::assertMatchesEnvironment(
+            (string) config('runtime.profile'),
+            (string) config('app.env'),
+        );
     }
 }
