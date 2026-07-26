@@ -18,4 +18,9 @@ class NullAuditLogger implements AuditLoggerContract
     {
         // Test-only no-op retained for isolated MappingService construction.
     }
+
+    public function logAccountDeletion(array $summary, AuditOutcome $outcome): void
+    {
+        // Test-only no-op retained for isolated privacy-service construction.
+    }
 }

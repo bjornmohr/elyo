@@ -265,6 +265,11 @@ class MappingServiceTest extends TestCase
             {
                 // This test exercises MappingService operations only.
             }
+
+            public function logAccountDeletion(array $summary, AuditOutcome $outcome): void
+            {
+                // This test exercises MappingService operations only.
+            }
         };
 
         app()->instance(AuditLoggerContract::class, $auditLogger);

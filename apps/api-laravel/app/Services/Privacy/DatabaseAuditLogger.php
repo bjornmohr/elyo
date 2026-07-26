@@ -41,6 +41,21 @@ final class DatabaseAuditLogger implements AuditLoggerContract
         );
     }
 
+    public function logAccountDeletion(array $summary, AuditOutcome $outcome): void
+    {
+        $this->insertEvent(
+            'account.deletion',
+            PurposeCode::REVOCATION,
+            [
+                ...AuditActorContext::privacyAdmin()->toArray(),
+                'summary' => $summary,
+            ],
+            null,
+            null,
+            $outcome,
+        );
+    }
+
     /**
      * @param  array<string, mixed>  $actorContext
      */

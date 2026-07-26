@@ -17,7 +17,16 @@ interface MappingServiceContract
 
     public function resolveOwnSubject(int $userId, PurposeCode $purpose): string;
 
-    public function revokeSubjectLink(int $userId, PurposeCode $purpose): void;
+    /**
+     * @param  null|callable(string): void  $beforeRevocation
+     * @param  null|callable(): void  $afterRevocationAudit
+     */
+    public function revokeSubjectLink(
+        int $userId,
+        PurposeCode $purpose,
+        ?callable $beforeRevocation = null,
+        ?callable $afterRevocationAudit = null,
+    ): void;
 
     /**
      * @param  array<int, int>  $userIds
