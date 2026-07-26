@@ -77,6 +77,14 @@ When adding an endpoint or a new individual-health response shape:
 6. Run the privacy suite standalone and the full Laravel suite. No privacy test
    may skip when PostgreSQL, roles, credentials or schemas are missing.
 
+A contextual pattern is matched against the endpoint, the JSON path and the
+object's sibling keys, all snake_cased and lowercased before matching. Anchor
+short context tokens so they cannot fire inside ordinary company vocabulary —
+a bare `lab` also matches `available`, `label` and `scale_min_label`. Use the
+`LAB_TOKEN` form in the catalog as the template, and cover any new short token
+with a sensitivity test proving both that it fires in real context and that it
+stays silent on the words that merely contain it.
+
 Future reporting-domain aggregates allowed by ADR-001 §2.5 do not justify
 removing or weakening a forbidden pattern. Add a narrow reviewed entry to
 `apps/api-laravel/tests/Support/HealthLeakAllowlist.php` instead. Every entry

@@ -14,6 +14,16 @@ final class ForbiddenHealthPatternCatalog
     public const VERSION = 'v1';
 
     /**
+     * `lab` as a standalone context token.
+     *
+     * Contexts are snake_cased before matching, so a bare `lab` substring would
+     * also fire on ordinary company vocabulary — `available`, `label`,
+     * `scale_min_label`. Requiring a non-letter on both sides keeps
+     * `lab-markers`, `lab_summary` and `lab_reading` while dropping those.
+     */
+    private const LAB_TOKEN = '(?<![a-z])lab(?![a-z])';
+
+    /**
      * Keys forbidden regardless of their scalar value.
      *
      * @var list<array{id: string, regex: string, rationale: string}>
@@ -60,7 +70,7 @@ final class ForbiddenHealthPatternCatalog
         [
             'id' => 'score_in_health_context',
             'key_regex' => '/^(?:(?:.+_)?score(?:_.+)?|value)$/',
-            'context_regex' => '/(?:health|wellbeing|checkin|mood|stress|energy|lab|marker|measurement|biometric|anamnesis|wearable|company\/(?:dashboard|reports?(?:\b|\/)|surveys\/[^\/\s]+\/results))/',
+            'context_regex' => '/(?:health|wellbeing|checkin|mood|stress|energy|'.self::LAB_TOKEN.'|marker|measurement|biometric|anamnesis|wearable|company\/(?:dashboard|reports?(?:\b|\/)|surveys\/[^\/\s]+\/results))/',
             'rationale' => 'Score variants and generic value fields are health data inside health-related or company-reporting contexts.',
         ],
         [
@@ -78,7 +88,7 @@ final class ForbiddenHealthPatternCatalog
         [
             'id' => 'lab_metadata_in_lab_context',
             'key_regex' => '/^(?:name|status|unit|low|high|group|source)$/',
-            'context_regex' => '/(?:lab|marker|measurement|biometric)/',
+            'context_regex' => '/(?:'.self::LAB_TOKEN.'|marker|measurement|biometric)/',
             'rationale' => 'Lab names, statuses, units, bounds, groups and sources reveal lab-domain data in a lab-related context.',
         ],
     ];
@@ -107,7 +117,7 @@ final class ForbiddenHealthPatternCatalog
      */
     public const HEALTH_CONTEXT_ULID = [
         'id' => 'health_context_ulid',
-        'context_regex' => '/(?:health|wellbeing|checkin|lab|marker|measurement|biometric|anamnesis|wearable|subject|\/api\/company(?:\/|\s))/',
+        'context_regex' => '/(?:health|wellbeing|checkin|'.self::LAB_TOKEN.'|marker|measurement|biometric|anamnesis|wearable|subject|\/api\/company(?:\/|\s))/',
         'rationale' => 'ULIDs in health-related locations or company responses may expose a health subject or health record.',
     ];
 

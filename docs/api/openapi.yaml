@@ -2391,7 +2391,9 @@ paths:
                         properties:
                           eligibleCount: { type: integer }
                           responseCount: { type: integer }
-                          rate: { type: number }
+                          rate:
+                            type: number
+                            description: Participation percentage rounded to the nearest 5 percentage points.
                       responseCount: { type: integer }
                       minRequired:
                         type: integer
@@ -2449,7 +2451,9 @@ paths:
                                 properties:
                                   value: { type: integer }
                                   count: { type: integer, minimum: 5 }
-                                  percentage: { type: number }
+                                  percentage:
+                                    type: number
+                                    description: Bucket percentage rounded to the nearest 5 percentage points.
                             trueCount:
                               type: integer
                               nullable: true
@@ -2461,9 +2465,11 @@ paths:
                             truePercentage:
                               type: number
                               nullable: true
+                              description: Percentage rounded to the nearest 5 percentage points; null when suppressed.
                             falsePercentage:
                               type: number
                               nullable: true
+                              description: Percentage rounded to the nearest 5 percentage points; null when suppressed.
                             options:
                               type: array
                               description: MULTIPLE_CHOICE options. Empty when the distribution is suppressed because any non-zero category has fewer than 5 contributors; answerCount is also null in that case.
@@ -2472,7 +2478,9 @@ paths:
                                 properties:
                                   value: { type: string, nullable: true }
                                   count: { type: integer, minimum: 5 }
-                                  percentage: { type: number }
+                                  percentage:
+                                    type: number
+                                    description: Bucket percentage rounded to the nearest 5 percentage points.
         403:
           description: User is not eligible for the company portal, anonymity threshold not met, or TEAM_LAYER_DISABLED for team-scoped results when the company team layer is disabled
           content:

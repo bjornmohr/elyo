@@ -91,7 +91,10 @@ class SurveyResultsAggregationService
                         ->map(fn ($item) => [
                             'value' => (int) $item->value,
                             'count' => (int) $item->count,
-                            'percentage' => $answerCount > 0 ? round(((int) $item->count / $answerCount) * 100, 1) : 0,
+                            'percentage' => $this->roundedPercentage(
+                                (int) $item->count,
+                                $answerCount,
+                            ),
                         ]);
             } elseif ($q->type->value === 'YES_NO') {
                 $trueCount = (clone $answerQuery)->where('bool_value', true)->count();
@@ -102,8 +105,12 @@ class SurveyResultsAggregationService
                 $result['suppressedCount'] = $isSuppressed ? null : 0;
                 $result['trueCount'] = $isSuppressed ? null : $trueCount;
                 $result['falseCount'] = $isSuppressed ? null : $falseCount;
-                $result['truePercentage'] = ! $isSuppressed && $answerCount > 0 ? round(($trueCount / $answerCount) * 100, 1) : null;
-                $result['falsePercentage'] = ! $isSuppressed && $answerCount > 0 ? round(($falseCount / $answerCount) * 100, 1) : null;
+                $result['truePercentage'] = ! $isSuppressed && $answerCount > 0
+                    ? $this->roundedPercentage($trueCount, $answerCount)
+                    : null;
+                $result['falsePercentage'] = ! $isSuppressed && $answerCount > 0
+                    ? $this->roundedPercentage($falseCount, $answerCount)
+                    : null;
                 if ($isSuppressed) {
                     $result['suppressionReason'] = 'DISTRIBUTION_SUPPRESSED';
                 }
@@ -124,7 +131,10 @@ class SurveyResultsAggregationService
                         ->map(fn ($item) => [
                             'value' => $item->value,
                             'count' => (int) $item->count,
-                            'percentage' => $answerCount > 0 ? round(((int) $item->count / $answerCount) * 100, 1) : 0,
+                            'percentage' => $this->roundedPercentage(
+                                (int) $item->count,
+                                $answerCount,
+                            ),
                         ]);
                 $result['isSuppressed'] = $isSuppressed;
                 $result['suppressedCount'] = $isSuppressed ? null : 0;
@@ -185,8 +195,17 @@ class SurveyResultsAggregationService
         return [
             'eligibleCount' => $eligibleCount,
             'responseCount' => $responseCount,
-            'rate' => $eligibleCount > 0 ? round(($responseCount / $eligibleCount) * 100, 1) : 0,
+            'rate' => $this->roundedPercentage($responseCount, $eligibleCount),
         ];
+    }
+
+    private function roundedPercentage(int $count, int $total): int
+    {
+        if ($total <= 0) {
+            return 0;
+        }
+
+        return (int) (round((($count / $total) * 100) / 5) * 5);
     }
 
     private function isSmallBucket(int $count): bool

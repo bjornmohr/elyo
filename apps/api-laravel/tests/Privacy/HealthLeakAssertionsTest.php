@@ -176,6 +176,45 @@ class HealthLeakAssertionsTest extends TestCase
         $this->assertResponseHasNoHealthLeaks($response, '/api/company/new-endpoint');
     }
 
+    /**
+     * @return array<string, array{array<string, mixed>, string}>
+     */
+    public static function nonLabWordsContainingLab(): array
+    {
+        return [
+            'available in json path' => [
+                ['data' => ['availableMeasures' => [['name' => 'Synthetic measure']]]],
+                '/api/company/measures',
+            ],
+            'label as sibling key' => [
+                ['data' => ['label' => 'Synthetic label', 'name' => 'Synthetic name']],
+                '/api/company/new-endpoint',
+            ],
+            'scale labels as sibling keys' => [
+                ['data' => [
+                    'scaleMinLabel' => 'Never',
+                    'scaleMaxLabel' => 'Always',
+                    'status' => 'ACTIVE',
+                ]],
+                '/api/company/surveys/1',
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    #[DataProvider('nonLabWordsContainingLab')]
+    public function test_words_merely_containing_lab_do_not_establish_lab_context(
+        array $payload,
+        string $endpoint,
+    ): void {
+        $response = TestResponse::fromBaseResponse(new JsonResponse($payload));
+
+        $this->assertResponseHasNoHealthLeaks($response, $endpoint);
+        $this->addToAssertionCount(1);
+    }
+
     public function test_known_health_subject_is_rejected_even_under_a_generic_key(): void
     {
         $subjectId = '01J5KQ9Z8Y7X6W5V4T3S2R1Q0P';

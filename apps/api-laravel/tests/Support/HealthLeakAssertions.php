@@ -65,7 +65,7 @@ trait HealthLeakAssertions
                 }
             }
 
-            $objectContext = strtolower($endpoint.' '.$path.' '.implode(' ', $normalizedKeys));
+            $objectContext = $this->contextFor($endpoint, $path, $normalizedKeys);
 
             foreach ($payload as $key => $value) {
                 $childPath = $path.'.'.$key;
@@ -126,7 +126,7 @@ trait HealthLeakAssertions
             }
         }
 
-        $healthContext = strtolower($endpoint.' '.$path);
+        $healthContext = $this->contextFor($endpoint, $path);
 
         if (
             Str::isUlid($payload)
@@ -142,6 +142,28 @@ trait HealthLeakAssertions
                 $releasedAggregatePaths,
             );
         }
+    }
+
+    /**
+     * Build the lowercase context a contextual pattern is matched against.
+     *
+     * Path segments are snake_cased so camelCase keys expose their word
+     * boundaries: `labSummary` becomes `lab_summary`, which lets a context
+     * token anchor on `lab` without also matching `label` or `available`.
+     * The reported path stays verbatim — only the context is normalized.
+     *
+     * @param  list<string>  $normalizedKeys
+     */
+    private function contextFor(string $endpoint, string $path, array $normalizedKeys = []): string
+    {
+        $normalizedPath = implode('.', array_map(
+            static fn (string $segment): string => Str::snake($segment),
+            explode('.', $path),
+        ));
+
+        return strtolower(
+            $endpoint.' '.$normalizedPath.' '.implode(' ', $normalizedKeys),
+        );
     }
 
     /**
