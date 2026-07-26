@@ -4,6 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { EmployeeService } from '../../services/employee.service';
 import { NotificationService } from '../../../../shared/notifications/notification.service';
+import {
+  WELLBEING_SCALE_MAX,
+  WELLBEING_SCALE_MIN,
+  getMoodEmoji,
+  getStressEmoji,
+} from '../../wellbeing-scale';
 
 @Component({
   selector: 'app-checkin',
@@ -32,7 +38,7 @@ import { NotificationService } from '../../../../shared/notifications/notificati
       } @else {
         <!-- Progress -->
         <div class="flex justify-between items-center px-2">
-          @for (s of [0, 1, 2, 3]; track s; let i = $index) {
+          @for (s of [0, 1, 2]; track s; let i = $index) {
             <div
               class="h-1 flex-1 mx-1 rounded-full transition-colors duration-500"
               [class.bg-teal-500]="i <= step()"
@@ -47,7 +53,7 @@ import { NotificationService } from '../../../../shared/notifications/notificati
             <div class="space-y-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
               <h2 class="text-2xl font-bold text-slate-800">Wie fühlst du dich?</h2>
               <div class="text-6xl my-8">{{ getMoodEmoji(mood()) }}</div>
-              <input type="range" min="1" max="10" [(ngModel)]="mood" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
+              <input type="range" [min]="scaleMin" [max]="scaleMax" step="1" [(ngModel)]="mood" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
               <div class="flex justify-between text-xs text-slate-400 font-medium uppercase tracking-wider">
                 <span>Schlecht</span>
                 <span>Sehr gut</span>
@@ -60,7 +66,7 @@ import { NotificationService } from '../../../../shared/notifications/notificati
             <div class="space-y-6 text-center animate-in fade-in slide-in-from-right-4 duration-500">
               <h2 class="text-2xl font-bold text-slate-800">Stresslevel</h2>
               <div class="text-6xl my-8">{{ getStressEmoji(stress()) }}</div>
-              <input type="range" min="1" max="10" [(ngModel)]="stress" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
+              <input type="range" [min]="scaleMin" [max]="scaleMax" step="1" [(ngModel)]="stress" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
               <div class="flex justify-between text-xs text-slate-400 font-medium uppercase tracking-wider">
                 <span>Entspannt</span>
                 <span>Gestresst</span>
@@ -68,26 +74,16 @@ import { NotificationService } from '../../../../shared/notifications/notificati
             </div>
           }
 
-          <!-- Step 2: Sleep -->
+          <!-- Step 2: Energy -->
           @if (step() === 2) {
             <div class="space-y-6 text-center animate-in fade-in slide-in-from-right-4 duration-500">
               <h2 class="text-2xl font-bold text-slate-800">Energieniveau</h2>
               <div class="text-6xl my-8">⚡</div>
-              <input type="range" min="1" max="10" [(ngModel)]="energy" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
+              <input type="range" [min]="scaleMin" [max]="scaleMax" step="1" [(ngModel)]="energy" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-teal-600">
               <div class="flex justify-between text-xs text-slate-400 font-medium uppercase tracking-wider">
                 <span>Niedrig</span>
                 <span>Hoch</span>
               </div>
-            </div>
-          }
-
-          <!-- Step 3: Notes -->
-          @if (step() === 3) {
-            <div class="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-              <h2 class="text-2xl font-bold text-slate-800 text-center">Anmerkungen?</h2>
-              <textarea [(ngModel)]="notes"
-                        placeholder="Optional: Wie war dein Tag?"
-                        class="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none min-h-[150px] resize-none"></textarea>
             </div>
           }
 
@@ -103,7 +99,7 @@ import { NotificationService } from '../../../../shared/notifications/notificati
             }
             <button (click)="next()"
                     class="flex-[2] py-4 px-6 rounded-2xl bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-all shadow-lg shadow-teal-200 disabled:opacity-50">
-              {{ step() === 3 ? 'Abschließen' : 'Weiter' }}
+              {{ step() === 2 ? 'Abschließen' : 'Weiter' }}
             </button>
           </div>
           @if (error()) {
@@ -119,11 +115,15 @@ export class CheckinComponent implements OnInit {
   private router = inject(Router);
   private notifications = inject(NotificationService);
 
+  protected readonly scaleMin = WELLBEING_SCALE_MIN;
+  protected readonly scaleMax = WELLBEING_SCALE_MAX;
+  protected readonly getMoodEmoji = getMoodEmoji;
+  protected readonly getStressEmoji = getStressEmoji;
+
   step = signal(0);
-  mood = signal(5);
-  stress = signal(5);
-  energy = signal(5);
-  notes = signal('');
+  mood = signal(3);
+  stress = signal(3);
+  energy = signal(3);
   loading = signal(true);
   alreadyDone = signal(false);
   error = signal<string | null>(null);
@@ -139,7 +139,7 @@ export class CheckinComponent implements OnInit {
   }
 
   next() {
-    if (this.step() < 3) {
+    if (this.step() < 2) {
       this.step.set(this.step() + 1);
     } else {
       this.submit();
@@ -158,7 +158,6 @@ export class CheckinComponent implements OnInit {
       mood: this.mood(),
       stress: this.stress(),
       energy: this.energy(),
-      notes: this.notes()
     }).subscribe({
       next: () => {
         this.notifications.success('Check-in wurde gespeichert.');
@@ -175,21 +174,5 @@ export class CheckinComponent implements OnInit {
         }
       }
     });
-  }
-
-  getMoodEmoji(val: number) {
-    if (val >= 9) return '🤩';
-    if (val >= 7) return '😊';
-    if (val >= 4) return '😐';
-    if (val >= 2) return '😟';
-    return '😫';
-  }
-
-  getStressEmoji(val: number) {
-    if (val >= 9) return '💥';
-    if (val >= 7) return '😫';
-    if (val >= 4) return '😐';
-    if (val >= 2) return '😌';
-    return '🧘';
   }
 }

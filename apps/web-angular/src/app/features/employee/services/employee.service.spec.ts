@@ -38,4 +38,22 @@ describe('EmployeeService', () => {
     expect(body).not.toHaveProperty('participated_at');
     expect(body).not.toHaveProperty('participatedAt');
   });
+
+  it('submits a check-in with only the required 1-5 scale values', () => {
+    service.submitCheckin({
+      mood: 5,
+      stress: 1,
+      energy: 4,
+    }).subscribe();
+
+    const body = api.post.mock.calls[0][1] as Record<string, unknown>;
+    expect(api.post).toHaveBeenCalledWith('/employee/checkin', {
+      mood: 5,
+      stress: 1,
+      energy: 4,
+    });
+    // Order-independent: guards against a resurrected `note`, which the API
+    // rejects with 422 (ELYO-102 §3.3 / B4).
+    expect(Object.keys(body).sort()).toEqual(['energy', 'mood', 'stress']);
+  });
 });
