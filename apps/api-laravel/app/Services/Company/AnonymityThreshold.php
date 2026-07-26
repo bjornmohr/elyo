@@ -4,10 +4,10 @@ namespace App\Services\Company;
 
 final class AnonymityThreshold
 {
-    private const DEFAULT = 5;
+    private const PLATFORM_MINIMUM = 10;
 
     public static function resolve(?int $configuredThreshold): int
     {
-        return $configuredThreshold ?? self::DEFAULT;
+        return max(self::PLATFORM_MINIMUM, $configuredThreshold ?? self::PLATFORM_MINIMUM);
     }
 }

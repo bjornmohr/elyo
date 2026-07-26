@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -20,6 +21,11 @@ class RoleMiddleware
         }
 
         $user = $request->user();
+
+        if (! $user instanceof User) {
+            return response()->json(['error' => ['code' => 'FORBIDDEN', 'message' => 'Unauthorized.']], 403);
+        }
+
         $user->loadMissing('roles');
 
         $hasRole = $user->roles->contains(fn ($ur) => in_array($ur->role->value, $roles));

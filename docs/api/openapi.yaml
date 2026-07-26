@@ -126,7 +126,9 @@ components:
         name: { type: string }
         slug: { type: string }
         status: { type: string, enum: [active, inactive, suspended] }
-        anonymity_threshold: { type: integer }
+        anonymity_threshold:
+          type: integer
+          description: Customer-configured threshold. The effective reporting threshold is never lower than the platform minimum of 10.
         team_layer_enabled:
           type: boolean
           description: Whether this company uses team-level affiliation and team-scoped manager workflows.
@@ -141,7 +143,10 @@ components:
       properties:
         name: { type: string, maxLength: 255 }
         slug: { type: string, maxLength: 255, nullable: true }
-        anonymity_threshold: { type: integer, minimum: 1 }
+        anonymity_threshold:
+          type: integer
+          minimum: 1
+          description: Customer-configured threshold. Values below 10 do not lower the effective platform minimum.
         team_layer_enabled:
           type: boolean
           description: Defaults to false on create when omitted.
@@ -155,7 +160,10 @@ components:
           maxLength: 255
           description: Optional on update, but must be a non-null string when provided.
         status: { type: string, enum: [active, inactive, suspended] }
-        anonymity_threshold: { type: integer, minimum: 1 }
+        anonymity_threshold:
+          type: integer
+          minimum: 1
+          description: Customer-configured threshold. Values below 10 do not lower the effective platform minimum.
         team_layer_enabled:
           type: boolean
           description: Whether this company uses team-level affiliation and team-scoped manager workflows.
@@ -943,7 +951,10 @@ components:
       additionalProperties: false
       properties:
         error: { type: string }
-        minRequired: { type: integer }
+        minRequired:
+          type: integer
+          minimum: 10
+          description: Effective anonymity threshold after applying the platform minimum of 10.
         isAboveThreshold: { type: boolean }
         suppressionReason:
           type: string
@@ -2384,7 +2395,9 @@ paths:
                       responseCount: { type: integer }
                       minRequired:
                         type: integer
+                        minimum: 10
                         nullable: true
+                        description: Effective threshold after applying the platform minimum of 10 and any stricter customer threshold.
                       isAboveThreshold: { type: boolean }
                       questions:
                         type: array

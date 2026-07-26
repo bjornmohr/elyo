@@ -38,6 +38,48 @@ Survey results shown to company users must be aggregated.
 
 Apply:
 - global anonymity threshold
+- effective threshold `max(10, customer threshold, metric threshold)`; customer
+  configuration can never lower the platform minimum of 10
 - bucket-level suppression for small groups
 - no raw text output
 - no misleading charts when data is suppressed
+
+## Privacy Regression Pattern Catalog
+
+The standalone PostgreSQL-backed suite is:
+
+```bash
+docker compose exec api-tooling php artisan test --testsuite=privacy
+```
+
+`apps/api-laravel/tests/Support/ForbiddenHealthPatternCatalog.php` is the
+versioned source of forbidden company/admin response patterns.
+`HealthLeakAssertions` recursively inspects JSON keys and shapes and reports
+only the offending JSON path. `PrivacySeeder` supplies deterministic synthetic
+health subjects and health records; do not use demo or production-derived data
+in this suite.
+
+When adding an endpoint or a new individual-health response shape:
+
+1. Add the key, contextual-key, compound-shape or identifier pattern to the
+   catalog with a stable id and rationale.
+2. Add a focused assertion-sensitivity test under
+   `apps/api-laravel/tests/Privacy/`.
+3. Extend `PrivacySeeder` only when synthetic records are needed to make the
+   endpoint return its real response shape.
+4. Keep route discovery dynamic. Do not replace the company/admin route sweep
+   with a hand-maintained endpoint list or reduce its minimum route-count guard.
+5. Every discovered company/admin route must reach at least one `2xx` response
+   with an authorized synthetic user. When a new route needs parameters or a
+   request body, add its narrow synthetic request definition to
+   `PrivacyRouteRequestFactory`; a sweep that observes only `4xx` responses is
+   intentionally a test failure.
+6. Run the privacy suite standalone and the full Laravel suite. No privacy test
+   may skip when PostgreSQL, roles, credentials or schemas are missing.
+
+Future reporting-domain aggregates allowed by ADR-001 §2.5 do not justify
+removing or weakening a forbidden pattern. Add a narrow reviewed entry to
+`apps/api-laravel/tests/Support/HealthLeakAllowlist.php` instead. Every entry
+must identify one catalog pattern, endpoint glob, JSON-path glob, review ticket
+and aggregate-specific rationale. Broad endpoint-wide or `$.*` exceptions are
+not permitted.
