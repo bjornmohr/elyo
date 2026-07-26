@@ -145,6 +145,20 @@ catalog now rejects generic text only in answer collections and any normalized
 score token on health/reporting surfaces. The aggregate exception now requires
 `type: SCALE`.
 
+## Seventh review findings
+
+The fourth memory-cleared review found two Medium response/boundary gaps:
+
+1. The User relation guard rejected Health models but not direct
+   `SubjectMapping`/Privacy-domain relations.
+2. The foreign lab-record 404 body was not leak-scanned before its status and
+   error code were asserted.
+
+A direct mapping-relation sensitivity test was added first and failed. The
+guard now classifies both Health and Privacy model namespaces as forbidden.
+The foreign-resource response now uses the shared leak scanner with seeded
+subject IDs before its 404 assertions.
+
 ## Additional test seams
 
 - `GET /api/company/surveys/{id}/results` for effective-threshold suppression.

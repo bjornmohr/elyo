@@ -3,6 +3,7 @@
 namespace Tests\Privacy;
 
 use App\Models\Health\HealthSubject;
+use App\Models\Privacy\SubjectMapping;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use ReflectionClass;
@@ -27,12 +28,12 @@ class MappingNonJoinabilityPrivacyTest extends BoundaryTestCase
         );
     }
 
-    public function test_user_has_no_eloquent_relation_path_to_a_health_model(): void
+    public function test_user_has_no_eloquent_relation_path_to_a_health_or_mapping_model(): void
     {
         $this->assertSame(
             [],
-            $this->healthRelationMethodsVisibleOn(new User),
-            'User must not expose an Eloquent relation path to health-domain models.',
+            $this->forbiddenRelationMethodsVisibleOn(new User),
+            'User must not expose an Eloquent relation path to health or mapping-domain models.',
         );
     }
 
@@ -48,7 +49,7 @@ class MappingNonJoinabilityPrivacyTest extends BoundaryTestCase
 
         $this->assertSame(
             ['leakedHealthSubjects()'],
-            $this->healthRelationMethodsVisibleOn($userWithUntypedLeak),
+            $this->forbiddenRelationMethodsVisibleOn($userWithUntypedLeak),
         );
     }
 
@@ -56,14 +57,22 @@ class MappingNonJoinabilityPrivacyTest extends BoundaryTestCase
     {
         $this->assertSame(
             ['inheritedHealthSubjects()'],
-            $this->healthRelationMethodsVisibleOn(new UserWithInheritedHealthRelation),
+            $this->forbiddenRelationMethodsVisibleOn(new UserWithInheritedHealthRelation),
+        );
+    }
+
+    public function test_relation_guard_detects_a_direct_subject_mapping_relation(): void
+    {
+        $this->assertSame(
+            ['subjectMappings()'],
+            $this->forbiddenRelationMethodsVisibleOn(new UserWithSubjectMappingRelation),
         );
     }
 
     /**
      * @return list<string>
      */
-    private function healthRelationMethodsVisibleOn(User $user): array
+    private function forbiddenRelationMethodsVisibleOn(User $user): array
     {
         $violations = [];
 
@@ -84,7 +93,12 @@ class MappingNonJoinabilityPrivacyTest extends BoundaryTestCase
 
             $related = $result->getRelated();
 
-            if ($related instanceof HealthSubject || str_starts_with($related::class, 'App\\Models\\Health\\')) {
+            if (
+                $related instanceof HealthSubject
+                || str_starts_with($related::class, 'App\\Models\\Health\\')
+                || $related instanceof SubjectMapping
+                || str_starts_with($related::class, 'App\\Models\\Privacy\\')
+            ) {
                 $violations[] = $method->getName().'()';
             }
         }
@@ -103,4 +117,12 @@ class UserWithHealthRelation extends User
 
 class UserWithInheritedHealthRelation extends UserWithHealthRelation
 {
+}
+
+class UserWithSubjectMappingRelation extends User
+{
+    public function subjectMappings()
+    {
+        return $this->hasMany(SubjectMapping::class, 'user_id');
+    }
 }

@@ -46,8 +46,8 @@ payload.
 
 ## Validation
 
-- `php artisan test --testsuite=privacy`: 63 tests, 359 assertions.
-- `php artisan test`: 574 tests, 3,280 assertions.
+- `php artisan test --testsuite=privacy`: 64 tests, 360 assertions.
+- `php artisan test`: 575 tests, 3,281 assertions.
 - Boundary suite: 21 tests, 97 assertions.
 - Deptrac: 0 violations, 0 errors.
 - Angular production build: passed.
@@ -76,7 +76,7 @@ payload.
   - `LabAccessPrivacyTest` leak-checks every forbidden-role response, including
     a real Partner token, before asserting 403.
   - `MappingNonJoinabilityPrivacyTest` detects untyped and inherited User-to-
-    health relation paths.
+    health relations plus direct User-to-SubjectMapping relations.
   - Threshold unit and measure/survey feature tests cover the production
     fix-forward changes.
 - ACs covered by tests:

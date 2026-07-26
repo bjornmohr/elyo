@@ -2,11 +2,14 @@
 
 namespace Tests\Privacy;
 
+use Tests\Support\HealthLeakAssertions;
 use Tests\Support\PrivacySeeder;
 use Tests\TestCase;
 
 class EmployeeCrossAccessPrivacyTest extends TestCase
 {
+    use HealthLeakAssertions;
+
     public function test_employee_collections_exclude_another_employees_wellbeing_and_lab_data(): void
     {
         $fixtures = new PrivacySeeder;
@@ -30,8 +33,16 @@ class EmployeeCrossAccessPrivacyTest extends TestCase
         $fixtures = new PrivacySeeder;
         $fixtures->run();
 
-        $this->actingAs($fixtures->employee, 'sanctum')
-            ->deleteJson('/api/employee/lab-markers/'.$fixtures->foreignLabReading->id)
+        $response = $this->actingAs($fixtures->employee, 'sanctum')
+            ->deleteJson('/api/employee/lab-markers/'.$fixtures->foreignLabReading->id);
+
+        $this->assertResponseHasNoHealthLeaks(
+            $response,
+            '/api/employee/lab-markers/{reading}',
+            $fixtures->healthSubjectIds(),
+        );
+
+        $response
             ->assertStatus(404)
             ->assertJsonPath('error.code', 'LAB_READING_NOT_FOUND');
     }
