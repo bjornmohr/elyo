@@ -9,9 +9,56 @@ implement_tier:    standard
 implement_effort:  medium
 review_tier:       standard
 review_effort:     medium
-blocked_by:        U1, U3, U6, U14
+blocked_by:        U6, U14
 depends_on:        07
 ```
+
+## Arbeitsregeln
+
+Diese sechs Regeln gelten für jede Etappe. Sie stehen vor dem Inhalt, weil sie ihn überstimmen.
+
+**1. Erst prüfen, dann ändern.** Jede Aussage in diesem Dokument ist ein Befund vom Stand
+`56b4a53` (27.07.2026), nicht vom Stand deines Branches. Öffne vor jeder Etappe die genannten
+Dateien, Klassen und Methoden und bestätige den beschriebenen Zustand im aktuellen Code.
+
+**2. Befund trifft nicht zu → melden, nicht umdeuten.** Wenn der Code anders aussieht als hier
+beschrieben (bereits behoben, verschoben, umbenannt, so nie dagewesen): Etappe abbrechen, den
+Ist-Zustand in `docs/ai-results/` festhalten, mit der nächsten Etappe weitermachen. Kein
+Ersatzproblem suchen, nichts „sinngemäß“ umsetzen.
+
+**3. Nur benannte Dateien anfassen.** Änderungen außerhalb der in der Etappe genannten Dateien
+und ihrer direkten Tests sind out of scope — auch wenn dabei ein echter Fehler auffällt. Solche
+Funde gehören nach `docs/ai-results/`, nicht in den Diff.
+
+**4. Nichts löschen ohne ausdrücklichen Auftrag.** Tabellen, Spalten, Migrationen, Klassen,
+Endpunkte, Routen, Frontend-Komponenten: löschen nur, wenn die Etappe es wörtlich anordnet.
+„Kein Aufrufer gefunden“ ist kein Löschgrund — siehe Entscheidungspunkte.
+
+**5. Abbruch ist ein gültiges Ergebnis.** Bei Unklarheit schlägt abbrechen und melden das Raten.
+Ein Paket mit fünf sauberen und drei abgebrochenen Etappen ist verwertbar. Ein Paket mit acht
+Etappen, von denen drei geraten sind, ist es nicht.
+
+**6. Abnahme ist Nachweis, nicht Behauptung.** Jede Etappe endet mit dem tatsächlich gelaufenen
+Testbefehl und seiner Ausgabe — im Commit oder im Ergebnisbericht. „Passt“ ist keine Abnahme.
+
+### Entscheidungspunkte
+
+**U3 entschieden am 27.07.2026:** Der Ausschluss von `ELYO_SUPPORT` bei der Partnerfreigabe war
+ein **Versehen**. Die Rolle wird ergänzt und an die übrigen Admin-Aktionen angeglichen.
+Etappe 5 ist nicht mehr blockiert.
+
+**U1 entschieden am 27.07.2026:** Das Partner-Portal ist **geplant**. Der `partner`-Zweig in
+`User::canUsePortal()` und `PartnerDashboardComponent` bleiben — mit Ticketverweis kommentieren,
+nicht entfernen. Etappe 6 wird damit zu „kennzeichnen statt entfernen".
+
+Eine Etappe mit Zeile **Björn** wird nicht selbst entschieden. Lage aufbereiten, Optionen mit
+Konsequenzen nach `docs/ai-results/` schreiben, Etappe als blockiert markieren, weitermachen.
+
+| Etappe | Entscheidung | Wer |
+|---|---|---|
+| 2 | Partner-Lebenszyklus: welche Statusübergänge es geben soll (H1, H2, C10) | **Björn** — Etappe blockiert |
+| 3 | Tokenmodell: Cookie-Session oder Bearer, Ablauf und Rotation (A3, A4) | **Björn** — Etappe blockiert |
+
 
 ## Goal
 

@@ -13,6 +13,39 @@ blocked_by:        U12
 depends_on:        08
 ```
 
+## Arbeitsregeln
+
+Diese sechs Regeln gelten für jede Etappe. Sie stehen vor dem Inhalt, weil sie ihn überstimmen.
+
+**1. Erst prüfen, dann ändern.** Jede Aussage in diesem Dokument ist ein Befund vom Stand
+`56b4a53` (27.07.2026), nicht vom Stand deines Branches. Öffne vor jeder Etappe die genannten
+Dateien, Klassen und Methoden und bestätige den beschriebenen Zustand im aktuellen Code.
+
+**2. Befund trifft nicht zu → melden, nicht umdeuten.** Wenn der Code anders aussieht als hier
+beschrieben (bereits behoben, verschoben, umbenannt, so nie dagewesen): Etappe abbrechen, den
+Ist-Zustand in `docs/ai-results/` festhalten, mit der nächsten Etappe weitermachen. Kein
+Ersatzproblem suchen, nichts „sinngemäß“ umsetzen.
+
+**3. Nur benannte Dateien anfassen.** Änderungen außerhalb der in der Etappe genannten Dateien
+und ihrer direkten Tests sind out of scope — auch wenn dabei ein echter Fehler auffällt. Solche
+Funde gehören nach `docs/ai-results/`, nicht in den Diff.
+
+**4. Nichts löschen ohne ausdrücklichen Auftrag.** Tabellen, Spalten, Migrationen, Klassen,
+Endpunkte, Routen, Frontend-Komponenten: löschen nur, wenn die Etappe es wörtlich anordnet.
+„Kein Aufrufer gefunden“ ist kein Löschgrund — siehe Entscheidungspunkte.
+
+**5. Abbruch ist ein gültiges Ergebnis.** Bei Unklarheit schlägt abbrechen und melden das Raten.
+Ein Paket mit fünf sauberen und drei abgebrochenen Etappen ist verwertbar. Ein Paket mit acht
+Etappen, von denen drei geraten sind, ist es nicht.
+
+**6. Abnahme ist Nachweis, nicht Behauptung.** Jede Etappe endet mit dem tatsächlich gelaufenen
+Testbefehl und seiner Ausgabe — im Commit oder im Ergebnisbericht. „Passt“ ist keine Abnahme.
+
+### Entscheidungspunkte
+
+Keine. Alle Etappen sind aus dem Code heraus entscheidbar.
+
+
 ## Goal
 
 Den einzigen Weg in das System — die Einladung — sicher, nachvollziehbar und ohne

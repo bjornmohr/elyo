@@ -48,7 +48,7 @@ Analog zur bestehenden Prompt-Serie (`2026-07-19-00-elyo-91-execution-plan.md`):
 
 ---
 
-## Die 16 Arbeitspakete
+## Die Arbeitspakete
 
 | # | Paket | Etappen | Befunde | Prio | Status |
 |---|---|---|---|---|---|
@@ -66,22 +66,31 @@ Analog zur bestehenden Prompt-Serie (`2026-07-19-00-elyo-91-execution-plan.md`):
 | 12 | Teams und Manager-Berechtigungen | 6 | D3, D4, D7, D8, F1, F2, F8, H11, I9 | 3 | offen |
 | 13 | Maßnahmen, QR-Check-in und Punkte | 6 | F6, G16, G21, I2, I7, J14, J17, J18, J24 | 3 | offen |
 | 14 | Admin-Kataloge und Nebenläufigkeit | 6 | C7, C8, C9, F3, F4, G13, G18, H7, H8, H12, I3, I5, J29 | 3 | offen |
-| 15 | Aufräumen: toter Code, Datenmodell, Frontend-Struktur | 8 | G1, G2, G8–G11, G15, G19, G23–G27, F7, I10, I11, J3, J4, J6–J11, J32 | 4 | offen |
+| 15 | Aufräumen: toter Code, Datenmodell, Frontend-Struktur | 12 | G1, G2, G8–G11, G15, G19, G23–G27, F7, I10, I11, J3, J4, J6–J11, J32 | 4 | offen |
 | 16 | Architektur- und Produktentscheidungen dokumentieren | 4 | J1, J2, J12, U1–U14 | 4 | offen |
+| 17 | Push-Benachrichtigungen bauen | 9 | G2, G15 | 3 | offen |
 
-**Summe: 96 Etappen** über 16 Pakete.
+**Summe: 109 Etappen** über 17 Pakete.
+
+Paket 17 ist kein Befundpaket, sondern ein Feature — entstanden aus der Entscheidung zu 15.2.
+Es bringt drei eigene Entscheidungspunkte mit (**P1–P3**), von denen P1 das ganze Paket sperrt.
 
 ---
 
 ## Empfohlene Reihenfolge
 
 ```
-Prio 1  ──►  04 ──► 05 ──► 01 ──► 02 ──► 03
+Prio 1  ──►  04 ──► 05 ──► 01 (Etappen 1–5) ──► 02 ──► 03
              │      │
              │      └─ 05 vor 02: die Audit-Grant-Diskrepanz (B1) betrifft
              │         den Provisionierungspfad, auf dem 02 aufsetzt
              └─ 04 zuerst: legt api-tooling hinter ein Profil, was CI und
                 alle folgenden Test-Aufrufe betrifft
+
+             ⚠ 01 Etappe 6 (Passwort-Zurücksetzung) erst NACH 07 Etappe 1.
+               Es gibt im Repository keinerlei Mailversand; 07.1 baut ihn.
+               Seit der Entscheidung „fertig bauen" (27.07.) ist das eine
+               echte Abhängigkeit, keine Empfehlung.
 
 Prio 2  ──►  09 ──► 08 ──► 07 ──► 06
              │      │      │
@@ -99,10 +108,59 @@ Prio 4  ──►  16 ──► 15
              │
              └─ 16 vor 15: die Entscheidungen aus 16 bestimmen, was in 15
                 entfernt und was angebunden wird
+
+Feature   ►  17 (nach 04)
+             │
+             └─ 17 braucht den Queue-Worker und die Scheduler-Runtime,
+                die 04 anlegt. P1 (Datenschutz) sperrt bis dahin alles.
 ```
 
 **Paket 16 blockiert Teile von 15**, weil dort entschieden wird, ob toter Code entfernt oder
 angebunden wird. Wer 15 vorzieht, muss die betroffenen Etappen überspringen.
+
+---
+
+## Arbeitsregeln und Entscheidungspunkte
+
+Jede Paketdatei trägt direkt nach dem `ai-run`-Block zwei Abschnitte, die den restlichen Inhalt
+überstimmen.
+
+**Arbeitsregeln** — sechs Regeln gegen die typischen Fehlerbilder eines Agenten:
+
+1. Erst prüfen, dann ändern — die Befunde stammen vom Stand `56b4a53`, nicht vom Branch
+2. Befund trifft nicht zu → melden, nicht umdeuten
+3. Nur die in der Etappe genannten Dateien anfassen
+4. Nichts löschen ohne ausdrücklichen Auftrag; „kein Aufrufer gefunden" ist kein Löschgrund
+5. Abbruch ist ein gültiges Ergebnis und wird als solches berichtet
+6. Abnahme ist Nachweis (gelaufener Testbefehl), nicht Behauptung
+
+**Entscheidungspunkte** — eine Tabelle je Paket, die jede Entweder-oder-Stelle einem Entscheider
+zuordnet. Zeilen mit **Björn** sind für den Agenten gesperrt: Optionen und Konsequenzen nach
+`docs/ai-results/` schreiben, Etappe als blockiert markieren, weitermachen. Zeilen mit *Agent*
+darf er selbst entscheiden, mit Begründung im Commit.
+
+Nach der Entscheidungsrunde vom 27.07.2026 sind noch **8 Etappen** in sechs Paketen gesperrt:
+05.2, 06.2, 06.3, 10.3, 13.6, 14.3, 14.6, 15.3. Alle acht gehören zu **Gruppe B** — sie werden
+nicht blind übersprungen, sondern vom Agenten aufbereitet (Optionen mit Konsequenzen nach
+`docs/ai-results/`) und danach in einer zweiten Runde entschieden.
+
+Die vollständige Triage steht in **`2026-07-27-entscheidungen.md`** — das ist ab jetzt die Quelle
+für alle offenen Entscheidungen, die Paketdateien tragen Kopien. `scripts/run-ai-task.sh` zeigt
+die gesperrten Etappen im Preflight unter „Your decisions"; die Kreuz-Review prüft als Punkt 9,
+ob der Agent sich daran gehalten hat.
+
+**Zehn Punkte wurden am 27.07.2026 entschieden** (U1, U2, U3, U7, U8, U10 sowie 01.6, 02.5,
+15.2, und 10.3 als Verschiebung nach Gruppe B). Zwei davon ändern den Zuschnitt: Push wird
+gebaut (neues **Paket 17**), die Passwort-Zurücksetzung wird fertiggestellt statt entfernt
+(**Paket 01** wächst um etwa eine Etappe).
+
+Paket 17 bringt mit **P1–P3** drei neue Entscheidungspunkte mit, die nicht aus Kapitel 14
+stammen, sondern aus dem Feature selbst. **P1** (Einwilligung und Drittlandtransfer) ist keine
+Produktfrage, sondern eine datenschutzrechtliche — sie gehört nicht in Gruppe A.
+
+Der Unterschied zu den U-Fragen unten: U-Fragen sind **paketübergreifend** und werden in Paket 16
+gesammelt beantwortet. Entscheidungspunkte sind **paketlokal** und lassen sich einzeln klären,
+ohne auf Paket 16 zu warten.
 
 ---
 
@@ -113,16 +171,16 @@ beantwortet und blockieren bis dahin die genannten Etappen.
 
 | ID | Frage | Blockiert |
 |---|---|---|
-| U1 | Ist der `partner`-Portalzweig in `User::canUsePortal()` beabsichtigt? | 06.6 |
-| U2 | Soll `COMPANY_OWNER` von der Umfrageerstellung ausgeschlossen sein? | 11.1 |
-| U3 | Soll `ELYO_SUPPORT` von der Partnerfreigabe ausgeschlossen sein? | 06.5 |
+| ~~U1~~ | ~~Ist der `partner`-Portalzweig in `User::canUsePortal()` beabsichtigt?~~ **Beantwortet 27.07.: Ja, Partner-Portal ist geplant — Zweig bleibt** | — |
+| ~~U2~~ | ~~Soll `COMPANY_OWNER` von der Umfrageerstellung ausgeschlossen sein?~~ **Beantwortet 27.07.: Nein, `COMPANY_OWNER` darf** | — |
+| ~~U3~~ | ~~Soll `ELYO_SUPPORT` von der Partnerfreigabe ausgeschlossen sein?~~ **Beantwortet 27.07.: Nein, war ein Versehen — Rolle ergänzen** | — |
 | U4 | Darf ein Manager mehrere Teams verwalten? | 12.3 |
 | U5 | Nach welchem Kriterium sind Anamnesefelder verschlüsselt? | 02.6 |
 | U6 | Was bedeutet `partners.minimum_level`? | 06.7 |
-| U7 | Ist SSR produktiv vorgesehen? | 03.3 |
-| U8 | Welches Doku-Verzeichnis ist maßgeblich? | 04.8 |
+| ~~U7~~ | ~~Ist SSR produktiv vorgesehen?~~ **Beantwortet 27.07.: nein, SPA bleibt** | — |
+| ~~U8~~ | ~~Welches Doku-Verzeichnis ist maßgeblich?~~ **Beantwortet 27.07.: Nur die Dopplungen auflösen** | — |
 | U9 | Darf Retention `PROPOSED`-Kategorien löschen? | 05.5 |
-| U10 | Bleiben die 16 verwaisten ENV-Variablen erhalten? | 15.7 |
+| ~~U10~~ | ~~Bleiben die 16 verwaisten ENV-Variablen erhalten?~~ **Beantwortet 27.07.: Ja, bleiben mit Kommentar** | — |
 | U11 | Wo liegt der Karenzworkflow der Kontolöschung? | 05.4 |
 | U12 | Warum ignoriert `accept()` Name und Passwort bestehender Nutzer? | 07.5 |
 | U13 | Ist die Zeitzonenabhängigkeit des `period_key` bewusst? | 13.6 |
@@ -222,7 +280,7 @@ irgendetwas läuft. `--yes` überspringt die Rückfrage, `--dry-run` zeigt nur d
 |---|---|---|---|---|
 | 01 Auth und Sitzung | hoch | high / high | standard / medium | — |
 | 02 Gesundheitsdaten | hoch | high / high | high / high | U5 |
-| 03 Frontend-Auslieferung | mittel | standard / medium | standard / low | U7 |
+| 03 Frontend-Auslieferung | mittel | standard / medium | standard / low | — |
 | 04 Infrastruktur | mittel | standard / medium | standard / medium | U8 |
 | 05 Audit und Mapping | hoch | high / high | high / high | U9, U11 |
 | 06 Partner | mittel | standard / medium | standard / medium | U1, U3, U6, U14 |
