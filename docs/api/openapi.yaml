@@ -1106,6 +1106,33 @@ components:
                 items: { type: string }
 
 paths:
+  /health:
+    get:
+      tags: [Auth]
+      summary: Check the active API runtime and database connection
+      description: Public liveness endpoint. The runtime value identifies the serving runtime profile.
+      responses:
+        200:
+          description: Runtime and its default database connection are available
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, runtime]
+                properties:
+                  status: { type: string, enum: [up] }
+                  runtime: { type: string, enum: [identity, employee, company, full] }
+        503:
+          description: Runtime database connection is unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, runtime]
+                properties:
+                  status: { type: string, enum: [down] }
+                  runtime: { type: string, enum: [identity, employee, company, full] }
+
   /auth/login:
     post:
       tags: [Auth]
@@ -1187,29 +1214,62 @@ paths:
                     type: array
                     items: { type: string }
 
-  /auth/register:
+  /auth/logout:
     post:
       tags: [Auth]
-      summary: Register a new company and admin
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                companyName: { type: string, minLength: 2 }
-                email: { type: string, format: email }
-                password: { type: string, minLength: 8 }
-                name: { type: string, minLength: 2 }
+      summary: Log out the current user
+      security: [{ Sanctum: [] }]
       responses:
         200:
-          description: Success
-        400:
-          description: Validation error
+          description: Current access token deleted
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string, example: Logged out }
+        401:
+          description: Unauthenticated
+
+  /auth/invite/verify:
+    get:
+      tags: [Auth]
+      summary: Verify an invitation token
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Valid pending invitation
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [valid, email, companyName, role, expiresAt]
+                properties:
+                  valid: { type: boolean, enum: [true] }
+                  email: { type: string, format: email }
+                  companyName: { type: string, nullable: true }
+                  role: { type: string }
+                  expiresAt: { type: string, format: date-time }
+        404:
+          description: Invitation is invalid, expired, revoked, or already used
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [valid, error]
+                properties:
+                  valid: { type: boolean, enum: [false] }
+                  error: { type: string }
+        422:
+          description: Missing or invalid token query parameter
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LaravelValidationError' }
 
   /auth/invite/accept:
     post:
@@ -1723,6 +1783,53 @@ paths:
         404:
           description: Survey not found, not active, or unavailable because the company team layer is disabled
 
+  /employee/surveys/{surveyId}/result:
+    get:
+      tags: [Employee]
+      summary: Get the authenticated employee's submitted survey answers
+      description: Returns only the current employee's own response. It is not a company aggregate or reporting endpoint.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: surveyId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Submitted survey result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [survey]
+                properties:
+                  survey:
+                    type: object
+                    required: [id, title, description, submittedAt, questions]
+                    properties:
+                      id: { type: integer }
+                      title: { type: string }
+                      description: { type: string, nullable: true }
+                      submittedAt: { type: string, format: date-time, nullable: true }
+                      questions:
+                        type: array
+                        items:
+                          type: object
+                          required: [id, text, type, answer]
+                          properties:
+                            id: { type: integer }
+                            text: { type: string }
+                            type: { type: string }
+                            answer:
+                              type: object
+                              properties:
+                                scaleValue: { type: integer, nullable: true }
+                                textValue: { type: string, nullable: true }
+                                choiceValue: { type: string, nullable: true }
+                                boolValue: { type: boolean, nullable: true }
+        404:
+          description: Survey not found in the employee's company, or the employee has no response
+
   /employee/lab-markers:
     get:
       tags: [Employee]
@@ -1933,6 +2040,51 @@ paths:
               schema:
                 $ref: '#/components/schemas/LabReadingNotFoundError'
 
+  /partner/register:
+    post:
+      tags: [Partner]
+      summary: Register a partner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name, type, categories, address, city, minimum_level, nachweis_url]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password, minLength: 8 }
+                name: { type: string }
+                type: { type: string }
+                categories:
+                  type: array
+                  items: {}
+                description: { type: string, nullable: true }
+                address: { type: string }
+                city: { type: string }
+                lat: { type: number, nullable: true }
+                lng: { type: number, nullable: true }
+                website: { type: string, format: uri, nullable: true }
+                phone: { type: string, nullable: true }
+                minimum_level: { type: integer, minimum: 0 }
+                nachweis_url: { type: string, format: uri }
+      responses:
+        201:
+          description: Partner created in pending-document verification state and bearer token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [partnerId, token]
+                properties:
+                  partnerId: { type: integer }
+                  token: { type: string }
+        422:
+          description: Validation error, including an already registered email
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LaravelValidationError' }
+
   /partner/login:
     post:
       tags: [Partner]
@@ -1969,6 +2121,43 @@ paths:
                 type: object
                 properties:
                   partner: { $ref: '#/components/schemas/Partner' }
+
+  /partner/logout:
+    post:
+      tags: [Partner]
+      summary: Log out the current partner
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Current partner access token deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string, example: Logged out }
+        401:
+          description: Unauthenticated
+
+  /partner/documents:
+    post:
+      tags: [Partner]
+      summary: Acknowledge a partner document upload request
+      description: Placeholder endpoint. It currently performs no validation or persistence and returns only the acknowledgement message.
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Placeholder acknowledgement
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string, example: Document uploaded }
+        401:
+          description: Unauthenticated
 
   /company/dashboard:
     get:
@@ -2013,6 +2202,38 @@ paths:
                         color: { type: string, nullable: true }
                         managerId: { type: integer, nullable: true }
                         metrics: { $ref: '#/components/schemas/ReportingPendingBlock' }
+        403:
+          $ref: '#/components/responses/PortalForbidden'
+
+  /company/users:
+    get:
+      tags: [Company]
+      summary: List users visible to the current company user
+      description: Company admins and owners see their company directory. Manager-only users see users in teams they manage. No health-domain data is returned.
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Scoped company user directory
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name, email, roles, status, lastLoginAt]
+                      properties:
+                        id: { type: integer }
+                        name: { type: string, nullable: true }
+                        email: { type: string, format: email }
+                        roles:
+                          type: array
+                          items: { type: string }
+                        status: { type: string }
+                        lastLoginAt: { type: string, format: date-time, nullable: true }
         403:
           $ref: '#/components/responses/PortalForbidden'
 
@@ -2326,6 +2547,62 @@ paths:
           $ref: '#/components/responses/TeamLayerDisabled'
 
   /company/surveys/{id}:
+    get:
+      tags: [Company]
+      summary: Get a company survey
+      description: Company scope, manager scope, and team-layer restrictions are enforced before the survey resource is returned.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Survey with ordered questions and scoped team identifiers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      title: { type: string }
+                      description: { type: string, nullable: true }
+                      status: { type: string, enum: [DRAFT, ACTIVE, CLOSED] }
+                      startsAt: { type: string, format: date-time, nullable: true }
+                      endsAt: { type: string, format: date-time, nullable: true }
+                      isAnonymous: { type: boolean }
+                      createdBy: { type: integer }
+                      teamIds:
+                        type: array
+                        items: { type: integer }
+                      canEdit: { type: boolean }
+                      canActivate: { type: boolean }
+                      responsesCount: { type: integer }
+                      questionsCount: { type: integer }
+                      questions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: integer }
+                            text: { type: string }
+                            type: { type: string, enum: [SCALE, MULTIPLE_CHOICE, TEXT, YES_NO] }
+                            order: { type: integer }
+                            isRequired: { type: boolean }
+                            options:
+                              type: array
+                              nullable: true
+                              items: { type: string }
+                            scaleMinLabel: { type: string, nullable: true }
+                            scaleMaxLabel: { type: string, nullable: true }
+        403:
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
+        404:
+          description: Survey not found in the authenticated company scope
     patch:
       tags: [Company]
       summary: Update survey status or info
@@ -2357,6 +2634,34 @@ paths:
           description: OK
         403:
           $ref: '#/components/responses/PortalOrScopeForbidden'
+
+  /company/surveys/{id}/activate:
+    post:
+      tags: [Company]
+      summary: Activate a draft company survey
+      description: Company scope, edit permission, manager scope, and team-layer restrictions are enforced. A survey without questions cannot be activated.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Activated survey resource
+        403:
+          $ref: '#/components/responses/CompanyPortalForbiddenOrTeamLayerDisabled'
+        404:
+          description: Survey not found in the authenticated company scope
+        422:
+          description: Survey has no questions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string }
 
   /company/surveys/{id}/results:
     get:
@@ -2773,6 +3078,117 @@ paths:
                   data: { $ref: '#/components/schemas/AdminCompany' }
         422:
           description: Validation error
+
+  /admin/companies/{company}/invite-company-admin:
+    post:
+      tags: [Admin]
+      summary: Invite a company administrator
+      description: Platform admin only. The raw invite token is returned by the current development implementation and must not be exposed in production.
+      security: [{ Sanctum: [] }]
+      parameters:
+        - name: company
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        201:
+          description: Company-admin invitation created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [id, email, role, expires_at, invite_token]
+                    properties:
+                      id: { type: integer }
+                      email: { type: string, format: email }
+                      role: { type: string, enum: [COMPANY_ADMIN] }
+                      expires_at: { type: string, format: date-time }
+                      invite_token: { type: string }
+        404:
+          description: Company not found
+        422:
+          description: Invalid email or email belongs to another company
+
+  /admin/points-config:
+    get:
+      tags: [Admin]
+      summary: Get platform point settings
+      description: Platform admin only.
+      security: [{ Sanctum: [] }]
+      responses:
+        200:
+          description: Current point values
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [daily_checkin, streak_7days, streak_30days, anamnesis_completed, medical_document_upload, measure_participation]
+                    properties:
+                      daily_checkin: { type: integer, minimum: 0, maximum: 100000 }
+                      streak_7days: { type: integer, minimum: 0, maximum: 100000 }
+                      streak_30days: { type: integer, minimum: 0, maximum: 100000 }
+                      anamnesis_completed: { type: integer, minimum: 0, maximum: 100000 }
+                      medical_document_upload: { type: integer, minimum: 0, maximum: 100000 }
+                      measure_participation: { type: integer, minimum: 0, maximum: 100000 }
+        401:
+          description: Unauthenticated
+        403:
+          description: Forbidden (not a platform admin role)
+    put:
+      tags: [Admin]
+      summary: Replace platform point settings
+      description: Platform admin only. Every point action is required.
+      security: [{ Sanctum: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [daily_checkin, streak_7days, streak_30days, anamnesis_completed, medical_document_upload, measure_participation]
+              properties:
+                daily_checkin: { type: integer, minimum: 0, maximum: 100000 }
+                streak_7days: { type: integer, minimum: 0, maximum: 100000 }
+                streak_30days: { type: integer, minimum: 0, maximum: 100000 }
+                anamnesis_completed: { type: integer, minimum: 0, maximum: 100000 }
+                medical_document_upload: { type: integer, minimum: 0, maximum: 100000 }
+                measure_participation: { type: integer, minimum: 0, maximum: 100000 }
+      responses:
+        200:
+          description: Updated point values
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: object }
+        401:
+          description: Unauthenticated
+        403:
+          description: Forbidden (not a platform admin role)
+        422:
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LaravelValidationError' }
 
   /admin/partners:
     get:
@@ -3303,107 +3719,3 @@ paths:
           description: Template not found, or a submitted ID does not belong to the template
         422:
           description: Validation error (partial payload missing template exercise IDs, or duplicate sortOrder values); no positions are changed
-
-  /measures:
-    get:
-      tags: [Measures]
-      summary: List health measures
-      security: [{ Sanctum: [] }]
-      responses:
-        200:
-          description: List of measures
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  measures:
-                    type: array
-                    items: { $ref: '#/components/schemas/Measure' }
-    post:
-      tags: [Measures]
-      summary: Create/Activate a measure
-      security: [{ Sanctum: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [title, category, description]
-              properties:
-                title: { type: string, minLength: 3, maxLength: 100 }
-                category: { type: string, enum: [workshop, flexibility, sport, mental, nutrition] }
-                description: { type: string, minLength: 10, maxLength: 500 }
-                teamId: { type: string, nullable: true }
-      responses:
-        201:
-          description: Created
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  measure: { $ref: '#/components/schemas/Measure' }
-
-  /measures/{id}:
-    patch:
-      tags: [Measures]
-      summary: Update measure status
-      security: [{ Sanctum: [] }]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [status]
-              properties:
-                status: { type: string, enum: [ACTIVE, COMPLETED, DISMISSED] }
-      responses:
-        200:
-          description: Updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  measure: { $ref: '#/components/schemas/Measure' }
-
-  /points/me:
-    get:
-      tags: [Points]
-      summary: Get my points and level
-      security: [{ Sanctum: [] }]
-      responses:
-        200:
-          description: Points data
-
-  /webhooks/terra:
-    post:
-      tags: [Webhooks]
-      summary: Terra webhook receiver
-      responses:
-        200:
-          description: OK
-
-  /cron:
-    post:
-      tags: [Cron]
-      summary: Execute scheduled tasks
-      security: [{ CronSecret: [] }]
-      parameters:
-        - name: action
-          in: query
-          required: true
-          schema:
-            type: string
-            enum: [daily-checkin-reminder, weekly-digest, wearable-sync, measure-engine, streak-check]
-      responses:
-        200:
-          description: Tasks executed

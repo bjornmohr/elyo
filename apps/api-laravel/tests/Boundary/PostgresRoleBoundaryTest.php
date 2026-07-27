@@ -7,6 +7,97 @@ use PHPUnit\Framework\Attributes\DataProvider;
 
 class PostgresRoleBoundaryTest extends BoundaryTestCase
 {
+    public function test_employee_runtime_can_touch_only_sanctum_usage_timestamps(): void
+    {
+        $identityMigrator = DB::connection('identity_migrator');
+        $tokenId = $identityMigrator->table('personal_access_tokens')->insertGetId([
+            'tokenable_type' => 'App\\Models\\User',
+            'tokenable_id' => 1,
+            'name' => 'boundary-session-continuity',
+            'token' => hash('sha256', 'boundary-session-continuity'),
+            'abilities' => '["*"]',
+            'created_at' => now()->subMinute(),
+            'updated_at' => now()->subMinute(),
+        ]);
+
+        try {
+            $connection = $this->boundaryConnection(
+                'employee_token_touch',
+                'identity',
+                'elyo_employee_rt',
+                (string) env('DB_HEALTH_PASSWORD'),
+            );
+            $this->assertCurrentUser($connection, 'elyo_employee_rt');
+
+            $touchedAt = now()->startOfSecond();
+            $this->assertSame(1, $connection->table('personal_access_tokens')
+                ->where('id', $tokenId)
+                ->update([
+                    'last_used_at' => $touchedAt,
+                    'updated_at' => $touchedAt,
+                ]));
+
+            $token = $identityMigrator->table('personal_access_tokens')->find($tokenId);
+            $this->assertSame($touchedAt->toDateTimeString(), $token->last_used_at);
+            $this->assertSame($touchedAt->toDateTimeString(), $token->updated_at);
+        } finally {
+            $identityMigrator->table('personal_access_tokens')->where('id', $tokenId)->delete();
+        }
+    }
+
+    public function test_employee_runtime_cannot_write_protected_identity_data(): void
+    {
+        $identityMigrator = DB::connection('identity_migrator');
+        $tokenId = $identityMigrator->table('personal_access_tokens')->insertGetId([
+            'tokenable_type' => 'App\\Models\\User',
+            'tokenable_id' => 1,
+            'name' => 'boundary-protected-token-data',
+            'token' => hash('sha256', 'boundary-protected-token-data'),
+            'abilities' => '["*"]',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            $connection = $this->boundaryConnection(
+                'employee_protected_identity',
+                'identity',
+                'elyo_employee_rt',
+                (string) env('DB_HEALTH_PASSWORD'),
+            );
+            $this->assertCurrentUser($connection, 'elyo_employee_rt');
+            $this->assertFalse((bool) $identityMigrator->scalar(
+                "SELECT has_table_privilege('elyo_employee_rt', 'public.personal_access_tokens', 'UPDATE')",
+            ));
+
+            foreach ([
+                'token' => hash('sha256', 'changed-boundary-token'),
+                'abilities' => '["read"]',
+                'expires_at' => now()->addHour(),
+                'tokenable_id' => 2,
+                'tokenable_type' => 'App\\Models\\Partner',
+            ] as $column => $value) {
+                $this->assertDatabaseOperationDenied(
+                    fn () => $connection->table('personal_access_tokens')
+                        ->where('id', $tokenId)
+                        ->update([$column => $value]),
+                    'permission denied',
+                    "Employee runtime unexpectedly updated personal_access_tokens.{$column}.",
+                );
+            }
+
+            $this->assertDatabaseOperationDenied(
+                fn () => $connection->table('users')
+                    ->whereRaw('1 = 0')
+                    ->update(['name' => 'changed']),
+                'permission denied',
+                'Employee runtime unexpectedly updated an ordinary identity table.',
+            );
+        } finally {
+            $identityMigrator->table('personal_access_tokens')->where('id', $tokenId)->delete();
+        }
+    }
+
     public function test_identity_runtime_cannot_read_subject_mappings(): void
     {
         $connection = $this->boundaryConnection(
