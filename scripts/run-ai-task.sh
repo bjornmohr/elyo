@@ -311,11 +311,31 @@ fi
 if [ -n "$BLOCKED_BY" ] && [ "$BLOCKED_BY" != "-" ]; then
   head2 "Open decisions required"
   printf '  Blocked by: %s\n' "$BLOCKED_BY"
-  printf '  Answered in package 16. Stages depending on them must be skipped and\n'
-  printf '  reported, not guessed. The agent is instructed accordingly.\n'
+  # U-questions are the cross-package list answered in package 16.
+  # Anything else is package-local and is answered in this package's own stage.
+  if printf '%s' "$BLOCKED_BY" | grep -qE '(^|[ ,])U[0-9]+'; then
+    printf '  U-questions are answered in package 16.\n'
+  fi
+  printf '  Stages depending on these must be skipped and reported, not guessed.\n'
+  printf '  The agent is instructed accordingly.\n'
 fi
 if [ -n "$DEPENDS_ON" ] && [ "$DEPENDS_ON" != "-" ]; then
   printf '\n  Recommended order: run package %s first (plan, "Empfohlene Reihenfolge").\n' "$DEPENDS_ON"
+fi
+
+# stages holding a decision that is yours, not the agent's
+OWNER_ROWS="$(awk '/^### Entscheidungspunkte/,/^## Goal/' "$TASK_FILE" \
+  | grep -E '^\| [0-9]+ \|.*Björn' || true)"
+if [ -n "$OWNER_ROWS" ]; then
+  head2 "Your decisions — these stages will be skipped"
+  printf '%s\n' "$OWNER_ROWS" | while IFS='|' read -r _ st what _; do
+    # strip markdown emphasis and backticks, wrap long text at 66 chars
+    what="$(printf '%s' "$what" | sed 's/^ *//;s/ *$//;s/\*\*//g;s/`//g')"
+    printf '  Etappe %-3s %s\n' "$(echo "$st" | tr -d ' ')" \
+      "$(printf '%s' "$what" | fold -s -w 66 | sed '2,$s/^/             /')"
+  done
+  printf '\n  Decide these yourself, or let the agent write up the options and\n'
+  printf '  come back to them. It will not decide them on its own.\n'
 fi
 
 if [ "$DRY_RUN" -eq 1 ]; then
@@ -364,6 +384,13 @@ Dokumentation", chapter 14 "Bekannte Inkonsistenzen und technische Risiken").
 
 What each part means:
 
+- **Arbeitsregeln** near the top: six rules that override everything below them. Read
+  them first. Rule 2 (report instead of reinterpreting) and rule 4 (delete nothing
+  without an explicit order) are the two that get violated most often.
+- **Entscheidungspunkte**: a table of decisions this package contains. Rows marked
+  **Björn** are not yours to make. Write up the options and their consequences, mark
+  the stage blocked, move on. Rows marked *Agent* you decide — with the reasoning in
+  the commit message.
 - **Befunde** in the header: finding IDs from chapter 14 (A1, J17, ...). Every change
   must trace back to one of them. Do not fix things outside this list.
 - **Context**: the verified current state, quoted from the code. The documentation was
@@ -392,8 +419,31 @@ What each part means:
 7. Tests run in the container: \`docker compose exec api-tooling php artisan test\`.
 8. Partial unique indexes only via \`DB::statement()\` — the Blueprint fluent
    \`unique()->whereNull()\` is a silent no-op that emits a full unique index.
-9. If a stage is blocked by an open decision (U-question), **do not guess**. Skip it,
-   report it, continue with the unblocked stages.
+9. If a stage is blocked by an open decision (U-question) or by a **Björn** row in
+   Entscheidungspunkte, **do not guess**. Skip it, report it, continue.
+10. Verify before you change. Every claim in the package is a finding from commit
+   \`56b4a53\`, not from your branch. If the code no longer matches the description —
+   already fixed, moved, renamed, never was that way — stop that stage, record the
+   actual state, continue with the next one. Do not substitute a different problem.
+11. Aborting a stage is a valid outcome and must be reported as one. Five clean stages
+   and three reported blocks beat eight stages where three were guessed.
+EOF
+}
+
+decision_note() {
+  local tbl
+  tbl="$(awk '/^### Entscheidungspunkte/,/^## Goal/' "$TASK_FILE" | grep -E '^\| [0-9]+ \|' || true)"
+  [ -n "$tbl" ] || return 0
+  cat <<EOF
+
+## Decision points in this package
+
+| Etappe | Entscheidung | Wer |
+|---|---|---|
+${tbl}
+
+Rows marked **Björn** are out of your authority. Produce the options and their
+consequences in the report, mark the stage blocked, continue with the next stage.
 EOF
 }
 
@@ -512,6 +562,7 @@ EOF
     plan_semantics
     stage_note
     blocked_note
+    decision_note
     style_block
     cat <<EOF
 
@@ -520,6 +571,8 @@ EOF
 The package's **Expected output** section, plus:
 - stage-by-stage list of commits with their finding IDs
 - which stages you skipped and why
+- every place where the code did not match the package description (rule 2), with what
+  you actually found
 - whether a migration was needed and in which domain directory
 - the filled-in Review-Checkliste
 EOF
@@ -545,6 +598,54 @@ if [ -z "$(git status --porcelain)" ] \
   DO_REVIEW=0
   DO_FIX=0
 fi
+
+# ---------------------------------------------------------------------------
+# scope check — which touched files are never mentioned in the package?
+# ---------------------------------------------------------------------------
+
+SCOPE_STRAYS=""
+if [ -n "$(git log --oneline "${BASE_BRANCH}..HEAD" 2>/dev/null)" ]; then
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    # ignore artefacts the run itself produces
+    case "$f" in
+      docs/ai-results/*|docs/ai-reviews/*|docs/handoff*|docs/ai-tasks/*) continue ;;
+    esac
+    # a file counts as in scope if its path, basename or class name appears in the package
+    base="$(basename "$f")"
+    stem="${base%.*}"
+    if ! grep -qF -e "$f" -e "$base" -e "$stem" "$TASK_FILE"; then
+      SCOPE_STRAYS="${SCOPE_STRAYS}${f}"$'\n'
+    fi
+  done <<< "$(git diff --name-only "${BASE_BRANCH}..HEAD" 2>/dev/null)"
+
+  if [ -n "$SCOPE_STRAYS" ]; then
+    head2 "Scope check — files not mentioned anywhere in the package"
+    printf '%s' "$SCOPE_STRAYS" | sed 's/^/  /'
+    printf '\n  Not automatically wrong: helper classes, new tests and new migrations\n'
+    printf '  legitimately have names the package could not know. The reviewer is asked\n'
+    printf '  to justify each one (Arbeitsregel 3).\n'
+  else
+    info "scope check clean — every touched file is named in the package"
+  fi
+fi
+
+scope_note() {
+  [ -n "$SCOPE_STRAYS" ] || return 0
+  cat <<EOF
+
+## Scope check (automatic)
+
+These changed files are not mentioned anywhere in the package file:
+
+\`\`\`
+${SCOPE_STRAYS}\`\`\`
+
+For each one, decide: legitimately implied by a stage (a new test, a new migration, an
+extracted helper) — or scope creep under Arbeitsregel 3. Name the stage that justifies
+it, or report it as a finding. Do not wave them through as a group.
+EOF
+}
 
 # ---------------------------------------------------------------------------
 # cross-review
@@ -585,13 +686,22 @@ In this order:
    tests silently skipped, deleted or weakened?
 8. **Privacy and boundary suites**: still green? Any new leak surface?
 9. **Guessing**: did the agent implement a stage blocked by an open decision
-   (${BLOCKED_BY:-none}) instead of skipping it?
+   (${BLOCKED_BY:-none}) or a **Björn** row in Entscheidungspunkte, instead of
+   skipping it? This is always Critical.
+10. **Unordered deletions**: any table, column, migration, class, route, endpoint or
+   component removed without the stage explicitly ordering it? Also Critical.
+11. **Invented findings**: does every commit trace back to a finding ID listed in the
+   package header? A change that traces to nothing is scope creep, even if correct.
+12. **Silent reinterpretation**: where the code did not match the package description,
+   did the agent report it — or quietly fix a different problem instead?
 
 ## Do not
 
 - Do not modify any file. This is a review.
 - Do not restate what the diff does. Report what is wrong or risky.
 EOF
+    decision_note
+    scope_note
     style_block
     cat <<EOF
 

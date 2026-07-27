@@ -1,6 +1,6 @@
 # Paket 15: Aufräumen — toter Code, Datenmodell, Frontend-Struktur
 
-**Priorität:** 4 · **Bereich:** Backend + Frontend · **Etappen:** 8
+**Priorität:** 4 · **Bereich:** Backend + Frontend · **Etappen:** 12
 **Befunde:** F7, G1, G2, G8–G11, G15, G19, G23–G27, I10, I11, J3, J4, J6–J11, J32
 
 ```ai-run
@@ -9,9 +9,54 @@ implement_tier:    standard
 implement_effort:  medium
 review_tier:       standard
 review_effort:     medium
-blocked_by:        U10
+blocked_by:        -
 depends_on:        16
 ```
+
+## Arbeitsregeln
+
+Diese sechs Regeln gelten für jede Etappe. Sie stehen vor dem Inhalt, weil sie ihn überstimmen.
+
+**1. Erst prüfen, dann ändern.** Jede Aussage in diesem Dokument ist ein Befund vom Stand
+`56b4a53` (27.07.2026), nicht vom Stand deines Branches. Öffne vor jeder Etappe die genannten
+Dateien, Klassen und Methoden und bestätige den beschriebenen Zustand im aktuellen Code.
+
+**2. Befund trifft nicht zu → melden, nicht umdeuten.** Wenn der Code anders aussieht als hier
+beschrieben (bereits behoben, verschoben, umbenannt, so nie dagewesen): Etappe abbrechen, den
+Ist-Zustand in `docs/ai-results/` festhalten, mit der nächsten Etappe weitermachen. Kein
+Ersatzproblem suchen, nichts „sinngemäß“ umsetzen.
+
+**3. Nur benannte Dateien anfassen.** Änderungen außerhalb der in der Etappe genannten Dateien
+und ihrer direkten Tests sind out of scope — auch wenn dabei ein echter Fehler auffällt. Solche
+Funde gehören nach `docs/ai-results/`, nicht in den Diff.
+
+**4. Nichts löschen ohne ausdrücklichen Auftrag.** Tabellen, Spalten, Migrationen, Klassen,
+Endpunkte, Routen, Frontend-Komponenten: löschen nur, wenn die Etappe es wörtlich anordnet.
+„Kein Aufrufer gefunden“ ist kein Löschgrund — siehe Entscheidungspunkte.
+
+**5. Abbruch ist ein gültiges Ergebnis.** Bei Unklarheit schlägt abbrechen und melden das Raten.
+Ein Paket mit fünf sauberen und drei abgebrochenen Etappen ist verwertbar. Ein Paket mit acht
+Etappen, von denen drei geraten sind, ist es nicht.
+
+**6. Abnahme ist Nachweis, nicht Behauptung.** Jede Etappe endet mit dem tatsächlich gelaufenen
+Testbefehl und seiner Ausgabe — im Commit oder im Ergebnisbericht. „Passt“ ist keine Abnahme.
+
+### Entscheidungspunkte
+
+**U10 entschieden am 27.07.2026:** Die verwaisten ENV-Variablen **bleiben** in `.env.example`
+und bekommen je einen Kommentar mit Grund (geplant / Altlast / extern gesetzt). Nichts entfernen.
+Etappe 7 ist damit nicht mehr blockiert, sondern eine Dokumentationsaufgabe.
+
+**Entschieden am 27.07.2026:** Push wird **gebaut** — als eigenes Paket 17, nicht hier.
+Etappe 2 entfernt daher nichts. Siehe `2026-07-27-entscheidungen.md`.
+
+Eine Etappe mit Zeile **Björn** wird nicht selbst entschieden. Lage aufbereiten, Optionen mit
+Konsequenzen nach `docs/ai-results/` schreiben, Etappe als blockiert markieren, weitermachen.
+
+| Etappe | Entscheidung | Wer |
+|---|---|---|
+| 3 | `AdminUsersComponent`: Sidebar-Link entfernen oder Seite bauen (G11) | **Björn** — nur dieser Punkt |
+
 
 ## Goal
 
@@ -39,6 +84,8 @@ Paketen zugeordnet:
 
 ## Umsetzung in Etappen
 
+**Zwölf Etappen — als drei Pull Requests fahren:** 1–4 (Entfernen), 5–7 (Datenmodell und Konfiguration), 8–12 (Struktur). Ein PR über alle zwölf ist nicht reviewbar.
+
 ### Etappe 1 — Eindeutig toter Backend-Code entfernen (G1, G8)
 
 Ohne Entscheidungsbedarf — kein Aufrufer, keine fachliche Bedeutung:
@@ -52,23 +99,24 @@ Ohne Entscheidungsbedarf — kein Aufrufer, keine fachliche Bedeutung:
   `canUseEmployeePortal()` **werden** verwendet — nicht mitentfernen.
 - **Abnahme:** Suite grün; Deptrac grün.
 
-### Etappe 2 — Push-Infrastruktur entscheiden (G2, G15)
+### Etappe 2 — Push-Infrastruktur als geplant kennzeichnen (G2, G15)
 
-- **`PushNotificationService`** (G2) hat keinen Aufrufer und **simuliert** nur
-  (`Log::info("Sending push to …")`). Der Kommentar sagt: „In a real scenario, use
-  minishlink/web-push or similar."
-- Es gibt **keinen Endpunkt** zum Registrieren eines Abonnements — `saveSubscription()` ist
-  unerreichbar. Die Tabellen `push_subscriptions` und `notification_preferences` (G15) bleiben
-  dauerhaft leer.
-- Auch das Frontend hat **keine** Push-Anbindung: kein Service Worker, kein
-  `Notification.requestPermission()`, kein `pushManager`.
-- `minishlink/web-push` ist **nicht** in `composer.json`; die drei VAPID-Variablen stehen in
-  `.env.example`, werden aber nirgends gelesen.
-- **Entscheiden:** vollständig entfernen (Service, beide Tabellen per neuer Migration, VAPID-Variablen)
-  oder als Roadmap-Element mit Ticketverweis kennzeichnen.
-- **Achtung:** `AccountDeletionService` räumt `push_subscriptions` nicht auf — es kaskadiert über
-  `users`. Bei Entfernung mitprüfen.
-- **Abnahme:** Entscheidung mit Begründung; bei Entfernung keine verwaisten Tabellen oder Variablen.
+**Entschieden: Push wird gebaut.** Diese Etappe entfernt nichts. Sie markiert nur den
+vorhandenen Attrappen-Code als geplant, damit ihn niemand später für tot hält.
+
+**Dateien:** `apps/api-laravel/app/Services/PushNotificationService.php`, `.env.example`, `docs/ai-context/`.
+
+- `PushNotificationService` simuliert bisher nur (`Log::info("Sending push to …")`).
+  Klassenkommentar ergänzen: Attrappe, wird in Paket 17 ersetzt, Verweis auf das Ticket.
+- Die Tabellen `push_subscriptions` und `notification_preferences` (G15) **bleiben**.
+  Kommentar in der Migration oder im Modell mit demselben Verweis.
+- Die drei VAPID-Variablen in `.env.example` **bleiben** und werden von der Liste der
+  verwaisten Variablen in Etappe 7 ausgenommen.
+- **Achtung:** `AccountDeletionService` räumt `push_subscriptions` nicht auf, sondern verlässt
+  sich auf die Kaskade über `users`. Das ist ein echter Befund für Paket 17 — hier nur
+  in `docs/ai-results/` festhalten, nicht beheben.
+- **Abnahme:** Kein Code entfernt; jede der drei Stellen trägt einen Verweis auf Paket 17;
+  Etappe 7 schließt die VAPID-Variablen aus.
 
 ### Etappe 3 — Frontend-Leichen entfernen (G9, G10, G11)
 
@@ -76,11 +124,11 @@ Ohne Entscheidungsbedarf — kein Aufrufer, keine fachliche Bedeutung:
   **keiner** Route verwendet. Entfernen oder einsetzen.
   **Achtung:** `authGuard` und `portalGuard` werden verwendet — nur `roleGuard` ist tot.
 - **`PlaceholderComponent`** (G10): kein Import, keine Route. Entfernen.
-- **`AdminUsersComponent` und `PartnerDashboardComponent`** (G11): Platzhalterseiten mit statischem
-  Text. `AdminUsersComponent` ist über die Admin-Sidebar verlinkt und hat **kein Backend**;
-  `PartnerDashboardComponent` ist über den unerreichbaren Partner-Portalzweig geroutet
-  (siehe Paket 06, Etappe 6).
-  → Entscheiden: Sidebar-Link entfernen und Seite belassen, oder beides entfernen.
+- **`PartnerDashboardComponent`** (G11): **bleibt.** U1 ist entschieden — das Partner-Portal ist
+  geplant. Mit Ticketverweis kommentieren, nicht entfernen.
+- **`AdminUsersComponent`** (G11): Platzhalterseite mit statischem Text, über die Admin-Sidebar
+  verlinkt, **kein Backend**. Ein Klick führt ins Leere. **Offen:** Sidebar-Link entfernen und
+  die Seite belassen, oder die Seite bauen. Bis dahin diesen Punkt überspringen.
 - **Abnahme:** Keine unerreichbare Komponente mehr; Angular-Build und Specs grün.
 
 ### Etappe 4 — Ungenutzte Spalten und Enums (G19, CheckinFrequency, Lab-Gruppe)
@@ -150,38 +198,87 @@ Ohne Entscheidungsbedarf — kein Aufrufer, keine fachliche Bedeutung:
 - **Abnahme:** Nur noch gelesene Variablen in `.env.example`, oder verbleibende sind als Roadmap
   kommentiert.
 
-### Etappe 8 — Frontend-Struktur (J3, J4, J6, J7, J8, J9, F7, I10, I11)
+### Etappe 8 — Frontend-Datenzugriff auf Feature-Services vereinheitlichen (J6)
 
-- **J6:** **Zehn** Feature-Komponenten rufen `ApiClient` direkt auf, statt Feature-Services zu
-  nutzen: alle Company-Seiten außer Maßnahmen, `AdminCompaniesComponent`,
-  `AdminCompaniesCreateComponent`, `AdminPointsComponent`, `InviteComponent`.
-  → Auf Feature-Services vereinheitlichen. **Achtung:** `CompanyTeamsService` existiert bereits,
-  wird aber von `CompanyTeamsComponent` nicht genutzt (siehe Paket 12, Etappe 6).
-- **J7:** Zwei parallele Navigationsebenen — `AppComponent` rendert einen globalen Header mit
-  Portalwechsler und Logout **zusätzlich** zur Shell-Sidebar, die ebenfalls Logout bietet.
-  Auflösen.
+**Dateien:** `apps/web-angular/src/app/features/company/**`, `apps/web-angular/src/app/features/admin/**`,
+`apps/web-angular/src/app/features/auth/invite/**` sowie die zugehörigen `*.service.ts` und `*.spec.ts`.
+
+**Zehn** Feature-Komponenten rufen `ApiClient` direkt auf, statt Feature-Services zu nutzen:
+alle Company-Seiten außer Maßnahmen, `AdminCompaniesComponent`, `AdminCompaniesCreateComponent`,
+`AdminPointsComponent`, `InviteComponent`.
+
+- Je Komponente einen Feature-Service verwenden; fehlende Services anlegen
+- **Achtung:** `CompanyTeamsService` existiert bereits, wird aber von `CompanyTeamsComponent`
+  nicht genutzt. Wenn Paket 12 Etappe 6 schon gelaufen ist, ist das dort erledigt — dann hier
+  nicht erneut anfassen, sondern nur prüfen.
+- **Achtung:** Kein Verhaltenswechsel. Gleiche Endpunkte, gleiche Parameter, gleiches
+  Fehlerverhalten. Reine Umleitung des Aufrufwegs.
+- **Abnahme:** `grep -rn 'ApiClient' apps/web-angular/src/app/features/` liefert nur noch Treffer in
+  `*.service.ts`; Angular-Build und Specs grün.
+
+### Etappe 9 — Doppelte Navigation auflösen und `/employee/measures` verlinken (J7, J8)
+
+**Dateien:** `apps/web-angular/src/app/app.ts`, `apps/web-angular/src/app/app.html`, die Shell-Komponenten,
+`apps/web-angular/src/app/features/employee/**` (nur die Sidebar-Definition).
+
+- **J7:** `AppComponent` rendert einen globalen Header mit Portalwechsler und Logout
+  **zusätzlich** zur Shell-Sidebar, die ebenfalls Logout bietet. Eine der beiden Ebenen entfernen.
+  **Achtung:** Der Portalwechsler hängt an `canUsePortal()` — beim Verschieben die Sichtbarkeits-
+  logik mitnehmen, sonst sehen Mehrportal-Nutzer den Wechsler nicht mehr.
 - **J8:** `/employee/measures` ist **nicht** in der Employee-Sidebar verlinkt — nur per direkter
   URL oder über den QR-Fluss erreichbar. Ergänzen.
-- **J9:** Inline-Templates bis **821 Zeilen** (`company-measures.component.ts`),
-  695 (`company-surveys`), 626 (`admin-system-measure-templates`). Nur `app.html` ist ausgelagert.
-  → Auslagern, mindestens die drei größten.
+- **Abnahme:** Genau ein Logout-Element und ein Portalwechsler im DOM; Spec deckt beide Portale
+  ab; `/employee/measures` ist über die Sidebar erreichbar.
+
+### Etappe 10 — Inline-Templates auslagern (J9)
+
+**Dateien:** `company-measures.component.ts` (821 Zeilen), `company-surveys.component.ts` (695),
+`admin-system-measure-templates.component.ts` (626) plus die neuen `.html`-Dateien.
+
+Nur `app.html` ist bisher ausgelagert. Mindestens diese drei umstellen.
+
+- **Achtung:** Reines Verschieben. Kein Umbau der Templates in derselben Etappe — sonst ist der
+  Diff nicht mehr als Verschiebung lesbar und das Review verliert seinen Wert.
+- **Abnahme:** Keine der drei Komponenten hat noch ein `template:`; Angular-Build und Specs grün;
+  der Diff zeigt Verschiebung, keine inhaltliche Änderung.
+
+### Etappe 11 — Präsentationslayer entkoppeln (J3, J4, F7)
+
+**Dateien:** `apps/api-laravel/app/Http/Resources/Employee/LabMarkerReadingResource.php`,
+`.../Employee/LabMarkerHistoryEntryResource.php`, `apps/api-laravel/app/Http/Controllers/**/CompanySurveyController.php`,
+`CompanyController.php`, `apps/api-laravel/app/Services/Health/LabMarkerService.php`,
+`apps/api-laravel/app/Http/Requests/Employee/StoreLabMarkerReadingRequest.php`.
+
 - **J3:** `LabMarkerReadingResource` und `LabMarkerHistoryEntryResource` rufen
   `app(LabMarkerService::class)->deriveStatus(...)` — ein Service-Locator im Präsentationslayer.
   Status im Controller oder Service berechnen und übergeben.
 - **J4:** Dynamische, nicht persistierte Modellattribute zur Datenübergabe:
   `CompanySurveyController::results` setzt sechs davon auf `Survey`,
-  `CompanyController::dashboard` setzt `$team->metrics`. Durch DTOs oder Resource-Konstruktoren
-  ersetzen.
+  `CompanyController::dashboard` setzt `$team->metrics`. Durch DTOs oder
+  Resource-Konstruktoren ersetzen.
 - **F7:** Doppelte Labormarker-Validierung in `StoreLabMarkerReadingRequest` **und**
   `LabMarkerService::createReading`. Die zweite ist nötig, weil Seeder den Service ohne
-  HTTP-Kontext aufrufen — **im Code kommentieren** statt entfernen.
+  HTTP-Kontext aufrufen — **im Code kommentieren, nicht entfernen.**
+- **Achtung:** Das API-Antwortformat bleibt Byte-für-Byte gleich. Es ist ein interner Umbau.
+  Wenn ein Contract-Test anschlägt, war der Umbau falsch — nicht den Test anpassen.
+- **Abnahme:** Kein `app(` mehr in `apps/api-laravel/app/Http/Resources/`; Contract-Tests unverändert grün;
+  der Kommentar zur doppelten Validierung nennt den Seeder-Grund.
+
+### Etappe 12 — Eingabevalidierung und verwaiste Antworten (I10, I11)
+
+**Dateien:** `apps/api-laravel/app/Http/Controllers/**` (Employee-History-Endpunkt), zugehöriger Request,
+`apps/api-laravel/app/Models/SurveyResponse.php`, die Aggregationsstelle, Tests.
+
 - **I10:** `GET /employee/history?limit=` ist **ungeprüft** — der Wert geht direkt an `->take()`.
-  Keine Validierung, keine Obergrenze, anders als beim Lab-Verlauf (`max:100`). Validieren.
+  Keine Validierung, keine Obergrenze, anders als beim Lab-Verlauf (`max:100`). Validieren,
+  Obergrenze analog zum Lab-Verlauf.
 - **I11:** `survey_responses.user_id` ist nullable mit `set null`; mehrere `NULL` umgehen den
   Unique-Index `(user_id, survey_id)`. Die Aggregation filtert über `whereHas('user')` und
-  schließt verwaiste Antworten aus — **prüfen und dokumentieren**, ob das ausreicht.
-- **Abnahme:** Einheitlicher Datenzugriff im Frontend; keine Templates über 200 Zeilen inline;
-  `limit` validiert.
+  schließt verwaiste Antworten aus. **Prüfen und dokumentieren**, ob das ausreicht — kein
+  Schemaeingriff in dieser Etappe. Wenn es nicht ausreicht: Befund nach `docs/ai-results/`,
+  nicht spontan eine Migration schreiben.
+- **Abnahme:** Test für `limit=0`, `limit=-1`, `limit=99999` und fehlendes `limit`; das
+  Verhalten bei verwaisten Antworten ist mit einem Test belegt und im Ergebnisbericht bewertet.
 
 ## Out of Scope
 
@@ -205,7 +302,11 @@ Ohne Entscheidungsbedarf — kein Aufrufer, keine fachliche Bedeutung:
 - [ ] Fehlende Fremdschlüssel ergänzt
 - [ ] Einheitliche Cast-Deklaration
 - [ ] Nur noch gelesene ENV-Variablen, oder Roadmap-Kommentar
-- [ ] Einheitlicher Datenzugriff im Frontend
+- [ ] Einheitlicher Datenzugriff im Frontend; kein `ApiClient` mehr in Komponenten
+- [ ] Genau ein Logout-Element und ein Portalwechsler
+- [ ] Templates ausgelagert, Diff ist reine Verschiebung
+- [ ] Kein `app(` in `apps/api-laravel/app/Http/Resources/`; API-Antwortformat unverändert
+- [ ] `limit` validiert, mit Test für Grenzfälle
 - [ ] `/employee/measures` ist verlinkt
 - [ ] Doppelte Lab-Validierung ist kommentiert, nicht entfernt
 - [ ] Deptrac, Boundary-Suite, Angular-Build grün

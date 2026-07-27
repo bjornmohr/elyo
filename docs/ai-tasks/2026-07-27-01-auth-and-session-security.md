@@ -13,6 +13,47 @@ blocked_by:        -
 depends_on:        -
 ```
 
+## Arbeitsregeln
+
+Diese sechs Regeln gelten für jede Etappe. Sie stehen vor dem Inhalt, weil sie ihn überstimmen.
+
+**1. Erst prüfen, dann ändern.** Jede Aussage in diesem Dokument ist ein Befund vom Stand
+`56b4a53` (27.07.2026), nicht vom Stand deines Branches. Öffne vor jeder Etappe die genannten
+Dateien, Klassen und Methoden und bestätige den beschriebenen Zustand im aktuellen Code.
+
+**2. Befund trifft nicht zu → melden, nicht umdeuten.** Wenn der Code anders aussieht als hier
+beschrieben (bereits behoben, verschoben, umbenannt, so nie dagewesen): Etappe abbrechen, den
+Ist-Zustand in `docs/ai-results/` festhalten, mit der nächsten Etappe weitermachen. Kein
+Ersatzproblem suchen, nichts „sinngemäß“ umsetzen.
+
+**3. Nur benannte Dateien anfassen.** Änderungen außerhalb der in der Etappe genannten Dateien
+und ihrer direkten Tests sind out of scope — auch wenn dabei ein echter Fehler auffällt. Solche
+Funde gehören nach `docs/ai-results/`, nicht in den Diff.
+
+**4. Nichts löschen ohne ausdrücklichen Auftrag.** Tabellen, Spalten, Migrationen, Klassen,
+Endpunkte, Routen, Frontend-Komponenten: löschen nur, wenn die Etappe es wörtlich anordnet.
+„Kein Aufrufer gefunden“ ist kein Löschgrund — siehe Entscheidungspunkte.
+
+**5. Abbruch ist ein gültiges Ergebnis.** Bei Unklarheit schlägt abbrechen und melden das Raten.
+Ein Paket mit fünf sauberen und drei abgebrochenen Etappen ist verwertbar. Ein Paket mit acht
+Etappen, von denen drei geraten sind, ist es nicht.
+
+**6. Abnahme ist Nachweis, nicht Behauptung.** Jede Etappe endet mit dem tatsächlich gelaufenen
+Testbefehl und seiner Ausgabe — im Commit oder im Ergebnisbericht. „Passt“ ist keine Abnahme.
+
+### Entscheidungspunkte
+
+**Entschieden am 27.07.2026:** Die Passwort-Zurücksetzung (Etappe 6) wird **fertig gebaut**,
+nicht entfernt. Siehe `2026-07-27-entscheidungen.md`.
+
+Eine Etappe mit Zeile **Björn** wird nicht selbst entschieden. Lage aufbereiten, Optionen mit
+Konsequenzen nach `docs/ai-results/` schreiben, Etappe als blockiert markieren, weitermachen.
+
+| Etappe | Entscheidung | Wer |
+|---|---|---|
+| 1 | Konkrete Limits und Zeitfenster für das Rate-Limiting | Agent, Begründung in den Commit |
+
+
 ## Goal
 
 Die Anmelde- und Sitzungsschicht so härten, dass ein gestohlenes oder erratenes Token begrenzten
@@ -95,19 +136,41 @@ Jede Etappe ist ein eigener Commit mit eigenem Test.
   prüft bereits per `isAllowedPortalUrl()` gegen Open Redirect — diesen Schutz nutzen, nicht umgehen.
 - **Abnahme:** Spec belegt, dass ein 401 zum Logout und zur Weiterleitung führt.
 
-### Etappe 6 — Passwort-Zurücksetzung entscheiden (H4)
+### Etappe 6 — Passwort-Zurücksetzung umsetzen (H4)
 
-- **Variante A:** Umsetzen — Migration für `password_reset_tokens` (neue Datei im
-  Identity-Verzeichnis), zwei Routen, Mailable (Abhängigkeit zu Paket 07), Frontend-Formular.
-- **Variante B:** Broker-Konfiguration aus `config/auth.php` entfernen und dokumentieren, wie ein
-  ausgesperrter Nutzer administrativ Zugang erhält.
-- Bei Variante A: Die Antwort auf „Passwort vergessen" muss **unabhängig von der Existenz der
-  E-Mail** identisch sein. Das Repository verfolgt dieses Prinzip bereits bei Login und
-  Invite-Verify konsequent.
-- Bei Variante B: Nebenbefund U12 wird dringlich — `InviteAcceptanceService::accept()` ignoriert
-  bei bestehendem Nutzer Name und Passwort, der Weg über eine neue Einladung funktioniert also nicht.
-- **Abnahme:** Entscheidung dokumentiert; bei A ein grüner End-to-End-Test, bei B keine
-  verwaiste Konfiguration mehr.
+**Entschieden am 27.07.2026: fertig bauen.** Die Variante „Broker-Konfiguration entfernen" ist
+vom Tisch. Es gibt hier nichts mehr zu entscheiden.
+
+> **Diese Etappe setzt Paket 07, Etappe 1 voraus.**
+> Im gesamten Repository existiert **keine Mailable-Klasse, keine Notification und kein
+> `Mail::`-Aufruf** — Paket 07 Etappe 1 („Mailversand einführen", H3) baut diese Grundlage erst.
+> Ohne sie ist eine Passwort-Zurücksetzung nicht auslieferbar.
+>
+> **Empfohlenes Vorgehen:** Etappen 1–5 dieses Pakets jetzt fahren
+> (`scripts/run-ai-task.sh 01 --stage N`), Etappe 6 nach Paket 07 nachziehen. Wer Etappe 6
+> vorzieht, muss den Mailversand hier mitbauen — das gehört dann fachlich in Paket 07 und
+> verletzt Arbeitsregel 3.
+
+**Dateien:** neue Migration unter `apps/api-laravel/database/migrations/identity/`,
+`app/Http/Controllers/`, `routes/api/identity.php`, `config/auth.php`, Mailable aus Paket 07,
+`apps/web-angular/src/app/features/auth/`, Tests.
+
+- Migration für `password_reset_tokens` als **neue Datei** im Identity-Verzeichnis. **Achtung:**
+  `config/auth.php` konfiguriert bereits einen Broker, dem die Tabelle fehlt — deshalb ist der
+  Name durch die Konfiguration vorgegeben, nicht frei wählbar.
+- Zwei Routen: Anforderung und Einlösung. Beide über den Rate-Limiter aus **Etappe 1** dieses
+  Pakets — eine unbegrenzte Anforderung ist ein Mailversand-Verstärker.
+- **Achtung:** Die Antwort auf „Passwort vergessen" muss **unabhängig von der Existenz der
+  E-Mail-Adresse** identisch sein — gleicher Statuscode, gleicher Rumpf, keine messbare
+  Laufzeitdifferenz. Das Repository verfolgt dieses Prinzip bei Login und Invite-Verify bereits
+  konsequent; hier nicht davon abweichen.
+- Token einmalig verwendbar, mit Ablauf. Nach erfolgreicher Zurücksetzung **alle bestehenden
+  Sanctum-Tokens des Nutzers widerrufen** — sonst behält ein Angreifer seine Sitzung.
+- **Achtung:** Der Rohtoken geht ausschließlich in die Mail, nie in eine API-Antwort. Das ist
+  derselbe Fehler, den Paket 07 Etappe 2 (A7) für Einladungen behebt.
+- **Abnahme:** End-to-End-Test von Anforderung bis Anmeldung mit dem neuen Passwort; Test, dass
+  eine unbekannte Adresse dieselbe Antwort erhält; Test, dass ein Token nur einmal wirkt; Test,
+  dass alte Tokens nach der Zurücksetzung ungültig sind.
 
 ### Nicht in diesem Paket (A6 — Token im `localStorage`)
 
