@@ -16,6 +16,7 @@
 #   --no-fix               Run the review, skip the fix phase.
 #   --review-only          Skip implementation, run review (+fix) on the current branch.
 #   --tier T --effort E    Override implement_tier / implement_effort from the task file.
+#                          Effort: low|medium|high|xhigh|max (codex caps at high).
 #   --review-tier T
 #   --review-effort E      Override review_tier / review_effort.
 #   --plain                Disable caveman-ultra output style.
@@ -30,14 +31,20 @@
 # Environment:
 #   RUN_AI_TASK_BRANCH_PREFIX   Branch prefix. Default: findings
 #   RUN_AI_CLAUDE_MODEL_HIGH|STANDARD|FAST   Default: opus / sonnet / haiku
-#   RUN_AI_CODEX_MODEL_HIGH|STANDARD|FAST    Default: gpt-5-codex for all tiers
+#   RUN_AI_CODEX_MODEL_HIGH|STANDARD|FAST    Default: gpt-5.6-sol / -terra / -luna
 #   RUN_AI_CLAUDE_ARGS / RUN_AI_CODEX_ARGS   Extra CLI arguments
 #   RUN_AI_SKIP_PREFLIGHT=1                  Skip the docker/api-tooling check
+#   RUN_AI_CODEX_EXEC                        Non-interactive codex command.
+#                                            Default: "codex exec"
 #
 # Flow:
-#   preflight -> branch -> implement (interactive) -> handoff snapshot
-#             -> cross-review by the other agent (writes a review file)
-#             -> fix critical findings (implementing agent)
+#   preflight -> branch -> implement (interactive TUI; quit it when the stage
+#                                     is done, the script then continues)
+#             -> handoff snapshot
+#             -> cross-review by the other agent (headless, no TUI; its report
+#                is captured into docs/ai-reviews/)
+#             -> fix critical findings (interactive TUI — it touches
+#                production code, so you watch it)
 #
 # Cross-review rule: Codex implements -> Claude reviews.
 #                    Claude implements -> Codex reviews.
@@ -197,7 +204,15 @@ DEPENDS_ON="$(meta depends_on)"
 [ -n "$REV_EFFORT" ]  || REV_EFFORT="medium"
 
 validate_tier()   { case "$1" in high|standard|fast) : ;; *) err "invalid tier '$1' (high|standard|fast)" ;; esac; }
-validate_effort() { case "$1" in low|medium|high) : ;;     *) err "invalid effort '$1' (low|medium|high)" ;; esac; }
+validate_effort() {
+  case "$1" in
+    low|medium|high|xhigh|max) : ;;
+    *) err "invalid effort '$1' (low|medium|high|xhigh|max)" ;;
+  esac
+  # codex only accepts low|medium|high; map the two extra claude levels down
+  # so a shared ai-run block stays usable with either agent.
+  :
+}
 
 validate_tier "$IMPL_TIER";  validate_effort "$IMPL_EFFORT"
 validate_tier "$REV_TIER";   validate_effort "$REV_EFFORT"
@@ -208,9 +223,9 @@ model_for() {
     claude:high)     printf '%s' "${RUN_AI_CLAUDE_MODEL_HIGH:-opus}" ;;
     claude:standard) printf '%s' "${RUN_AI_CLAUDE_MODEL_STANDARD:-sonnet}" ;;
     claude:fast)     printf '%s' "${RUN_AI_CLAUDE_MODEL_FAST:-haiku}" ;;
-    codex:high)      printf '%s' "${RUN_AI_CODEX_MODEL_HIGH:-gpt-5-codex}" ;;
-    codex:standard)  printf '%s' "${RUN_AI_CODEX_MODEL_STANDARD:-gpt-5-codex}" ;;
-    codex:fast)      printf '%s' "${RUN_AI_CODEX_MODEL_FAST:-gpt-5-codex}" ;;
+    codex:high)      printf '%s' "${RUN_AI_CODEX_MODEL_HIGH:-gpt-5.6-sol}" ;;
+    codex:standard)  printf '%s' "${RUN_AI_CODEX_MODEL_STANDARD:-gpt-5.6-terra}" ;;
+    codex:fast)      printf '%s' "${RUN_AI_CODEX_MODEL_FAST:-gpt-5.6-luna}" ;;
   esac
 }
 
@@ -221,13 +236,6 @@ REV_MODEL="$(model_for "$REVIEW_AGENT" "$REV_TIER")"
 
 # Claude Code has no reasoning-effort flag; effort becomes a thinking directive
 # in the prompt. Codex uses -c model_reasoning_effort.
-think_for() {
-  case "$1" in
-    low)    printf '%s' "Answer directly. Do not overthink this." ;;
-    medium) printf '%s' "Think before you act." ;;
-    high)   printf '%s' "Think hard before you act. Ultrathink the risky parts." ;;
-  esac
-}
 
 # ---------------------------------------------------------------------------
 # preflight
@@ -474,27 +482,63 @@ EOF
 # agent runners — interactive, never exec (the review chain runs afterwards)
 # ---------------------------------------------------------------------------
 
+codex_effort() {
+  # codex accepts low|medium|high only
+  case "$1" in xhigh|max) printf 'high' ;; *) printf '%s' "$1" ;; esac
+}
+
 run_agent() {
+  # run_agent <agent> <model> <effort> <prompt_file> [mode] [outfile]
+  #   mode: interactive (default) | headless
+  # Headless writes the agent's answer to <outfile> instead of opening a TUI,
+  # so the chain continues without the user having to quit a session.
   local agent="$1" model="$2" effort="$3" prompt_file="$4"
+  local mode="${5:-interactive}" outfile="${6:-}"
   local extra=()
   # Short argv, full instruction in the file. See new_prompt() for why.
   local kick="Read ${prompt_file} and follow it. It is the complete instruction for this run — read it first, before anything else."
+
   # NOTE: "${extra[@]}" on an empty array is an "unbound variable" error under
   # `set -u` in bash < 4.4 — which is what macOS ships (3.2). The
   # ${arr[@]+"${arr[@]}"} form expands to nothing instead of erroring.
-  #
-  # Both CLIs read stdin on startup to detect piped input. Started from a
-  # script, stdin is whatever the script inherited — the preflight `read` may
-  # have left it in an odd state — and the TUI then waits instead of running.
-  # Handing it the terminal explicitly avoids that.
+  if [ "$agent" = "claude" ] && [ -n "${RUN_AI_CLAUDE_ARGS:-}" ]; then
+    # shellcheck disable=SC2206
+    extra=($RUN_AI_CLAUDE_ARGS)
+  elif [ "$agent" = "codex" ] && [ -n "${RUN_AI_CODEX_ARGS:-}" ]; then
+    # shellcheck disable=SC2206
+    extra=($RUN_AI_CODEX_ARGS)
+  fi
+
+  if [ "$mode" = "headless" ]; then
+    info "$agent (headless, model=$model effort=$effort) -> $outfile"
+    info "prompt: $prompt_file"
+    case "$agent" in
+      claude)
+        # `plan` permission mode: may read and reason, may not edit. The
+        # report goes to stdout, so the reviewer needs no write access at all.
+        claude -p --model "$model" --effort "$effort" \
+          --permission-mode plan ${extra[@]+"${extra[@]}"} "$kick" > "$outfile"
+        ;;
+      codex)
+        # `codex exec` is the non-interactive subcommand. Unverified against a
+        # local install — override with RUN_AI_CODEX_EXEC if the syntax differs.
+        # shellcheck disable=SC2086
+        ${RUN_AI_CODEX_EXEC:-codex exec} -m "$model" \
+          -c model_reasoning_effort="$(codex_effort "$effort")" \
+          ${extra[@]+"${extra[@]}"} "$kick" > "$outfile"
+        ;;
+    esac
+    return
+  fi
+
+  # --- interactive ---------------------------------------------------------
   # Interactive TUIs need to own the terminal's foreground process group.
-  # A non-interactive bash script has job control OFF, so children stay in
-  # the script's process group and never become the foreground group — the
-  # TUI then paints its interface but cannot read a single keystroke.
-  # `set -m` makes bash put each child in its own process group and hand it
-  # the terminal, exactly as an interactive shell does. This is the reason
-  # the original script had to use `exec`; `set -m` gives the same result
-  # while letting the review chain run afterwards.
+  # A non-interactive bash script has job control OFF, so children stay in the
+  # script's process group and never become the foreground group — the TUI
+  # then paints its interface but cannot read a single keystroke. `set -m`
+  # makes bash put each child in its own process group and hand it the
+  # terminal. This is why the original script had to use `exec`; `set -m`
+  # gives the same result and still lets the review chain run afterwards.
   local had_monitor=0
   case "$-" in *m*) had_monitor=1 ;; esac
   set -m
@@ -504,37 +548,31 @@ run_agent() {
   local redir_tty=0
   if [ ! -t 0 ] && (: < /dev/tty) 2>/dev/null; then redir_tty=1; fi
 
+  head2 "Interactive session — $agent"
+  printf '  The agent does not close itself. When it reports the stage is\n'
+  printf '  done, quit the session (Ctrl-D, or /exit). The script then\n'
+  printf '  continues on its own with the next phase.\n\n'
+  info "prompt: $prompt_file"
+
   case "$agent" in
     claude)
-      if [ -n "${RUN_AI_CLAUDE_ARGS:-}" ]; then
-        # shellcheck disable=SC2206
-        extra=($RUN_AI_CLAUDE_ARGS)
-      fi
-      info "claude --model $model   (effort=$effort via thinking directive)"
-      info "prompt: $prompt_file"
-      info "if the TUI stays unresponsive, quit it and run this yourself:"
-      printf '      claude --model %s "Read %s and follow it."\n' "$model" "$prompt_file"
+      info "claude --model $model --effort $effort"
       if [ "$redir_tty" -eq 1 ]; then
-        claude --model "$model" ${extra[@]+"${extra[@]}"} "$kick" < /dev/tty
+        claude --model "$model" --effort "$effort" \
+          ${extra[@]+"${extra[@]}"} "$kick" < /dev/tty
       else
-        claude --model "$model" ${extra[@]+"${extra[@]}"} "$kick"
+        claude --model "$model" --effort "$effort" \
+          ${extra[@]+"${extra[@]}"} "$kick"
       fi
       ;;
     codex)
-      if [ -n "${RUN_AI_CODEX_ARGS:-}" ]; then
-        # shellcheck disable=SC2206
-        extra=($RUN_AI_CODEX_ARGS)
-      fi
-      info "codex -m $model -c model_reasoning_effort=$effort   (interactive TUI)"
-      info "prompt: $prompt_file"
-      info "if the TUI stays unresponsive, quit it and run this yourself:"
-      printf '      codex -m %s -c model_reasoning_effort=%s "Read %s and follow it."\n' \
-        "$model" "$effort" "$prompt_file"
+      local ce; ce="$(codex_effort "$effort")"
+      info "codex -m $model -c model_reasoning_effort=$ce"
       if [ "$redir_tty" -eq 1 ]; then
-        codex -m "$model" -c model_reasoning_effort="$effort" \
+        codex -m "$model" -c model_reasoning_effort="$ce" \
           ${extra[@]+"${extra[@]}"} "$kick" < /dev/tty
       else
-        codex -m "$model" -c model_reasoning_effort="$effort" \
+        codex -m "$model" -c model_reasoning_effort="$ce" \
           ${extra[@]+"${extra[@]}"} "$kick"
       fi
       ;;
@@ -606,7 +644,6 @@ Read \`AGENTS.md\` first.
 - Branch: \`${BRANCH}\` (already checked out)
 - Stages in this package: ${STAGE_COUNT}
 
-$(think_for "$IMPL_EFFORT")
 EOF
     plan_semantics
     stage_note
@@ -715,7 +752,6 @@ Read \`AGENTS.md\` first.
 - Branch under review: \`${BRANCH}\`
 - Base: \`${BASE_BRANCH}\`
 
-$(think_for "$REV_EFFORT")
 
 ## What to review
 
@@ -757,7 +793,11 @@ EOF
 
 ## Required output
 
-Write the review to \`${REVIEW_FILE}\` (create it) with exactly these sections:
+Write the review **to standard output**. Do not create or edit any file — the
+script captures your output into \`${REVIEW_FILE}\`. Output nothing but the
+report itself: no preamble, no "here is the review", no closing remarks.
+
+Use exactly these sections:
 
 \`\`\`markdown
 # Review: package ${TASK_NN} (${AGENT} implemented, ${REVIEW_AGENT} reviewed)
@@ -790,14 +830,23 @@ EOF
   } > "$REVIEW_PROMPT"
 
   head2 "Cross-review — $REVIEW_AGENT (implemented by $AGENT)"
-  run_agent "$REVIEW_AGENT" "$REV_MODEL" "$REV_EFFORT" "$REVIEW_PROMPT"
+  mkdir -p "$REVIEW_DIR"
+  # Headless: the review needs no input, and having to quit a second TUI is
+  # what broke the chain before. The agent reads and reasons but may not edit
+  # (claude: --permission-mode plan); its report is captured here.
+  run_agent "$REVIEW_AGENT" "$REV_MODEL" "$REV_EFFORT" "$REVIEW_PROMPT" \
+    headless "$REVIEW_FILE" \
+    || warn "reviewer exited non-zero — check $REVIEW_FILE"
 
-  if [ -f "$REVIEW_FILE" ]; then
-    info "review written: $REVIEW_FILE"
+  if [ -s "$REVIEW_FILE" ]; then
+    info "review written: $REVIEW_FILE ($(wc -l < "$REVIEW_FILE" | tr -d ' ') lines)"
     VERDICT="$(awk '/^## Verdict/{getline; while ($0 ~ /^[[:space:]]*$/) getline; print; exit}' "$REVIEW_FILE" 2>/dev/null || true)"
     [ -n "$VERDICT" ] && info "verdict: $VERDICT"
+    CRITICAL_COUNT="$(awk '/^## Critical/{f=1;next} /^## /{f=0} f' "$REVIEW_FILE" \
+      | grep -cE '^[-*0-9]' || true)"
+    info "critical items: ${CRITICAL_COUNT:-0}"
   else
-    warn "reviewer did not write $REVIEW_FILE — fix phase runs without a review file"
+    warn "review file is empty — fix phase runs without a review"
   fi
 fi
 
@@ -817,7 +866,6 @@ if [ "$DO_FIX" -eq 1 ] && [ "$DO_REVIEW" -eq 1 ]; then
 - Package file: \`${TASK_FILE}\`
 - Execution plan: \`${PLAN_FILE}\`
 
-$(think_for "$IMPL_EFFORT")
 
 ## What to do
 
