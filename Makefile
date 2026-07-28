@@ -62,6 +62,7 @@ smoke: ## Verify runtime split: credential isolation, path routing, session cont
 	bash infra/smoke-runtime-split.sh
 
 check-grants: ## Assert the PostgreSQL role boundaries created by the initdb script
+	docker compose up -d --wait postgres
 	bash infra/postgres/check-grants.sh
 
 verify-migration-restructure: ## Compare consolidated schema and routes with the pre-restructure baseline
