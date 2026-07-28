@@ -258,21 +258,28 @@ depends_on:        05            # empfohlenes Vorgängerpaket, oder -
 
 | Tier | Claude | Codex |
 |---|---|---|
-| `high` | `opus` | `gpt-5-codex` |
-| `standard` | `sonnet` | `gpt-5-codex` |
-| `fast` | `haiku` | `gpt-5-codex` |
+| `high` | `opus` | `gpt-5.6-sol` |
+| `standard` | `sonnet` | `gpt-5.6-terra` |
+| `fast` | `haiku` | `gpt-5.6-luna` |
 
 Überschreibbar über `RUN_AI_CLAUDE_MODEL_HIGH`, `RUN_AI_CODEX_MODEL_STANDARD` usw.
-**Die Codex-Standardwerte sind Platzhalter** — bitte einmalig auf die tatsächlich
-verfügbaren Modelle setzen.
 
-**Effort** wirkt je Agent unterschiedlich: Codex bekommt
-`-c model_reasoning_effort=<low|medium|high>`, Claude Code hat keinen entsprechenden
-Schalter und erhält stattdessen eine Denkanweisung im Prompt
-(`low` → direkt antworten, `medium` → „think", `high` → „think hard / ultrathink").
+**Effort** ist bei beiden Agenten ein echtes CLI-Flag: Claude `--effort`
+(`low|medium|high|xhigh|max`), Codex `-c model_reasoning_effort=` (`low|medium|high`).
+Die `ai-run`-Blöcke nutzen nur `low|medium|high`, damit dieselbe Datei mit beiden
+Agenten funktioniert; `xhigh` und `max` sind über `--effort` möglich und werden für
+Codex auf `high` heruntergesetzt.
 
 Das Skript zeigt Modell und Effort im Preflight und wartet auf Bestätigung, bevor
 irgendetwas läuft. `--yes` überspringt die Rückfrage, `--dry-run` zeigt nur den Plan.
+
+### Was interaktiv läuft und was nicht
+
+| Phase | Modus | Warum |
+|---|---|---|
+| Implementierung | interaktive TUI | Du siehst mit und kannst eingreifen. **Beende die Sitzung mit Strg-D, wenn die Etappe fertig ist** — das Skript läuft dann von selbst weiter. |
+| Review | headless | Braucht keine Eingabe. Der Agent darf lesen und denken, aber nichts ändern; sein Bericht wird nach `docs/ai-reviews/` geschrieben. |
+| Fix | interaktive TUI | Fasst Produktivcode an — da schaust du zu. |
 
 ### Modell- und Effort-Zuordnung der 16 Pakete
 
@@ -281,9 +288,9 @@ irgendetwas läuft. `--yes` überspringt die Rückfrage, `--dry-run` zeigt nur d
 | 01 Auth und Sitzung | hoch | high / high | standard / medium | — |
 | 02 Gesundheitsdaten | hoch | high / high | high / high | U5 |
 | 03 Frontend-Auslieferung | mittel | standard / medium | standard / low | — |
-| 04 Infrastruktur | mittel | standard / medium | standard / medium | U8 |
+| 04 Infrastruktur | mittel | standard / medium | standard / medium | — |
 | 05 Audit und Mapping | hoch | high / high | high / high | U9, U11 |
-| 06 Partner | mittel | standard / medium | standard / medium | U1, U3, U6, U14 |
+| 06 Partner | mittel | standard / medium | standard / medium | U6, U14 |
 | 07 Onboarding | hoch | standard / high | standard / medium | U12 |
 | 08 Fehler und Vertrag | hoch | high / high | standard / medium | — |
 | 09 CI und Tests | niedrig | standard / medium | standard / low | — |
