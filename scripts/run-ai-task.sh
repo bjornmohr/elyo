@@ -487,10 +487,22 @@ run_agent() {
   # script, stdin is whatever the script inherited — the preflight `read` may
   # have left it in an odd state — and the TUI then waits instead of running.
   # Handing it the terminal explicitly avoids that.
-  # /dev/tty can exist as a node yet not be openable (no controlling
-  # terminal, e.g. under CI or a sandbox) — so test opening it, not -e.
+  # Interactive TUIs need to own the terminal's foreground process group.
+  # A non-interactive bash script has job control OFF, so children stay in
+  # the script's process group and never become the foreground group — the
+  # TUI then paints its interface but cannot read a single keystroke.
+  # `set -m` makes bash put each child in its own process group and hand it
+  # the terminal, exactly as an interactive shell does. This is the reason
+  # the original script had to use `exec`; `set -m` gives the same result
+  # while letting the review chain run afterwards.
+  local had_monitor=0
+  case "$-" in *m*) had_monitor=1 ;; esac
+  set -m
+
+  # Only reach for /dev/tty if stdin is NOT already a terminal (e.g. the
+  # script itself was piped). Redirecting when stdin is fine can hurt.
   local redir_tty=0
-  if (: < /dev/tty) 2>/dev/null; then redir_tty=1; fi
+  if [ ! -t 0 ] && (: < /dev/tty) 2>/dev/null; then redir_tty=1; fi
 
   case "$agent" in
     claude)
@@ -500,6 +512,8 @@ run_agent() {
       fi
       info "claude --model $model   (effort=$effort via thinking directive)"
       info "prompt: $prompt_file"
+      info "if the TUI stays unresponsive, quit it and run this yourself:"
+      printf '      claude --model %s "Read %s and follow it."\n' "$model" "$prompt_file"
       if [ "$redir_tty" -eq 1 ]; then
         claude --model "$model" ${extra[@]+"${extra[@]}"} "$kick" < /dev/tty
       else
@@ -513,6 +527,9 @@ run_agent() {
       fi
       info "codex -m $model -c model_reasoning_effort=$effort   (interactive TUI)"
       info "prompt: $prompt_file"
+      info "if the TUI stays unresponsive, quit it and run this yourself:"
+      printf '      codex -m %s -c model_reasoning_effort=%s "Read %s and follow it."\n' \
+        "$model" "$effort" "$prompt_file"
       if [ "$redir_tty" -eq 1 ]; then
         codex -m "$model" -c model_reasoning_effort="$effort" \
           ${extra[@]+"${extra[@]}"} "$kick" < /dev/tty
@@ -522,6 +539,8 @@ run_agent() {
       fi
       ;;
   esac
+
+  [ "$had_monitor" -eq 1 ] || set +m
 }
 
 # Prompts are written to files, not passed on argv. A multi-kilobyte markdown
@@ -609,7 +628,8 @@ EOF
   } > "$IMPL_PROMPT"
 
   head2 "Implementation — $AGENT"
-  run_agent "$AGENT" "$IMPL_MODEL" "$IMPL_EFFORT" "$IMPL_PROMPT"
+  run_agent "$AGENT" "$IMPL_MODEL" "$IMPL_EFFORT" "$IMPL_PROMPT" \
+    || warn "agent exited non-zero — an interactive session's exit code is not a reliable success signal, continuing"
   info "implementation session ended"
 fi
 
