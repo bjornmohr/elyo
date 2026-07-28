@@ -514,10 +514,26 @@ run_agent() {
     info "prompt: $prompt_file"
     case "$agent" in
       claude)
-        # `plan` permission mode: may read and reason, may not edit. The
-        # report goes to stdout, so the reviewer needs no write access at all.
+        # NOTE: --permission-mode plan was tried here and is wrong for -p.
+        # Plan mode is an interactive workflow — it drafts a plan and then
+        # waits for the user to approve it (ExitPlanMode). There is no user
+        # in headless mode, so the session stopped after the draft and never
+        # wrote a real review; the "review file" contained a plan summary
+        # ending in "Proceed to output final review report?". Caught by
+        # actually reading a captured review file, not by reasoning about it.
+        #
+        # Fix: no --permission-mode at all, just block the tools a reviewer
+        # has no business using. Edit/Write/NotebookEdit are the only tools
+        # that mutate files directly, so those are what's disallowed. Bash
+        # stays available on purpose — the review checklist requires actually
+        # running the test/deptrac/check-grants commands to verify "still
+        # green", not taking the implementer's word for it. Residual risk:
+        # Bash can still write a file via redirection; there is no CLI switch
+        # that closes that gap without also blocking the validation runs the
+        # review needs. The report goes to stdout either way.
         claude -p --model "$model" --effort "$effort" \
-          --permission-mode plan ${extra[@]+"${extra[@]}"} "$kick" > "$outfile"
+          --disallowedTools "Edit,Write,NotebookEdit" \
+          ${extra[@]+"${extra[@]}"} "$kick" > "$outfile"
         ;;
       codex)
         # `codex exec` is the non-interactive subcommand. Unverified against a
@@ -833,7 +849,8 @@ EOF
   mkdir -p "$REVIEW_DIR"
   # Headless: the review needs no input, and having to quit a second TUI is
   # what broke the chain before. The agent reads and reasons but may not edit
-  # (claude: --permission-mode plan); its report is captured here.
+  # (claude: --disallowedTools blocks Edit/Write/NotebookEdit); its report
+  # is captured here.
   run_agent "$REVIEW_AGENT" "$REV_MODEL" "$REV_EFFORT" "$REVIEW_PROMPT" \
     headless "$REVIEW_FILE" \
     || warn "reviewer exited non-zero — check $REVIEW_FILE"
