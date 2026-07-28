@@ -9,7 +9,7 @@ install: ## Install dependencies for all apps
 	cp apps/api-laravel/.env.example apps/api-laravel/.env
 	cd apps/api-laravel && php artisan key:generate
 
-up: ## Start docker containers (three API runtimes + nginx + infra + api-tooling)
+up: ## Start docker containers (three API runtimes + nginx + infra); api-tooling stays down (profile `tools`)
 	docker compose up -d
 
 down: ## Stop docker containers
@@ -43,13 +43,19 @@ fresh-all: ## Fresh-migrate every ELYO domain database and seed (docker)
 
 # The test suite needs every route and every connection (ELYO_RUNTIME=full), so
 # it runs in the local-only api-tooling service, never in a deployable runtime.
+# api-tooling sits behind the `tools` profile (never started by `up -d`), and
+# `exec` — unlike `run` — does not activate a profile on its own, so each target
+# brings the container up explicitly first.
 test: ## Run the full API test suite (api-tooling)
+	docker compose --profile tools up -d api-tooling
 	docker compose exec api-tooling php artisan test
 
 test-boundary: ## Run the boundary testsuite (api-tooling)
+	docker compose --profile tools up -d api-tooling
 	docker compose exec api-tooling php artisan test --testsuite=boundary
 
 deptrac: ## Run the static boundary analysis (api-tooling)
+	docker compose --profile tools up -d api-tooling
 	docker compose exec api-tooling composer deptrac
 
 smoke: ## Verify runtime split: credential isolation, path routing, session continuity
