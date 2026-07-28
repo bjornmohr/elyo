@@ -7,6 +7,8 @@ use App\Models\Survey;
 use App\Models\SurveyAnswer;
 use App\Models\SurveyResponse;
 use App\Models\User;
+use App\Services\Company\AnonymityThreshold;
+use App\Services\Company\ReportingPercentage;
 use Illuminate\Database\Eloquent\Builder;
 
 class SurveyResultsAggregationService
@@ -70,7 +72,7 @@ class SurveyResultsAggregationService
                     ->orderBy('scale_value')
                     ->get();
                 $suppressedCount = $distribution
-                    ->filter(fn ($item) => $this->isSmallBucket((int) $item->count, $threshold))
+                    ->filter(fn ($item) => $this->isSmallBucket((int) $item->count))
                     ->sum(fn ($item) => (int) $item->count);
                 $result['avgValue'] = $suppressedCount > 0 || $agg->avg_value === null ? null : (float) round($agg->avg_value, 1);
                 $result['minValue'] = $suppressedCount > 0 || $agg->min_value === null ? null : (int) $agg->min_value;
@@ -90,19 +92,26 @@ class SurveyResultsAggregationService
                         ->map(fn ($item) => [
                             'value' => (int) $item->value,
                             'count' => (int) $item->count,
-                            'percentage' => $answerCount > 0 ? round(((int) $item->count / $answerCount) * 100, 1) : 0,
+                            'percentage' => ReportingPercentage::of(
+                                (int) $item->count,
+                                $answerCount,
+                            ),
                         ]);
             } elseif ($q->type->value === 'YES_NO') {
                 $trueCount = (clone $answerQuery)->where('bool_value', true)->count();
                 $falseCount = $answerCount - $trueCount;
-                $isSuppressed = $this->isSmallBucket($trueCount, $threshold) || $this->isSmallBucket($falseCount, $threshold);
+                $isSuppressed = $this->isSmallBucket($trueCount) || $this->isSmallBucket($falseCount);
                 $result['isSuppressed'] = $isSuppressed;
                 $result['answerCount'] = $isSuppressed ? null : $answerCount;
                 $result['suppressedCount'] = $isSuppressed ? null : 0;
                 $result['trueCount'] = $isSuppressed ? null : $trueCount;
                 $result['falseCount'] = $isSuppressed ? null : $falseCount;
-                $result['truePercentage'] = ! $isSuppressed && $answerCount > 0 ? round(($trueCount / $answerCount) * 100, 1) : null;
-                $result['falsePercentage'] = ! $isSuppressed && $answerCount > 0 ? round(($falseCount / $answerCount) * 100, 1) : null;
+                $result['truePercentage'] = ! $isSuppressed && $answerCount > 0
+                    ? ReportingPercentage::of($trueCount, $answerCount)
+                    : null;
+                $result['falsePercentage'] = ! $isSuppressed && $answerCount > 0
+                    ? ReportingPercentage::of($falseCount, $answerCount)
+                    : null;
                 if ($isSuppressed) {
                     $result['suppressionReason'] = 'DISTRIBUTION_SUPPRESSED';
                 }
@@ -113,7 +122,7 @@ class SurveyResultsAggregationService
                     ->orderByDesc('count')
                     ->get();
                 $suppressedCount = $choiceBuckets
-                    ->filter(fn ($item) => $this->isSmallBucket((int) $item->count, $threshold))
+                    ->filter(fn ($item) => $this->isSmallBucket((int) $item->count))
                     ->sum(fn ($item) => (int) $item->count);
                 $isSuppressed = $suppressedCount > 0;
                 $result['options'] = $isSuppressed
@@ -123,7 +132,10 @@ class SurveyResultsAggregationService
                         ->map(fn ($item) => [
                             'value' => $item->value,
                             'count' => (int) $item->count,
-                            'percentage' => $answerCount > 0 ? round(((int) $item->count / $answerCount) * 100, 1) : 0,
+                            'percentage' => ReportingPercentage::of(
+                                (int) $item->count,
+                                $answerCount,
+                            ),
                         ]);
                 $result['isSuppressed'] = $isSuppressed;
                 $result['suppressedCount'] = $isSuppressed ? null : 0;
@@ -184,12 +196,12 @@ class SurveyResultsAggregationService
         return [
             'eligibleCount' => $eligibleCount,
             'responseCount' => $responseCount,
-            'rate' => $eligibleCount > 0 ? round(($responseCount / $eligibleCount) * 100, 1) : 0,
+            'rate' => ReportingPercentage::of($responseCount, $eligibleCount),
         ];
     }
 
-    private function isSmallBucket(int $count, int $threshold): bool
+    private function isSmallBucket(int $count): bool
     {
-        return $count > 0 && $count < $threshold;
+        return $count > 0 && $count < AnonymityThreshold::categoryMinimum();
     }
 }

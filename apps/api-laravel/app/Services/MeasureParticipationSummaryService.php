@@ -7,6 +7,7 @@ use App\Models\Measure;
 use App\Models\MeasureParticipation;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Company\ReportingPercentage;
 use App\Services\Company\TeamLayerGuard;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -58,7 +59,7 @@ class MeasureParticipationSummaryService
             'isAboveThreshold' => true,
             'eligibleCount' => $eligibleCount,
             'participantCount' => $participantCount,
-            'participationRate' => $eligibleCount > 0 ? round(($participantCount / $eligibleCount) * 100, 1) : 0,
+            'participationRate' => ReportingPercentage::of($participantCount, $eligibleCount),
             'suppressionReason' => null,
             'teamBreakdown' => null,
         ];
