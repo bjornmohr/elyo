@@ -34,6 +34,8 @@
 #   RUN_AI_CODEX_MODEL_HIGH|STANDARD|FAST    Default: gpt-5.6-sol / -terra / -luna
 #   RUN_AI_CLAUDE_ARGS / RUN_AI_CODEX_ARGS   Extra CLI arguments
 #   RUN_AI_SKIP_PREFLIGHT=1                  Skip the docker/api-tooling check
+#   RUN_AI_TRUNK_BRANCH                      Branch to diff against for --continue
+#                                            and --review-only. Default: main
 #   RUN_AI_CODEX_EXEC                        Non-interactive codex command.
 #                                            Default: "codex exec"
 #
@@ -614,10 +616,33 @@ new_prompt() {
 # branch
 # ---------------------------------------------------------------------------
 
-BASE_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+# BASE_BRANCH is "what to diff against", not "what branch am I on". Those are
+# the same thing only when a fresh package branch is being created off
+# whatever you currently have checked out. For --continue and --review-only
+# you are, by construction, already ON the package branch when the script
+# starts — capturing `git rev-parse --abbrev-ref HEAD` there gave BASE_BRANCH
+# the branch's own name, so every later `git diff/log "$BASE_BRANCH..HEAD"`
+# compared the branch to itself and always came up empty. Caught by a
+# reviewer explicitly reporting it ("declared base diff empty; main...HEAD
+# needed to inspect the commit") rather than by inspecting the script.
+TRUNK_BRANCH="${RUN_AI_TRUNK_BRANCH:-main}"
+CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+
+if [ "$REVIEW_ONLY" -eq 1 ] || [ "$CONTINUE" -eq 1 ]; then
+  if git show-ref --verify --quiet "refs/heads/$TRUNK_BRANCH"; then
+    BASE_BRANCH="$TRUNK_BRANCH"
+  else
+    warn "trunk branch '$TRUNK_BRANCH' not found locally — diffing against" \
+         "'$CURRENT_BRANCH' itself, which will show nothing. Fetch it or set" \
+         "RUN_AI_TRUNK_BRANCH."
+    BASE_BRANCH="$CURRENT_BRANCH"
+  fi
+else
+  BASE_BRANCH="$CURRENT_BRANCH"
+fi
 
 if [ "$REVIEW_ONLY" -eq 1 ]; then
-  info "review-only on current branch: $BASE_BRANCH"
+  info "review-only on current branch: $CURRENT_BRANCH (diff base: $BASE_BRANCH)"
 elif [ "$CONTINUE" -eq 1 ]; then
   [ "$BRANCH_EXISTS" -eq 1 ] || err "--continue: branch $BRANCH does not exist"
   git checkout "$BRANCH"
@@ -704,6 +729,13 @@ fi
 
 # ---------------------------------------------------------------------------
 # scope check — which touched files are never mentioned in the package?
+#
+# The presence check above (line 707) is a two-dot log on purpose: it asks
+# "are there commits unique to this branch", and a three-dot would fold in
+# trunk's own independent commits and always answer yes. The file diff below
+# is three-dot on purpose, for the opposite reason: it asks "what changed on
+# this branch since it forked", and a two-dot would show trunk's independent
+# movement (e.g. a later fix on main) as if this branch had touched it.
 # ---------------------------------------------------------------------------
 
 SCOPE_STRAYS=""
@@ -720,7 +752,7 @@ if [ -n "$(git log --oneline "${BASE_BRANCH}..HEAD" 2>/dev/null)" ]; then
     if ! grep -qF -e "$f" -e "$base" -e "$stem" "$TASK_FILE"; then
       SCOPE_STRAYS="${SCOPE_STRAYS}${f}"$'\n'
     fi
-  done <<< "$(git diff --name-only "${BASE_BRANCH}..HEAD" 2>/dev/null)"
+  done <<< "$(git diff --name-only "${BASE_BRANCH}...HEAD" 2>/dev/null)"
 
   if [ -n "$SCOPE_STRAYS" ]; then
     head2 "Scope check — files not mentioned anywhere in the package"
@@ -771,7 +803,11 @@ Read \`AGENTS.md\` first.
 
 ## What to review
 
-Inspect the branch diff against the base, including untracked files.
+Inspect the branch diff against the base, including untracked files. Use
+\`git diff ${BASE_BRANCH}...HEAD\` (three dots — merge-base diff), not
+\`${BASE_BRANCH}..HEAD\`: trunk may have moved on independently since this
+branch forked, and a two-dot diff would show that unrelated trunk movement
+as if it were part of this review.
 
 In this order:
 
