@@ -477,9 +477,21 @@ EOF
 run_agent() {
   local agent="$1" model="$2" effort="$3" prompt_file="$4"
   local extra=()
+  # Short argv, full instruction in the file. See new_prompt() for why.
+  local kick="Read ${prompt_file} and follow it. It is the complete instruction for this run — read it first, before anything else."
   # NOTE: "${extra[@]}" on an empty array is an "unbound variable" error under
   # `set -u` in bash < 4.4 — which is what macOS ships (3.2). The
   # ${arr[@]+"${arr[@]}"} form expands to nothing instead of erroring.
+  #
+  # Both CLIs read stdin on startup to detect piped input. Started from a
+  # script, stdin is whatever the script inherited — the preflight `read` may
+  # have left it in an odd state — and the TUI then waits instead of running.
+  # Handing it the terminal explicitly avoids that.
+  # /dev/tty can exist as a node yet not be openable (no controlling
+  # terminal, e.g. under CI or a sandbox) — so test opening it, not -e.
+  local redir_tty=0
+  if (: < /dev/tty) 2>/dev/null; then redir_tty=1; fi
+
   case "$agent" in
     claude)
       if [ -n "${RUN_AI_CLAUDE_ARGS:-}" ]; then
@@ -487,7 +499,12 @@ run_agent() {
         extra=($RUN_AI_CLAUDE_ARGS)
       fi
       info "claude --model $model   (effort=$effort via thinking directive)"
-      claude --model "$model" ${extra[@]+"${extra[@]}"} "$(cat "$prompt_file")"
+      info "prompt: $prompt_file"
+      if [ "$redir_tty" -eq 1 ]; then
+        claude --model "$model" ${extra[@]+"${extra[@]}"} "$kick" < /dev/tty
+      else
+        claude --model "$model" ${extra[@]+"${extra[@]}"} "$kick"
+      fi
       ;;
     codex)
       if [ -n "${RUN_AI_CODEX_ARGS:-}" ]; then
@@ -495,28 +512,30 @@ run_agent() {
         extra=($RUN_AI_CODEX_ARGS)
       fi
       info "codex -m $model -c model_reasoning_effort=$effort   (interactive TUI)"
-      codex -m "$model" -c model_reasoning_effort="$effort" \
-        ${extra[@]+"${extra[@]}"} "$(cat "$prompt_file")"
+      info "prompt: $prompt_file"
+      if [ "$redir_tty" -eq 1 ]; then
+        codex -m "$model" -c model_reasoning_effort="$effort" \
+          ${extra[@]+"${extra[@]}"} "$kick" < /dev/tty
+      else
+        codex -m "$model" -c model_reasoning_effort="$effort" \
+          ${extra[@]+"${extra[@]}"} "$kick"
+      fi
       ;;
   esac
 }
 
-TMP_FILES=()
+# Prompts are written to files, not passed on argv. A multi-kilobyte markdown
+# string as a positional argument does not reliably reach the agent's TUI —
+# the session opens and then just sits there. The file is kept afterwards so
+# you can read exactly what the agent was told.
+PROMPT_DIR="docs/ai-prompts/runs"
 new_prompt() {
-  local f
-  f="$(mktemp "${TMPDIR:-/tmp}/run-ai-task.XXXXXX.md")"
-  TMP_FILES+=("$f")
+  local phase="$1" f
+  mkdir -p "$PROMPT_DIR"
+  f="${PROMPT_DIR}/${SERIES_DATE}-${TASK_NN}${STAGE:+-s$STAGE}-${phase}-$(date +%Y%m%d-%H%M%S).md"
+  : > "$f"
   printf '%s' "$f"
 }
-cleanup() {
-  local s=$?
-  # same bash 3.2 caveat as in run_agent. `rm -f` with no operands is a
-  # no-op per POSIX, so no count check is needed. `|| true` keeps the trap
-  # from overwriting the real exit status.
-  rm -f ${TMP_FILES[@]+"${TMP_FILES[@]}"} 2>/dev/null || true
-  return "$s"
-}
-trap cleanup EXIT
 
 # ---------------------------------------------------------------------------
 # branch
@@ -556,10 +575,10 @@ fi
 # ---------------------------------------------------------------------------
 
 if [ "$REVIEW_ONLY" -ne 1 ]; then
-  IMPL_PROMPT="$(new_prompt)"
+  IMPL_PROMPT="$(new_prompt implement)"
   {
     cat <<EOF
-# Work package ${TASK_NN}: ${PKG_TITLE}
+# ${PKG_TITLE}
 
 Read \`AGENTS.md\` first.
 
@@ -620,7 +639,7 @@ if [ -n "$(git log --oneline "${BASE_BRANCH}..HEAD" 2>/dev/null)" ]; then
     [ -n "$f" ] || continue
     # ignore artefacts the run itself produces
     case "$f" in
-      docs/ai-results/*|docs/ai-reviews/*|docs/handoff*|docs/ai-tasks/*) continue ;;
+      docs/ai-results/*|docs/ai-reviews/*|docs/ai-prompts/*|docs/handoff*|docs/ai-tasks/*) continue ;;
     esac
     # a file counts as in scope if its path, basename or class name appears in the package
     base="$(basename "$f")"
@@ -663,10 +682,10 @@ EOF
 # ---------------------------------------------------------------------------
 
 if [ "$DO_REVIEW" -eq 1 ]; then
-  REVIEW_PROMPT="$(new_prompt)"
+  REVIEW_PROMPT="$(new_prompt review)"
   {
     cat <<EOF
-# Cross-review of work package ${TASK_NN}: ${PKG_TITLE}
+# Cross-review: ${PKG_TITLE}
 
 \`${AGENT}\` implemented this package. You are the independent reviewer.
 Read \`AGENTS.md\` first.
@@ -767,7 +786,7 @@ fi
 # ---------------------------------------------------------------------------
 
 if [ "$DO_FIX" -eq 1 ] && [ "$DO_REVIEW" -eq 1 ]; then
-  FIX_PROMPT="$(new_prompt)"
+  FIX_PROMPT="$(new_prompt fix)"
   {
     cat <<EOF
 # Fix critical review findings — package ${TASK_NN}
