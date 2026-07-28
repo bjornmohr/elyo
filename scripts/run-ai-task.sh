@@ -477,18 +477,26 @@ EOF
 run_agent() {
   local agent="$1" model="$2" effort="$3" prompt_file="$4"
   local extra=()
+  # NOTE: "${extra[@]}" on an empty array is an "unbound variable" error under
+  # `set -u` in bash < 4.4 — which is what macOS ships (3.2). The
+  # ${arr[@]+"${arr[@]}"} form expands to nothing instead of erroring.
   case "$agent" in
     claude)
-      # shellcheck disable=SC2206
-      [ -n "${RUN_AI_CLAUDE_ARGS:-}" ] && extra=($RUN_AI_CLAUDE_ARGS)
+      if [ -n "${RUN_AI_CLAUDE_ARGS:-}" ]; then
+        # shellcheck disable=SC2206
+        extra=($RUN_AI_CLAUDE_ARGS)
+      fi
       info "claude --model $model   (effort=$effort via thinking directive)"
-      claude --model "$model" "${extra[@]}" "$(cat "$prompt_file")"
+      claude --model "$model" ${extra[@]+"${extra[@]}"} "$(cat "$prompt_file")"
       ;;
     codex)
-      # shellcheck disable=SC2206
-      [ -n "${RUN_AI_CODEX_ARGS:-}" ] && extra=($RUN_AI_CODEX_ARGS)
+      if [ -n "${RUN_AI_CODEX_ARGS:-}" ]; then
+        # shellcheck disable=SC2206
+        extra=($RUN_AI_CODEX_ARGS)
+      fi
       info "codex -m $model -c model_reasoning_effort=$effort   (interactive TUI)"
-      codex -m "$model" -c model_reasoning_effort="$effort" "${extra[@]}" "$(cat "$prompt_file")"
+      codex -m "$model" -c model_reasoning_effort="$effort" \
+        ${extra[@]+"${extra[@]}"} "$(cat "$prompt_file")"
       ;;
   esac
 }
@@ -502,7 +510,10 @@ new_prompt() {
 }
 cleanup() {
   local s=$?
-  [ "${#TMP_FILES[@]}" -gt 0 ] && rm -f "${TMP_FILES[@]}"
+  # same bash 3.2 caveat as in run_agent. `rm -f` with no operands is a
+  # no-op per POSIX, so no count check is needed. `|| true` keeps the trap
+  # from overwriting the real exit status.
+  rm -f ${TMP_FILES[@]+"${TMP_FILES[@]}"} 2>/dev/null || true
   return "$s"
 }
 trap cleanup EXIT
