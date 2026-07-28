@@ -185,7 +185,7 @@ The important services are:
 - `web`: Angular frontend on <http://localhost:4200>
 - `nginx`: single API entry point on <http://localhost:8080>
 - `api-identity`, `api-employee`, `api-company`: the three Laravel runtimes
-- `api-tooling`: local-only container for tests and artisan commands
+- `api-tooling`: local-only container for tests and artisan commands (profile `tools`, not started by plain `docker compose up`)
 - `postgres`: PostgreSQL database on local port `5432`
 - `redis`: Redis on local port `6379`
 - `mailpit`: test mailbox UI on <http://localhost:8025>
@@ -204,7 +204,7 @@ receives only the PostgreSQL credentials its own domain needs.
 | `api-employee` | `employee` | `/api/employee/*`, `/api/health` | `elyo_employee_rt` (identity read, health, audit), `elyo_mapping_svc` (mapping) |
 | `api-company` | `company` | `/api/company/*`, `/api/health` | `elyo_company_rt` (identity, audit) |
 | `migrate` | `full` | one-shot schema + seed | `elyo_migrator` |
-| `api-tooling` | `full` | tests and artisan, local only | all runtime roles + `elyo_migrator` |
+| `api-tooling` | `full` | tests and artisan, local only, profile `tools` | all runtime roles + `elyo_migrator` |
 
 `nginx` routes by path prefix, so the frontend keeps one base URL
 (`http://localhost:8080/api`) and knows nothing about the split. A runtime that
@@ -213,7 +213,17 @@ aggregator container and no runtime-to-runtime traffic.
 
 `api-tooling` exists because the test suite needs every route and every
 connection, which only `ELYO_RUNTIME=full` provides. It has no published port and
-no nginx upstream. It is a development convenience and is never deployed.
+no nginx upstream. It is a development convenience and is never deployed. It
+sits behind the `tools` profile, so plain `docker compose up -d` does not start
+it. Start it explicitly before using it:
+
+```bash
+docker compose --profile tools up -d api-tooling
+```
+
+`docker compose run` activates a service's profile automatically; `exec` and
+`up` (without `--profile`) do not, so `docker compose exec api-tooling ...`
+only works once the container above has been started.
 
 Two further services are prepared but not implemented; they start idle
 placeholders and are not wired into nginx:
@@ -339,9 +349,12 @@ docker compose up -d --build
 
 Run Laravel commands. Tests and cross-domain artisan commands go to
 `api-tooling`, because only `ELYO_RUNTIME=full` registers every route and
-connection:
+connection. `api-tooling` sits behind the `tools` profile, so start it once
+per session (`make test`, `make test-boundary` and `make deptrac` already do
+this for you):
 
 ```bash
+docker compose --profile tools up -d api-tooling
 docker compose exec api-tooling php artisan test
 docker compose exec api-tooling php artisan test --testsuite=boundary
 docker compose exec api-tooling composer deptrac

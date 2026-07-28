@@ -177,6 +177,7 @@ services:
   # has no ports, no nginx upstream and no place in any deployed topology.
   api-tooling:
     <<: *api-build
+    profiles: ["tools"]
     environment:
       <<: *api-env
       ELYO_RUNTIME: full

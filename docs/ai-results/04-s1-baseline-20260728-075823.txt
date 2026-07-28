@@ -1,0 +1,597 @@
+# Baseline before package 04
+
+commit: 6972344f2bb59f3af99bc2e6cc18e01a97ef068f
+
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\ExampleTest[39m
+  [32;1m✓[39;22m[90m [39m[90mthat true is true[39m
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\Health\LabMarkerServiceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mstatus is derived from the catalog orientation range with data set[39m[90m… [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstatus is derived from the catalog orientation range with data set "on the lower bound"[39m
+  [32;1m✓[39;22m[90m [39m[90mstatus is derived from the catalog orientation range with data set "between both bounds"[39m
+  [32;1m✓[39;22m[90m [39m[90mstatus is derived from the catalog orientation range with data set "on the upper bound"[39m
+  [32;1m✓[39;22m[90m [39m[90mstatus is derived from the catalog orientation range with data set "above the upper bound"[39m
+  [32;1m✓[39;22m[90m [39m[90mstatus ignores bounds the catalog leaves open with data set "no lower bound, value under the upper bound"[39m
+  [32;1m✓[39;22m[90m [39m[90mstatus ignores bounds the catalog leaves open with data set "no lower bound, value over the upper bound"[39m
+  [32;1m✓[39;22m[90m [39m[90mstatus ignores bounds the catalog leaves open with data set "no upper bound, value over the lower bound"[39m
+  [32;1m✓[39;22m[90m [39m[90mstatus ignores bounds the catalog leaves open with data set "no upper bound, value under the lower bound"[39m
+  [32;1m✓[39;22m[90m [39m[90mstatus ignores bounds the catalog leaves open with data set "no bounds at all"[39m
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\Http\Resources\Company\ReportingPendingResourceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mreserved contract fields cannot be overridden[39m
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\Privacy\AuditLoggerContractTest[39m
+  [32;1m✓[39;22m[90m [39m[90maudit contract uses typed operation and actor context[39m
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\Privacy\MappingCryptographyTest[39m
+  [32;1m✓[39;22m[90m [39m[90muser id hmac is deterministic sha256 with the dedicated key[39m
+  [32;1m✓[39;22m[90m [39m[90muser id encryption round trips with the dedicated key[39m
+  [32;1m✓[39;22m[90m [39m[90msubject id derivation is isolated from the lookup hmac key[39m
+  [32;1m✓[39;22m[90m [39m[90mmapping keys must be independent from each other and app key with data set "encryption and lookup"[39m
+  [32;1m✓[39;22m[90m [39m[90mmapping keys must be independent from each other and app key with data set "encryption and subject"[39m
+  [32;1m✓[39;22m[90m [39m[90mmapping keys must be independent from each other and app key with data set "lookup and subject"[39m
+  [32;1m✓[39;22m[90m [39m[90mmapping keys must be independent from each other and app key with data set "encryption and app"[39m
+  [32;1m✓[39;22m[90m [39m[90mmapping keys must be independent from each other and app key with data set "lookup and app"[39m
+  [32;1m✓[39;22m[90m [39m[90mmapping keys must be independent from each other and app key with data set "subject and app"[39m
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\Privacy\MappingServicePurposeTest[39m
+  [32;1m✓[39;22m[90m [39m[90moperations reject invalid purpose codes with data set "provision requires provisioning"[39m
+  [32;1m✓[39;22m[90m [39m[90moperations reject invalid purpose codes with data set "resolve rejects provisioning"[39m
+  [32;1m✓[39;22m[90m [39m[90moperations reject invalid purpose codes with data set "revoke requires revocation"[39m
+  [32;1m✓[39;22m[90m [39m[90moperations reject invalid purpose codes with data set "reporting requires reporting"[39m
+  [32;1m✓[39;22m[90m [39m[90moperations reject invalid purpose codes with data set "data subject request requires dsr"[39m
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\Services\Company\AnonymityThresholdTest[39m
+  [32;1m✓[39;22m[90m [39m[90mit uses the company threshold when configured[39m
+  [32;1m✓[39;22m[90m [39m[90mit uses the default threshold when not configured[39m
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\Support\AssertsNoWellbeingValuesTest[39m
+  [32;1m✓[39;22m[90m [39m[90massertion rejects an unexpected numeric value under a generic field[39m[90m…[39m [90m0.55s[39m  
+  [32;1m✓[39;22m[90m [39m[90massertion rejects an unexpected numeric string under a generic fiel[39m[90m…[39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90massertion allows an explicitly allowlisted identity numeric string[39m[90m  [39m [90m0.02s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\AdminSystemExerciseTest[39m
+  [32;1m✓[39;22m[90m [39m[90mplatform admin can list exercises[39m[90m                                   [39m [90m0.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90munauthenticated user cannot list exercises[39m[90m                          [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot list exercises[39m[90m                                      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin cannot list exercises[39m[90m                                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany manager cannot list exercises[39m[90m                               [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin cannot create exercise[39m[90m                                [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot list tags[39m[90m                                           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist returns expected fields including tags[39m[90m                         [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist sorts newest first[39m[90m                                             [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist filters by search across fields[39m[90m                                [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist filters by status[39m[90m                                              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist filters by exercise type[39m[90m                                       [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist filters by difficulty[39m[90m                                          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist filters by tag category and key on same tag[39m[90m                    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist rejects invalid status filter[39m[90m                                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist rejects invalid tag category filter[39m[90m                            [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist paginates[39m[90m                                                      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mplatform admin can view exercise detail[39m[90m                             [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdetail returns 404 for unknown exercise[39m[90m                             [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mplatform admin can create exercise[39m[90m                                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate generates unique slug on collision[39m[90m                           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects invalid enum values[39m[90m                                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects invalid numeric values[39m[90m                               [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects unknown tag ids[39m[90m                                      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mplatform admin can update exercise[39m[90m                                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mslug remains stable when title changes[39m[90m                              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mupdate syncs tags exactly when tag ids present[39m[90m                      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mupdate without tag ids leaves tags untouched[39m[90m                        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mupdate rejects invalid enum values[39m[90m                                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mplatform admin can archive exercise[39m[90m                                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90marchive is idempotent[39m[90m                                               [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90marchive does not delete exercise or detach relationships[39m[90m            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mno hard delete route exists[39m[90m                                         [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mplatform admin can list tags sorted[39m[90m                                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtag list filters work[39m[90m                                               [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mno tag mutation routes exist[39m[90m                                        [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\AdminSystemMeasureTemplateTest[39m
+  [32;1m✓[39;22m[90m [39m[90mplatform admin can list templates[39m[90m                                   [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90melyo support can list templates[39m[90m                                     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90munauthenticated user cannot list templates[39m[90m                          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot list templates[39m[90m                                      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin cannot list templates[39m[90m                                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany manager cannot create template[39m[90m                              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot manage template exercises[39m[90m                           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist returns expected fields and pagination shape[39m[90m                   [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist sorts newest first[39m[90m                                             [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist filters by search across text fields and slug[39m[90m                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist filters by status[39m[90m                                              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist filters by category[39m[90m                                            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist filters by difficulty[39m[90m                                          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist filters by is featured[39m[90m                                         [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist rejects invalid filter values[39m[90m                                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mplatform admin can create template with generated slug[39m[90m              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate defaults category status and featured flag[39m[90m                   [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate ignores client provided slug[39m[90m                                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mslug collision gets numeric suffix[39m[90m                                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects invalid enum values[39m[90m                                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects invalid numeric values[39m[90m                               [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mplatform admin can update template[39m[90m                                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mslug remains stable when title changes[39m[90m                              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mupdate rejects invalid values[39m[90m                                       [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdetail returns exercises ordered by sort order[39m[90m                      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mplatform admin can archive template[39m[90m                                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90marchive is idempotent and does not delete or detach[39m[90m                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mplatform admin can add active exercise and it appends at end[39m[90m        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90madding archived exercise is rejected[39m[90m                                [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90madding duplicate exercise is rejected[39m[90m                               [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mduplicate template exercise is enforced by db unique constraint[39m[90m     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90madding with unknown exercise id is rejected[39m[90m                         [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90madding with taken sort order is rejected[39m[90m                            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mplatform admin can update template exercise overrides[39m[90m               [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mupdating template exercise does not change underlying exercise[39m[90m      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mupdating template exercise of another template returns 404[39m[90m          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mplatform admin can remove template exercise without deleting system[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mremoving template exercise of another template returns 404[39m[90m          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mvalid complete reorder succeeds[39m[90m                                     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpartial reorder payload is rejected and positions unchanged[39m[90m         [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreorder with duplicate sort orders is rejected and positions unchan[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreorder with foreign template exercise id returns 404 and positions[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreorder swap does not violate unique position constraint[39m[90m            [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\AuthTest[39m
+  [32;1m✓[39;22m[90m [39m[90muser can login with correct credentials[39m[90m                             [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90muser cannot login with incorrect password[39m[90m                           [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlogin requires email and password[39m[90m                                   [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlogin does not reveal email existence[39m[90m                               [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90minactive user cannot login[39m[90m                                          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlogin to company portal fails for employee only user[39m[90m                [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin in real company can login to employee portal[39m[90m          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager only user without team layer does not get company portal[39m[90m    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager employee user without team layer can access employee dashbo[39m[90m…[39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager only user with team layer gets company portal[39m[90m               [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany portal eligibility does not require preloaded company relat[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin without team layer keeps company portal[39m[90m               [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mplain employee only gets employee portal[39m[90m                            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90melyo platform user does not get employee portal from internal compa[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager only user without team layer cannot request company portal[39m[90m  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauthenticated user can get me info[39m[90m                                  [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany defaults to team layer disabled[39m[90m                             [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauth responses include team layer enabled[39m[90m                           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90melyo admin can create company[39m[90m                                       [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90melyo admin can create company with team layer enabled[39m[90m               [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90melyo admin can update company team layer setting[39m[90m                    [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon admin cannot create company[39m[90m                                     [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot create company[39m[90m                                      [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90melyo admin can invite first company admin[39m[90m                           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90melyo admin can manage points config[39m[90m                                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin can invite employee[39m[90m                                   [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin can invite employee without team when team layer disa[39m[90m…[39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin cannot send team id when team layer disabled[39m[90m          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin cannot invite manager when team layer disabled[39m[90m        [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin can create employee invite with valid same company te[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany owner invite creation is rejected by validation[39m[90m             [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany invitations list includes team id for team scoped invites[39m[90m   [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvite creation rejects foreign company team[39m[90m                        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager can invite employee only into managed team[39m[90m                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager cannot invite when team layer disabled[39m[90m                      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager cannot invite into unmanaged team[39m[90m                           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin can create and accept manager invite with team affili[39m[90m…[39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager cannot invite non employee roles[39m[90m                            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin cannot invite into another company[39m[90m                    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot invite users[39m[90m                                        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot access company dashboard[39m[90m                            [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin cannot access another companys data[39m[90m                   [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvite accept creates user with correct role[39m[90m                        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvite accept succeeds after provisioning failure and command repai[39m[90m…[39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvite acceptance creates new user with invite team id[39m[90m              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforged request team id during invite accept is ignored[39m[90m              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvite acceptance rejects invite with foreign team id without mutat[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvite acceptance rejects existing user invite with foreign team id[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvite accept cannot override role[39m[90m                                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvite accept cannot override company[39m[90m                               [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90minvite for email already in another company is rejected[39m[90m             [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexisting user with different team accepting team invite is rejected[39m[90m [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexpired invite cannot be accepted[39m[90m                                   [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mused invite cannot be accepted twice[39m[90m                                [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\CompanyTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcompany dashboard wellbeing blocks report reporting pending[39m[90m         [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90maffected company reporting endpoints expose no wellbeing values[39m[90m     [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager scoping to team[39m[90m                                             [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90msurvey results anonymity threshold[39m[90m                                  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msurvey results show scale distribution when all buckets meet thresh[39m[90m…[39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager only sees survey results for their team[39m[90m                     [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msurvey results suppress small multiple choice buckets[39m[90m               [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90msurvey results show multiple choice distribution when all buckets m[39m[90m…[39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msurvey results suppress yes no minority split[39m[90m                       [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90msurvey results show yes no split when all buckets meet threshold[39m[90m    [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msurvey results suppress small scale distribution buckets[39m[90m            [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90msurvey results suppress question when answer count is below thresho[39m[90m…[39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreports return reporting pending without a reporting source[39m[90m         [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdraft surveys can be edited and activated by allowed owner[39m[90m          [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure creation and transitions[39m[90m                                    [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure creation accepts domain fields and derives visibility scope[39m[90m [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure creation uses domain field defaults[39m[90m                         [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure creation requires valid required fields[39m[90m                     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure creation rejects end at or before start at[39m[90m                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure creation derives duration for existing scheduled execution[39m[90m… [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure creation keeps manual duration for non scheduled execution[39m[90m… [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin can rotate measure checkin token without storing plai[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mactive token uniqueness guaranteed by database constraint[39m[90m           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany cannot rotate checkin token for self report measure without[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany cannot rotate checkin token for inactive or foreign measure[39m[90m [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager can only rotate checkin token for managed team measure[39m[90m      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure update accepts domain fields without bypassing status trans[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure update derives duration for scheduled execution types[39m[90m       [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtitle only update does not rewrite duration for scheduled execution[39m[90m…[39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mscheduled measure keeps manual duration when schedule window is inc[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure update clears derived duration when schedule boundary is cl[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstatus only update on completed or dismissed scheduled measure retu[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompleted and dismissed measures reject mutable edits[39m[90m               [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure update preserves company and manager scope[39m[90m                  [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure creation allows qr code verification requirement[39m[90m            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure creation rejects unsupported verification requirements[39m[90m      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure update allows qr code verification requirement[39m[90m              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure update rejects verification requirement change after partic[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure update rejects unsupported verification requirements[39m[90m        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure update does not allow client to change origin[39m[90m               [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure update rejects partial ends at before existing starts at[39m[90m    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure update rejects partial ends at equal to existing starts at[39m[90m  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure update rejects partial starts at after existing ends at[39m[90m     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager patch outside managed team returns 403 before date validati[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforeign company patch returns 404 before date validation[39m[90m            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90min scope manager patch with invalid partial date returns 422[39m[90m        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure update accepts valid partial date range[39m[90m                     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure schedule accepts explicit timezone offsets and stores utc[39m[90m   [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure domain field validation rejects invalid values[39m[90m              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager can see global and managed team measures[39m[90m                    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany can create team with manager and survey with dates[39m[90m          [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam list returns empty collection when team layer is disabled[39m[90m      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam management endpoints are rejected when team layer is disabled[39m[90m  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany dashboard still works without team metadata when team layer[39m[90m…[39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam scoped reporting is rejected when team layer disabled[39m[90m          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager only user without team layer cannot access company dashboar[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager only user without team layer cannot access company surveys[39m[90m  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager only user with team layer can access company dashboard[39m[90m      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mplain employee cannot access company routes[39m[90m                         [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager employee user without team layer can still access employee[39m[90m… [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msurvey team targeting is rejected when team layer disabled[39m[90m          [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany wide survey results still work when team layer disabled[39m[90m     [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam scoped survey results are rejected when team layer disabled[39m[90m    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure team targeting is rejected when team layer disabled[39m[90m         [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam scoped measure update is rejected when team layer disabled[39m[90m     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany survey show is rejected when team layer disabled and survey[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam members endpoint returns only matching team and company users[39m[90m  [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager can view only managed team directory members without health[39m[90m…[39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager cannot view unmanaged team members[39m[90m                          [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\DatabaseMigrationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mmigrations run successfully[39m[90m                                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcan create core models[39m[90m                                              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90muser factory creates users with company[39m[90m                             [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mplatform admin factory uses internal platform company[39m[90m               [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreating user without company id fails at database level[39m[90m            [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreating invite token without company id fails at database level[39m[90m    [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany with users cannot be deleted[39m[90m                                [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mseeded users have valid company assignments[39m[90m                         [39m [90m0.18s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Employee\LabMarkerEndpointTest[39m
+  [32;1m✓[39;22m[90m [39m[90mlist returns the latest reading per marker with the contract field[39m[90m… [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist is empty when the employee has no readings[39m[90m                     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist excludes another employees readings[39m[90m                            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhistory is chronological and paginated[39m[90m                              [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhistory of a known marker without readings is an empty list[39m[90m         [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhistory of an unknown marker is not found[39m[90m                           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhistory rejects a per page outside the contract bounds[39m[90m              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhistory excludes another employees readings[39m[90m                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpost creates a manual reading for the caller[39m[90m                        [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpost rejects a client supplied source[39m[90m                               [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpost rejects invalid payloads with data set "missing marker key"[39m[90m    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpost rejects invalid payloads with data set "non numeric value"[39m[90m     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpost rejects invalid payloads with data set "negative value"[39m[90m        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpost rejects invalid payloads with data set "more than four decimal[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpost rejects invalid payloads with data set "value above storage ma[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpost rejects invalid payloads with data set "missing value"[39m[90m         [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpost rejects invalid payloads with data set "missing measurement da[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpost rejects invalid payloads with data set "malformed measurement[39m[90m… [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpost rejects a measurement date in the future[39m[90m                       [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpost is not found for an unknown marker[39m[90m                             [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpost is not found for an inactive marker[39m[90m                            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelete removes an own reading[39m[90m                                       [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelete of a foreign reading is not found and keeps the row[39m[90m          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelete of an unknown reading is indistinguishable from a foreign on[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon employee roles are forbidden on every lab route with data set "[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon employee roles are forbidden on every lab route with data set "[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon employee roles are forbidden on every lab route with data set "[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon employee roles are forbidden on every lab route with data set "[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon employee roles are forbidden on every lab route with data set "[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnon employee roles are forbidden on every lab route with data set "[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90munauthenticated requests are rejected on every lab route[39m[90m            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mno company admin or reporting route exposes lab markers[39m[90m             [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\EmployeeTest[39m
+  [32;1m✓[39;22m[90m [39m[90memployee can get dashboard data[39m[90m                                     [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee can submit checkin[39m[90m                                         [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckin response does not expose the health subject[39m[90m                 [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckin rejects values outside the canonical scale[39m[90m                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckin rejects every supplied note value instead of dropping it[39m[90m    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheckin repairs a missing subject mapping[39m[90m                           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee can submit checkin only once per day[39m[90m                       [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexisting daily wellbeing entry blocks new checkin[39m[90m                   [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrejected duplicate checkin does not award points or update streak[39m[90m   [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90msubmit checkin returns null when database unique constraint is hit[39m[90m  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdaily streak is one when only today exists[39m[90m                          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mworkday streak counts friday and monday as consecutive[39m[90m              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mworkday streak counts thursday friday and monday[39m[90m                    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mworkday streak is one when friday is missing[39m[90m                        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mweekend entries do not extend workday streak[39m[90m                        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mweekend gaps do not break workday streak[39m[90m                            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmalformed daily period keys do not affect workday streak[39m[90m            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mweekend only checkins do not produce workday streak[39m[90m                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdaily streak uses seeded wellbeing entries without point transactio[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstreak 7days milestone is awarded when user reaches seven workdays[39m[90m  [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstreak 7days milestone is not awarded again for same user[39m[90m           [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstreak 30days milestone is not awarded again for same user[39m[90m          [39m [90m0.06s[39m  
+  [32;1m✓[39;22m[90m [39m[90manother users milestone transaction does not block current user[39m[90m     [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdaily streak ignores entries from another user[39m[90m                      [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee can get history[39m[90m                                            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhistory entries expose ulid ids on the canonical scale[39m[90m              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee can update profile[39m[90m                                         [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee can list surveys[39m[90m                                           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee can get survey details[39m[90m                                     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee can respond to survey[39m[90m                                      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee team targeted surveys are not available when team layer is[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee can always view own survey result[39m[90m                          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee own result accessible for team scoped survey when team lay[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee can list relevant measures[39m[90m                                 [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee measure list exposes measure domain fields[39m[90m                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee measure list includes authenticated employee participation[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee measure list does not expose other users participation sta[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee can participate in active company wide measure[39m[90m             [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee can participate in active team measure for own team[39m[90m        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot self report qr required measure[39m[90m                     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot participate in measure from another company[39m[90m         [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot participate in measure for another team[39m[90m             [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot participate in inactive visible measures[39m[90m            [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mduplicate measure participation returns conflict and does not award[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee can redeem measure checkin token for qr participation[39m[90m      [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot redeem qr checkin for self report measure[39m[90m           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot redeem revoked measure checkin token[39m[90m                [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot redeem expired measure checkin token[39m[90m                [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot redeem not yet valid measure checkin token[39m[90m          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot redeem qr checkin for inactive measure[39m[90m              [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot redeem qr checkin for other company or team[39m[90m         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqr checkin duplicate does not award points twice[39m[90m                    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure participation derives identity from authenticated employee[39m[90m… [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany user cannot use employee measure participation endpoint[39m[90m     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown qr checkin token returns not found[39m[90m                          [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforeign company token masks lifecycle state[39m[90m                         [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mwrong team token masks lifecycle state[39m[90m                              [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee can upload medical pdf[39m[90m                                     [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\ExampleTest[39m
+  [32;1m✓[39;22m[90m [39m[90mthe application returns a successful response[39m[90m                       [39m [90m0.05s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Health\EmployeeHealthProfileTest[39m
+  [32;1m✓[39;22m[90m [39m[90mprofile round trip returns the stored anamnesis[39m[90m                     [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mupdating the anamnesis twice keeps a single subject scoped profile[39m[90m  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfirst profile write recovers when a concurrent insert wins the race[39m[90m [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90muploaded document is returned by the profile endpoint with a ulid i[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdocument storage path carries no identity data[39m[90m                      [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot reach another subjects anamnesis or documents[39m[90m       [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mno company or admin route exposes anamnesis or documents[39m[90m            [39m [90m0.02s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Health\LabMarkerSchemaTest[39m
+  [32;1m✓[39;22m[90m [39m[90mlab readings schema is health subject only and history capable[39m[90m      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlab marker catalog avoids the reserved group column name[39m[90m            [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mproduction code does not reference the demo lab marker model[39m[90m        [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Health\LabMarkerSeederTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcatalog contains the complete demo reference marker set[39m[90m             [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mre seeding the catalog keeps the original creation timestamp[39m[90m        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdemo employee gets synthetic history through the health subject[39m[90m     [39m [90m0.14s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Health\LabMarkerServiceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mreadings are appended and history is chronological[39m[90m                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlatest per marker uses created at for same day duplicates[39m[90m           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlatest per marker never returns another subjects readings[39m[90m           [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhistory never returns another subjects readings[39m[90m                     [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhistory of a known marker without readings is empty[39m[90m                 [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mhistory of an unknown marker is rejected[39m[90m                            [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelete only removes a reading owned by the subject[39m[90m                  [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects values outside generic numeric bounds with data set[39m[90m… [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects values outside generic numeric bounds with data set[39m[90m… [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects values outside generic numeric bounds with data set[39m[90m… [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects values outside generic numeric bounds with data set[39m[90m… [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate accepts zero for a marker whose range starts at zero[39m[90m         [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects a missing or invalid measurement date with data set[39m[90m… [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects a missing or invalid measurement date with data set[39m[90m… [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects a missing or invalid measurement date with data set[39m[90m… [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects a measurement date in the future[39m[90m                     [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects an unknown source[39m[90m                                    [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects an unknown marker key[39m[90m                                [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcreate rejects an inactive marker[39m[90m                                   [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeleting a subject removes its readings[39m[90m                             [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Health\WearableServiceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mterra auth webhook stores the connection on the health subject[39m[90m      [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrepeated terra auth webhooks keep one connection per subject and so[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mauth webhook without a reference id writes nothing[39m[90m                  [39m [90m0.02s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Health\WellbeingCheckinAuditTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcheckin audits its mapping resolution with a write purpose[39m[90m          [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mduplicate checkin still resolves its mapping with a write purpose[39m[90m   [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrepairing a missing mapping is audited as provisioning[39m[90m              [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\IntegrationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mpartner registration and login[39m[90m                                      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90madmin can review partner[39m[90m                                            [39m [90m0.02s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\MeasureParticipationPersistenceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mfactory defaults create tenant consistent company wide participatio[39m[90m…[39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam measure factory state creates tenant consistent participation[39m[90m  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfactory derives team context from partial measure override[39m[90m          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfactory explicit overrides do not create unused tenant records[39m[90m      [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure participation can be created with team context[39m[90m              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90muser cannot have duplicate participation for same measure[39m[90m           [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmeasure can have many participations[39m[90m                                [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90muser can have many measure participations[39m[90m                           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany and team denormalization is persisted[39m[90m                       [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mnullable team id works for company wide measure[39m[90m                     [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforeign key constraints reject unknown references[39m[90m                   [39m [90m0.02s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\MeasureParticipationSummaryTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcompany admin can fetch measure participation summary[39m[90m               [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90msummary suppresses counts when anonymity threshold is not met[39m[90m       [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin cannot fetch foreign company measure summary[39m[90m          [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam specific summary counts only target team scope[39m[90m                 [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager summary for company wide measure is scoped to managed team[39m[90m  [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager summary counts participants through current managed team sc[39m[90m…[39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager cannot fetch summary for other team measure[39m[90m                 [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mteam specific measure summary is blocked when team layer is disable[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanager without managed team cannot fetch measure participation sum[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot access company measure participation summary[39m[90m        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mqr participations remain aggregate only in summary[39m[90m                  [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\MeasureParticipationTestEnvironmentIsolationTest[39m
+  [32;1m✓[39;22m[90m [39m[90mfiltered tests use isolated postgres databases with expected roles[39m[90m  [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Privacy\AccountDeletionServiceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdelete user removes only the users health and identity data then re[39m[90m…[39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelete user resumes after health deletion when identity deletion fa[39m[90m…[39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelete user keeps mapping active when summary audit fails then retr[39m[90m…[39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery subject keyed health table is covered by the deletion service[39m[90m [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdelete user fails loudly when the mapping was revoked without delet[39m[90m…[39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Privacy\DatabaseAuditLoggerTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcontainer uses the database audit logger[39m[90m                            [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90msuccessful resolve creates exactly one audit event without plaintex[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmissing resolve creates exactly one denied event[39m[90m                    [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdatabase rejects an event containing both reference types[39m[90m           [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90maudit database write failure blocks a resolve[39m[90m                       [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbackfill writes one run summary in addition to per subject events[39m[90m   [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning state has its own event type[39m[90m                           [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90maudit write failure rolls back a new provision[39m[90m                      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90maudit write failure rolls back a revocation[39m[90m                         [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Privacy\DemoDataSeederSubjectProvisioningTest[39m
+  [32;1m✓[39;22m[90m [39m[90mevery seeded identity has a stable health subject across reruns[39m[90m     [39m [90m0.26s[39m  
+  [32;1m✓[39;22m[90m [39m[90mseeded wellbeing entries use daily period keys[39m[90m                      [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90msubject provisioning failure does not expose identifiers[39m[90m            [39m [90m0.04s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Privacy\EnforceRetentionDeletionTest[39m
+  [32;1m✓[39;22m[90m [39m[90mretention command defaults to count only dry run without identifier[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mretention command deletes expired rows and files only with execute[39m[90m  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mretention command deletes expired documents across chunk boundaries[39m[90m [39m [90m0.44s[39m  
+  [32;1m✓[39;22m[90m [39m[90mretention command leaves no metadata for a deleted file when a late[39m[90m…[39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Privacy\MappingServiceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcontainer resolves mapping service with dedicated keys[39m[90m              [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcontainer keeps subject derivation separate from lookup hmac[39m[90m        [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning is idempotent and persists only an encrypted user id[39m[90m   [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning state distinguishes missing active and revoked without[39m[90m…[39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprovisioning state requires the provisioning purpose[39m[90m                [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmapping failure rolls back the subject and retry provisions cleanly[39m[90m [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconcurrent mapping insert returns the winning active mapping[39m[90m        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mresolve and revoke keep a final tombstone[39m[90m                           [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmissing and revoked mappings raise distinct exceptions[39m[90m              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeferred operations throw the dedicated guard exception[39m[90m             [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery operation emits an audit contract without raw identifiers[39m[90m     [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Privacy\ProvisionMissingHealthSubjectsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdry run reports missing users without provisioning[39m[90m                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcommand backfills a missing subject and an idempotent rerun creates[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90morphan mapping for deleted identity does not hide a current missing[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcommand provisions only missing users and reports revoked links as[39m[90m… [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcommand failure output and log do not expose identity or subject de[39m[90m…[39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstate inspection failure output and log do not expose identity or s[39m[90m…[39m [90m0.02s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Runtime\RuntimeProfileBootTest[39m
+  [32;1m✓[39;22m[90m [39m[90midentity runtime registers only identity routes and connections[39m[90m     [39m [90m0.35s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee runtime registers only employee routes and connections[39m[90m     [39m [90m0.36s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany runtime registers only company routes and connections[39m[90m       [39m [90m0.54s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfull runtime preserves all routes and connections in testing[39m[90m        [39m [90m0.33s[39m  
+  [32;1m✓[39;22m[90m [39m[90mempty runtime defaults to full only in local environment[39m[90m            [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown runtime fails boot with clear message[39m[90m                       [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfull runtime fails boot outside local and testing[39m[90m                   [39m [90m0.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcached configuration from another runtime fails boot[39m[90m                [39m [90m0.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknown runtime has no route or connection set[39m
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\SystemMeasureDataModelTest[39m
+  [32;1m✓[39;22m[90m [39m[90msystem exercise can be created with factory defaults[39m[90m                [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90msystem exercise generates slug from title[39m[90m                           [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90msystem exercise slug must be unique[39m[90m                                 [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90msystem exercise can have many tags[39m[90m                                  [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90msystem exercise tag can belong to many exercises[39m[90m                    [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90msystem exercise tag category key must be unique[39m[90m                     [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90msystem measure template can be created with factory defaults[39m[90m        [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtemplate can have exercises with positions[39m[90m                          [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtemplate exercise position is unique per template[39m[90m                   [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdifferent templates can use same exercise[39m[90m                           [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtemplate exercise overrides are stored[39m[90m                              [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90muser system measure snapshots template fields[39m[90m                       [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90muser system measure exercises snapshot exercise data[39m[90m                [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mediting source exercise does not change user snapshot[39m[90m               [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeleting source exercise preserves user snapshot[39m[90m                    [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeleting template preserves user assignment[39m[90m                         [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90muser system measure belongs to user[39m[90m                                 [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany is derived through user[39m[90m                                     [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90muser system measure defaults to assigned status[39m[90m                     [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90muser can have multiple system measures[39m[90m                              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeleting user cascades to user system measures[39m[90m                      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeleting user system measure cascades to exercises[39m[90m                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeleting user system measure exercise cascades to completions[39m[90m       [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeleting system exercise cascades to template exercises[39m[90m             [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeleting template cascades to template exercises[39m[90m                    [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompletion belongs to assigned exercise[39m[90m                             [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompletion user derived through exercise chain[39m[90m                      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexercise completion can store feedback without points[39m[90m               [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexercise can have multiple completions[39m[90m                              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompletion can reference points transaction[39m[90m                         [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdefault completion factory creates consistent data[39m[90m                  [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90msystem exercise seeder creates expected data[39m[90m                        [39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90msystem exercise seeder is idempotent[39m[90m                                [39m [90m0.11s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\TenantScopeTest[39m
+  [32;1m✓[39;22m[90m [39m[90memployee forged user and company ids are ignored on checkin[39m[90m         [39m [90m0.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee forged user id is ignored on profile update[39m[90m                [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee cannot access or respond to other team survey[39m[90m              [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin cannot use foreign team id for measure or report[39m[90m      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin cannot access foreign company resources by route id[39m[90m   [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany manager cannot access non managed team or create out of sco[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany manager users are limited to managed team[39m[90m                   [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany manager can only see and revoke own employee invites[39m[90m        [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforged role or active portal does not bypass backend role middlewar[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mme returns identity but frontend mutation is not authoritative[39m[90m      [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany admin forged company id is ignored when listing users[39m[90m       [39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Boundary\DeptracBoundaryTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdeptrac rejects an http import of subject mapping[39m[90m                   [39m [90m0.46s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeptrac rejects an identity service import of a health model[39m[90m        [39m [90m0.37s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Boundary\HealthSchemaBoundaryTest[39m
+  [32;1m✓[39;22m[90m [39m[90mno health table carries an identity or employer column[39m[90m              [39m [90m0.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mwellbeing entries are keyed on a health subject[39m[90m                     [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmoved health tables are keyed on a health subject[39m[90m                   [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdatabase rejects values outside the canonical scale with data set "[39m[90m…[39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdatabase rejects values outside the canonical scale with data set "[39m[90m…[39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdatabase rejects values outside the canonical scale with data set "[39m[90m…[39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdatabase rejects values outside the canonical scale with data set "[39m[90m…[39m [90m0.02s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Boundary\PostgresRoleBoundaryTest[39m
+  [32;1m✓[39;22m[90m [39m[90midentity runtime cannot read subject mappings[39m[90m                       [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompany runtime cannot connect to health database[39m[90m                   [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmapping runtime can read mapping database[39m[90m                           [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90memployee runtime can read health database[39m[90m                           [39m [90m0.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmapping runtime cannot read identity tables[39m[90m                         [39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90maudit is append only for runtime roles with data set "employee runt[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90maudit is append only for runtime roles with data set "company runti[39m[90m…[39m [90m0.03s[39m  
+  [32;1m✓[39;22m[90m [39m[90maudit is append only for runtime roles with data set "mapping runti[39m[90m…[39m [90m0.03s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Boundary\SourceBoundaryTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcompany and admin http paths have no health read dependency[39m[90m         [39m [90m0.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcode outside mapping service cannot access mapping connection direc[39m[90m…[39m [90m0.08s[39m  
+  [32;1m✓[39;22m[90m [39m[90midentity models have no relation to health domain models[39m[90m            [39m [90m0.02s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Boundary\SubjectMappingStorageBoundaryTest[39m
+  [32;1m✓[39;22m[90m [39m[90msubject mapping stores no plaintext user id[39m[90m                         [39m [90m0.02s[39m  
+
+  [90mTests:[39m    [32;1m509 passed[39;22m[90m (2919 assertions)[39m
+  [90mDuration:[39m [39m19.38s[39m
+
