@@ -99,6 +99,15 @@ Copy the root environment file:
 cp .env.example .env
 ```
 
+`ELYO_IDENTITY_RT_PASSWORD`, `ELYO_EMPLOYEE_RT_PASSWORD`,
+`ELYO_COMPANY_RT_PASSWORD`, `ELYO_MAPPING_SVC_PASSWORD`, and
+`ELYO_MIGRATOR_PASSWORD` in this file are required before Docker Compose can
+start PostgreSQL. Compose fails with the missing variable name; it never falls
+back to a password. Keep local values only in `.env`; provide production values
+through Docker secrets.
+For an existing clone, copy these five variables from `.env.example` into its
+existing `.env` before running the next Docker Compose command.
+
 The default database settings are:
 
 ```env

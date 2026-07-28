@@ -12,17 +12,17 @@
 # every table later created by `elyo_migrator` inherits the correct grants
 # (migrations land in prompt 03).
 #
-# Passwords come from the environment (dev defaults below are clearly marked
-# and must be overridden via Docker secrets outside local development).
+# Passwords come from the environment and are required. Provide them through
+# Docker secrets outside local development.
 
 set -euo pipefail
 
-# --- dev-only password defaults (override via env / Docker secrets) ----------
-: "${ELYO_IDENTITY_RT_PASSWORD:=identity_rt_dev}"
-: "${ELYO_EMPLOYEE_RT_PASSWORD:=employee_rt_dev}"
-: "${ELYO_COMPANY_RT_PASSWORD:=company_rt_dev}"
-: "${ELYO_MAPPING_SVC_PASSWORD:=mapping_svc_dev}"
-: "${ELYO_MIGRATOR_PASSWORD:=migrator_dev}"
+# --- required runtime-role passwords -----------------------------------------
+: "${ELYO_IDENTITY_RT_PASSWORD:?ELYO_IDENTITY_RT_PASSWORD must be set}"
+: "${ELYO_EMPLOYEE_RT_PASSWORD:?ELYO_EMPLOYEE_RT_PASSWORD must be set}"
+: "${ELYO_COMPANY_RT_PASSWORD:?ELYO_COMPANY_RT_PASSWORD must be set}"
+: "${ELYO_MAPPING_SVC_PASSWORD:?ELYO_MAPPING_SVC_PASSWORD must be set}"
+: "${ELYO_MIGRATOR_PASSWORD:?ELYO_MIGRATOR_PASSWORD must be set}"
 
 PSQL=(psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --no-psqlrc)
 

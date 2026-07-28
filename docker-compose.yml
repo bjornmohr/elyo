@@ -73,10 +73,10 @@ services:
       ELYO_RUNTIME: identity
       DB_IDENTITY_DATABASE: elyo_identity
       DB_IDENTITY_USERNAME: elyo_identity_rt
-      DB_IDENTITY_PASSWORD: ${ELYO_IDENTITY_RT_PASSWORD:-identity_rt_dev}
+      DB_IDENTITY_PASSWORD: ${ELYO_IDENTITY_RT_PASSWORD:?ELYO_IDENTITY_RT_PASSWORD must be set}
       DB_AUDIT_DATABASE: elyo_audit
       DB_AUDIT_USERNAME: elyo_identity_rt
-      DB_AUDIT_PASSWORD: ${ELYO_IDENTITY_RT_PASSWORD:-identity_rt_dev}
+      DB_AUDIT_PASSWORD: ${ELYO_IDENTITY_RT_PASSWORD:?ELYO_IDENTITY_RT_PASSWORD must be set}
     volumes: *api-volumes
     networks:
       - elyo-network
@@ -92,19 +92,19 @@ services:
       ELYO_RUNTIME: employee
       DB_IDENTITY_DATABASE: elyo_identity
       DB_IDENTITY_USERNAME: elyo_employee_rt
-      DB_IDENTITY_PASSWORD: ${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
+      DB_IDENTITY_PASSWORD: ${ELYO_EMPLOYEE_RT_PASSWORD:?ELYO_EMPLOYEE_RT_PASSWORD must be set}
       DB_MAPPING_DATABASE: elyo_subject_mapping
       DB_MAPPING_USERNAME: elyo_mapping_svc
-      DB_MAPPING_PASSWORD: ${ELYO_MAPPING_SVC_PASSWORD:-mapping_svc_dev}
+      DB_MAPPING_PASSWORD: ${ELYO_MAPPING_SVC_PASSWORD:?ELYO_MAPPING_SVC_PASSWORD must be set}
       MAPPING_ENCRYPTION_KEY: ${MAPPING_ENCRYPTION_KEY:-}
       MAPPING_HMAC_KEY: ${MAPPING_HMAC_KEY:-}
       MAPPING_SUBJECT_DERIVATION_KEY: ${MAPPING_SUBJECT_DERIVATION_KEY:-}
       DB_HEALTH_DATABASE: elyo_health
       DB_HEALTH_USERNAME: elyo_employee_rt
-      DB_HEALTH_PASSWORD: ${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
+      DB_HEALTH_PASSWORD: ${ELYO_EMPLOYEE_RT_PASSWORD:?ELYO_EMPLOYEE_RT_PASSWORD must be set}
       DB_AUDIT_DATABASE: elyo_audit
       DB_AUDIT_USERNAME: elyo_employee_rt
-      DB_AUDIT_PASSWORD: ${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
+      DB_AUDIT_PASSWORD: ${ELYO_EMPLOYEE_RT_PASSWORD:?ELYO_EMPLOYEE_RT_PASSWORD must be set}
     volumes: *api-volumes
     networks:
       - elyo-network
@@ -120,10 +120,10 @@ services:
       ELYO_RUNTIME: company
       DB_IDENTITY_DATABASE: elyo_identity
       DB_IDENTITY_USERNAME: elyo_company_rt
-      DB_IDENTITY_PASSWORD: ${ELYO_COMPANY_RT_PASSWORD:-company_rt_dev}
+      DB_IDENTITY_PASSWORD: ${ELYO_COMPANY_RT_PASSWORD:?ELYO_COMPANY_RT_PASSWORD must be set}
       DB_AUDIT_DATABASE: elyo_audit
       DB_AUDIT_USERNAME: elyo_company_rt
-      DB_AUDIT_PASSWORD: ${ELYO_COMPANY_RT_PASSWORD:-company_rt_dev}
+      DB_AUDIT_PASSWORD: ${ELYO_COMPANY_RT_PASSWORD:?ELYO_COMPANY_RT_PASSWORD must be set}
     volumes: *api-volumes
     networks:
       - elyo-network
@@ -149,18 +149,18 @@ services:
       # subjects through the mapping connection.
       DB_IDENTITY_DATABASE: elyo_identity
       DB_IDENTITY_USERNAME: elyo_migrator
-      DB_IDENTITY_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
+      DB_IDENTITY_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:?ELYO_MIGRATOR_PASSWORD must be set}
       DB_MAPPING_DATABASE: elyo_subject_mapping
       DB_MAPPING_USERNAME: elyo_migrator
-      DB_MAPPING_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
+      DB_MAPPING_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:?ELYO_MIGRATOR_PASSWORD must be set}
       DB_HEALTH_DATABASE: elyo_health
       DB_HEALTH_USERNAME: elyo_migrator
-      DB_HEALTH_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
+      DB_HEALTH_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:?ELYO_MIGRATOR_PASSWORD must be set}
       DB_AUDIT_DATABASE: elyo_audit
       DB_AUDIT_USERNAME: elyo_migrator
-      DB_AUDIT_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
+      DB_AUDIT_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:?ELYO_MIGRATOR_PASSWORD must be set}
       DB_MIGRATOR_USERNAME: elyo_migrator
-      DB_MIGRATOR_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
+      DB_MIGRATOR_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:?ELYO_MIGRATOR_PASSWORD must be set}
       MAPPING_ENCRYPTION_KEY: ${MAPPING_ENCRYPTION_KEY:-}
       MAPPING_HMAC_KEY: ${MAPPING_HMAC_KEY:-}
       MAPPING_SUBJECT_DERIVATION_KEY: ${MAPPING_SUBJECT_DERIVATION_KEY:-}
@@ -183,22 +183,22 @@ services:
       ELYO_RUNTIME: full
       DB_IDENTITY_DATABASE: elyo_identity
       DB_IDENTITY_USERNAME: elyo_identity_rt
-      DB_IDENTITY_PASSWORD: ${ELYO_IDENTITY_RT_PASSWORD:-identity_rt_dev}
+      DB_IDENTITY_PASSWORD: ${ELYO_IDENTITY_RT_PASSWORD:?ELYO_IDENTITY_RT_PASSWORD must be set}
       DB_MAPPING_DATABASE: elyo_subject_mapping
       DB_MAPPING_USERNAME: elyo_mapping_svc
-      DB_MAPPING_PASSWORD: ${ELYO_MAPPING_SVC_PASSWORD:-mapping_svc_dev}
+      DB_MAPPING_PASSWORD: ${ELYO_MAPPING_SVC_PASSWORD:?ELYO_MAPPING_SVC_PASSWORD must be set}
       MAPPING_ENCRYPTION_KEY: ${MAPPING_ENCRYPTION_KEY:-}
       MAPPING_HMAC_KEY: ${MAPPING_HMAC_KEY:-}
       MAPPING_SUBJECT_DERIVATION_KEY: ${MAPPING_SUBJECT_DERIVATION_KEY:-}
       DB_HEALTH_DATABASE: elyo_health
       DB_HEALTH_USERNAME: elyo_employee_rt
-      DB_HEALTH_PASSWORD: ${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
+      DB_HEALTH_PASSWORD: ${ELYO_EMPLOYEE_RT_PASSWORD:?ELYO_EMPLOYEE_RT_PASSWORD must be set}
       DB_AUDIT_DATABASE: elyo_audit
       DB_AUDIT_USERNAME: elyo_employee_rt
-      DB_AUDIT_PASSWORD: ${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
-      ELYO_COMPANY_RT_PASSWORD: ${ELYO_COMPANY_RT_PASSWORD:-company_rt_dev}
+      DB_AUDIT_PASSWORD: ${ELYO_EMPLOYEE_RT_PASSWORD:?ELYO_EMPLOYEE_RT_PASSWORD must be set}
+      ELYO_COMPANY_RT_PASSWORD: ${ELYO_COMPANY_RT_PASSWORD:?ELYO_COMPANY_RT_PASSWORD must be set}
       DB_MIGRATOR_USERNAME: elyo_migrator
-      DB_MIGRATOR_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
+      DB_MIGRATOR_PASSWORD: ${ELYO_MIGRATOR_PASSWORD:?ELYO_MIGRATOR_PASSWORD must be set}
     command: ["sleep", "infinity"]
     volumes: *api-volumes
     networks:
@@ -266,13 +266,13 @@ services:
       - POSTGRES_DB=${DB_DATABASE:-elyo}
       - POSTGRES_USER=${DB_USERNAME:-elyo}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-elyo_secret}
-      # Runtime-role passwords consumed by the initdb script (dev defaults;
-      # override via Docker secrets outside local development).
-      - ELYO_IDENTITY_RT_PASSWORD=${ELYO_IDENTITY_RT_PASSWORD:-identity_rt_dev}
-      - ELYO_EMPLOYEE_RT_PASSWORD=${ELYO_EMPLOYEE_RT_PASSWORD:-employee_rt_dev}
-      - ELYO_COMPANY_RT_PASSWORD=${ELYO_COMPANY_RT_PASSWORD:-company_rt_dev}
-      - ELYO_MAPPING_SVC_PASSWORD=${ELYO_MAPPING_SVC_PASSWORD:-mapping_svc_dev}
-      - ELYO_MIGRATOR_PASSWORD=${ELYO_MIGRATOR_PASSWORD:-migrator_dev}
+      # Runtime-role passwords consumed by the initdb script. All are required
+      # so Compose stops rather than silently using a development password.
+      - "ELYO_IDENTITY_RT_PASSWORD=${ELYO_IDENTITY_RT_PASSWORD:?ELYO_IDENTITY_RT_PASSWORD must be set}"
+      - "ELYO_EMPLOYEE_RT_PASSWORD=${ELYO_EMPLOYEE_RT_PASSWORD:?ELYO_EMPLOYEE_RT_PASSWORD must be set}"
+      - "ELYO_COMPANY_RT_PASSWORD=${ELYO_COMPANY_RT_PASSWORD:?ELYO_COMPANY_RT_PASSWORD must be set}"
+      - "ELYO_MAPPING_SVC_PASSWORD=${ELYO_MAPPING_SVC_PASSWORD:?ELYO_MAPPING_SVC_PASSWORD must be set}"
+      - "ELYO_MIGRATOR_PASSWORD=${ELYO_MIGRATOR_PASSWORD:?ELYO_MIGRATOR_PASSWORD must be set}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres/initdb:/docker-entrypoint-initdb.d:ro
