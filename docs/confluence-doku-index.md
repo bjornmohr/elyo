@@ -1,8 +1,35 @@
 # Confluence: Technische Dokumentation — Seitenindex
 
 Space **ELYO** · Site `https://elyo.atlassian.net/wiki`
-Dokumentierter Commit: `56b4a53148d2ab9c59a74c0396b486671958fc49` (Branch `elyo-91/17-docs-closure-and-verification`)
 Erstellt: 26./27.07.2026 · 36 Seiten
+
+## Dokumentierter Commit — korrigiert am 31.07.2026
+
+**Tatsächlich dokumentierter Stand:** `a00ee63` (Merge PR #33, 27.07.2026 13:04)
+bzw. inhaltlich `e4c0fba`.
+
+**In den Seitenköpfen genannt:** `56b4a53148d2ab9c59a74c0396b486671958fc49`
+(26.07.2026 21:08) — **veraltet**.
+
+Der Doku-Branch `elyo-91/17-docs-closure-and-verification` lief nach `56b4a53`
+noch weiter. Insbesondere hat `9f4473d docs(api): restore laravel and openapi
+operation parity` die OpenAPI von 54 auf 59 Pfade gebracht (13 ergänzt, 7
+entfernt). Die Confluence-Seiten beschreiben bereits diesen **neuen** Stand —
+Kapitel 6.1 dokumentiert `/health`, `/auth/logout`, `/partner/register` und
+`/partner/documents`, die auf `56b4a53` in der OpenAPI noch fehlten.
+
+Wer die Doku gegen `56b4a53` prüft, findet daher scheinbare Fehler, die keine
+sind. Immer gegen `a00ee63` prüfen.
+
+Die Root-Seite (6488066) wurde am 31.07.2026 korrigiert. Die übrigen 35
+Unterseiten tragen weiterhin `56b4a53` im Kopf — offene Aufgabe.
+
+Zwischen `a00ee63` und `main` (`7e4b5c0`) liegen 8 Commits, die ausschließlich
+`docs/ai-tasks/`, `scripts/run-ai-task.sh`, `.gitignore` und diese Datei
+berühren — alles außerhalb des Doku-Umfangs. **Am dokumentierten Code hat sich
+seither nichts geändert.**
+
+Siehe `docs/UEBERGABE-2026-07-31.md`, Abschnitt 5.
 
 ## Struktur
 
