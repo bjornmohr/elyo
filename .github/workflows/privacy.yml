@@ -17,6 +17,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Provide dev runtime env
+        run: cp .env.example .env
+
       - name: Start PostgreSQL-backed tooling runtime
         run: docker compose up -d --build postgres redis api-tooling
 
